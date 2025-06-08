@@ -6,8 +6,9 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 **Purpose**: A Model Context Protocol (MCP) server that integrates with CyberArk Privilege Cloud, enabling AI assistants and other MCP clients to securely interact with privileged account management capabilities.
 
-**Current Status**: ✅ MVP Complete - Production ready with full functionality
+**Current Status**: ✅ MVP+ Complete - Production ready with enhanced platform management functionality
 **Last Updated**: June 8, 2025
+**Recent Enhancement**: Platform Management Tools (list_platforms, get_platform_details)
 
 ## Architecture Overview
 
@@ -23,11 +24,11 @@ This document provides comprehensive context for Claude and other AI assistants 
    - Core CyberArk API integration
    - HTTP client with proper authentication headers
    - Rate limiting and network error handling
-   - Account and safe management operations
+   - Account, safe, and platform management operations
 
 3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
    - FastMCP server implementation
-   - 6 exposed tools for CyberArk operations
+   - 8 exposed tools for CyberArk operations
    - Proper tool parameter validation
    - Windows-compatible encoding handling
 
@@ -39,8 +40,9 @@ This document provides comprehensive context for Claude and other AI assistants 
 **Key Implementation Notes**:
 - Uses `.cloud` TLD, not `.com` (common mistake)
 - Token management requires automatic refresh due to 15-minute expiration
-- API responses use `value` field for array results
+- API responses use `value` field for array results, except Platforms API which uses `Platforms` field
 - Proper error handling for 401 (auth), 403 (permissions), 429 (rate limiting)
+- Platform APIs require Platform Auditor permissions
 
 ## Available MCP Tools
 
@@ -101,15 +103,18 @@ The project follows strict TDD principles:
 
 ### Test Structure
 - `tests/test_auth.py` - Authentication and token management (20+ tests)
-- `tests/test_server.py` - Core server functionality (25+ tests)
+- `tests/test_server.py` - Core server functionality (35+ tests with platform management)
 - `tests/test_account_mgmt.py` - Account operations (20+ tests)
+- `tests/test_platform_mgmt.py` - Platform management operations (7+ comprehensive tests)
+- `tests/test_mcp_platform_tools.py` - MCP platform tools integration (5+ tests)
 - `tests/test_integration.py` - End-to-end integration (10+ tests)
 
 ### Running Tests
 ```bash
-pytest                    # All tests
+pytest                    # All tests (100+ total)
 pytest -m auth           # Authentication tests only
 pytest -m integration    # Integration tests only
+pytest -k platform      # Platform management tests only
 pytest --cov=src/cyberark_mcp  # With coverage
 ```
 
@@ -206,6 +211,11 @@ npx @modelcontextprotocol/inspector
    - The multiplatform `run_server.py` handles Windows encoding automatically
    - Set PYTHONIOENCODING=utf-8 environment variable
 
+5. **"Platform management returns 0 platforms"**
+   - Verify service account has Platform Auditor permissions
+   - Check that platforms exist in the CyberArk tenant
+   - API response parsing was fixed (Platforms field vs platforms field)
+
 ### Debugging Commands
 ```bash
 # Test configuration
@@ -216,6 +226,12 @@ python -c "from src.cyberark_mcp.mcp_server import mcp; print('MCP server loaded
 
 # Test authentication only
 python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import asyncio; auth = CyberArkAuthenticator.from_environment(); print(asyncio.run(auth.get_auth_header()))"
+
+# Test platform management specifically
+python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); platforms = asyncio.run(server.list_platforms()); print(f'Found {len(platforms)} platforms')"
+
+# Debug platform API response structure
+python debug_platform_api.py  # Use the debug script for detailed platform analysis
 ```
 
 ## Code Quality Standards
@@ -239,7 +255,7 @@ python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import async
 - Mock external dependencies (CyberArk APIs)
 - Test both success and failure scenarios
 - Include performance/timeout testing where relevant
-- Clean up debug scripts after using them.
+- Keep debug scripts for troubleshooting and development use
 
 ## Security Considerations
 
@@ -301,4 +317,66 @@ python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import async
 4. Update version numbers and documentation
 5. Create git tag and release notes
 
-This CLAUDE.md provides comprehensive context for any AI assistant to understand the project structure, implementation details, and development patterns to facilitate continued development of the CyberArk MCP Server.
+## Next Development Priorities
+
+Based on the completed MVP and current enhancement patterns, the following areas are prioritized for future development:
+
+### 🔥 **Immediate Priority (Next Sprint)**
+1. **Password Management Tools** - Highest business value
+   - `get_password` - Secure password retrieval with additional authentication
+   - `change_password` - Password rotation capabilities
+   - `verify_password` - Password compliance checking
+   - **API Endpoints**: `POST /PasswordVault/API/Accounts/{accountId}/Password/Retrieve`, `POST /PasswordVault/API/Accounts/{accountId}/Change`
+   - **Security Considerations**: Requires additional authentication, audit logging, secure token handling
+
+2. **Session Management** - Critical for monitoring and compliance
+   - `list_sessions` - View active PSM sessions
+   - `terminate_session` - Emergency session termination
+   - `get_session_recordings` - Access to session recordings
+   - **API Endpoints**: `GET /PasswordVault/API/LiveSessions`, `POST /PasswordVault/API/LiveSessions/{sessionId}/Terminate`
+
+### 🚀 **Medium Priority (Future Sprints)**
+3. **Advanced Account Operations** - Lifecycle management
+   - `create_account` - Onboard new privileged accounts
+   - `update_account` - Modify account properties and platform assignments
+   - `delete_account` - Secure account removal with audit trail
+   - **API Endpoints**: `POST /PasswordVault/API/Accounts`, `PATCH /PasswordVault/API/Accounts/{accountId}`, `DELETE /PasswordVault/API/Accounts/{accountId}`
+
+4. **Enhanced Safe Management** - Complete safe lifecycle
+   - `create_safe` - Create new vaults for account organization
+   - `update_safe` - Modify safe permissions and properties
+   - `list_safe_members` - View safe member permissions
+   - **API Endpoints**: `POST /PasswordVault/API/Safes`, `PUT /PasswordVault/API/Safes/{safeName}`
+
+### 📊 **Lower Priority (Long-term)**
+5. **Reporting and Analytics** - Business intelligence
+   - `generate_access_report` - Account access patterns and compliance
+   - `get_compliance_status` - Security posture dashboard
+   - `audit_trail` - Complete audit information for investigations
+
+### 🔧 **Development Implementation Patterns**
+
+When implementing the next features, follow these established patterns from the platform management implementation:
+
+1. **API Response Parsing** - Be aware of inconsistent field names in CyberArk APIs
+   - Accounts/Safes use `value` field for arrays
+   - Platforms use `Platforms` field (capital P)
+   - Always implement fallback parsing: `response.get("SpecificField", response.get("value", []))`
+
+2. **Test-First Development** - Maintain TDD discipline
+   - Create dedicated test files: `tests/test_password_mgmt.py`, `tests/test_session_mgmt.py`
+   - Write comprehensive unit tests and MCP integration tests
+   - Mock external API calls with realistic response data
+
+3. **Security Implementation** - Enhanced security for sensitive operations
+   - Password operations require additional authentication flows
+   - Implement secure credential caching with automatic cleanup
+   - Never log sensitive data (passwords, session tokens)
+   - Use separate security audit logging for privileged operations
+
+4. **Error Handling** - Robust error management for production use
+   - Enhanced error messages for permission-denied scenarios
+   - Graceful degradation when optional features aren't available
+   - Rate limiting awareness for high-frequency operations
+
+This CLAUDE.md provides comprehensive context for any AI assistant to understand the project structure, implementation details, development patterns, and next development priorities to facilitate continued development of the CyberArk MCP Server.
