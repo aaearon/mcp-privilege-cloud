@@ -65,6 +65,7 @@ This document defines the capabilities that the MCP server will provide for Cybe
   - `system_type` (optional): Filter by system type (e.g., Windows, Unix)
 - **Returns**: List of platform objects with basic information
 - **API Endpoint**: `GET /PasswordVault/API/Platforms`
+- **Required Permissions**: Service account must be a member of Privilege Cloud Administrator role
 
 #### `get_platform_details`
 - **Description**: Get detailed information about a specific platform
@@ -72,6 +73,7 @@ This document defines the capabilities that the MCP server will provide for Cybe
   - `platform_id` (required): Unique identifier for the platform (e.g., WinServerLocal, UnixSSH)
 - **Returns**: Complete platform object with configuration details
 - **API Endpoint**: `GET /PasswordVault/API/Platforms/{platformId}`
+- **Required Permissions**: Service account must be a member of Privilege Cloud Administrator role
 
 ## Environment Configuration
 

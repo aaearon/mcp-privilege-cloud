@@ -81,7 +81,7 @@ CYBERARK_LOG_LEVEL=INFO
      - List Accounts in target safes
      - View Account Details
      - Access Safe information
-     - Platform Auditor (for platform management)
+     - Privilege Cloud Administrator role membership (for platform management)
 
 3. **Test Configuration**:
    ```bash

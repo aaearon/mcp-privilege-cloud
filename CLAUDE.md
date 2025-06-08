@@ -42,7 +42,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 - Token management requires automatic refresh due to 15-minute expiration
 - API responses use `value` field for array results, except Platforms API which uses `Platforms` field
 - Proper error handling for 401 (auth), 403 (permissions), 429 (rate limiting)
-- Platform APIs require Platform Auditor permissions
+- Platform APIs require Privilege Cloud Administrator role membership
 
 ## Available MCP Tools
 
@@ -212,7 +212,7 @@ npx @modelcontextprotocol/inspector
    - Set PYTHONIOENCODING=utf-8 environment variable
 
 5. **"Platform management returns 0 platforms"**
-   - Verify service account has Platform Auditor permissions
+   - Verify service account is a member of the Privilege Cloud Administrator role
    - Check that platforms exist in the CyberArk tenant
    - API response parsing was fixed (Platforms field vs platforms field)
 
