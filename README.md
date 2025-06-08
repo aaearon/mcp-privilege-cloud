@@ -6,7 +6,8 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 
 ### Current (MVP)
 - **Account Management**: List, search, and retrieve detailed account information
-- **Safe Management**: List and view safe information  
+- **Safe Management**: List and view safe information
+- **Platform Management**: List available platforms and view detailed platform configurations
 - **OAuth 2.0 Authentication**: Secure API token authentication with CyberArk Identity
 - **Health Monitoring**: Built-in health check functionality
 - **Comprehensive Logging**: Detailed logging for all operations
@@ -16,7 +17,6 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 - Password management operations
 - Account lifecycle management (create, update, delete)
 - Session monitoring and management
-- Platform management
 - Advanced reporting and analytics
 
 ## Prerequisites
@@ -81,6 +81,7 @@ CYBERARK_LOG_LEVEL=INFO
      - List Accounts in target safes
      - View Account Details
      - Access Safe information
+     - Platform Auditor (for platform management)
 
 3. **Test Configuration**:
    ```bash
@@ -98,7 +99,10 @@ CYBERARK_LOG_LEVEL=INFO
 ### Running the MCP Server
 
 ```bash
-# Direct execution
+# Recommended: Use the multiplatform launcher
+python run_server.py
+
+# Alternative: Direct execution
 python src/cyberark_mcp/mcp_server.py
 
 # Or using the module
@@ -173,6 +177,30 @@ Get detailed information about a specific safe.
 await client.call_tool("get_safe_details", {"safe_name": "IT-Infrastructure"})
 ```
 
+#### `list_platforms`
+List available platforms in CyberArk Privilege Cloud.
+
+```python
+# Parameters:
+# - search (optional): Search term for platform names
+# - active (optional): Filter by active status (true/false)
+# - system_type (optional): Filter by system type (e.g., Windows, Unix)
+
+# Example:
+await client.call_tool("list_platforms", {"active": True, "system_type": "Windows"})
+```
+
+#### `get_platform_details`
+Get detailed information about a specific platform.
+
+```python
+# Parameters:
+# - platform_id (required): Unique identifier for the platform (e.g., WinServerLocal)
+
+# Example:
+await client.call_tool("get_platform_details", {"platform_id": "WinServerLocal"})
+```
+
 #### `health_check`
 Perform a health check of the CyberArk connection.
 
@@ -208,6 +236,8 @@ pytest -v
 - `tests/test_auth.py`: Authentication and token management tests
 - `tests/test_server.py`: Core server functionality tests
 - `tests/test_account_mgmt.py`: Account management operation tests
+- `tests/test_platform_mgmt.py`: Platform management operation tests
+- `tests/test_mcp_platform_tools.py`: MCP platform tools integration tests
 - `tests/test_integration.py`: End-to-end integration tests
 
 ## MCP Inspector Testing
@@ -216,7 +246,7 @@ For detailed MCP Inspector testing instructions, see the [MCP Inspector Guide](d
 
 Quick start:
 1. Install: `npx @modelcontextprotocol/inspector`
-2. Start server: `python run_server.py`
+2. Start server: `python run_server.py` (works on all platforms)
 3. Connect Inspector to test tools interactively
 
 ## Troubleshooting
@@ -292,6 +322,8 @@ mcp-privilege-cloud/
 │   ├── test_auth.py            # Authentication tests
 │   ├── test_server.py          # Server tests
 │   ├── test_account_mgmt.py    # Account management tests
+│   ├── test_platform_mgmt.py   # Platform management tests
+│   ├── test_mcp_platform_tools.py # MCP platform tools tests
 │   └── test_integration.py     # Integration tests
 ├── docs/development/           # Development documentation
 │   ├── DEVELOPMENT_PLAN.md     # Development strategy
@@ -299,8 +331,7 @@ mcp-privilege-cloud/
 │   ├── QUICK_START.md          # Setup instructions
 │   ├── SERVER_CAPABILITIES.md  # Feature specifications
 │   └── TASK_LIST.md            # Development tasks
-├── run_server.py               # Main entry point
-├── run_server_windows.py       # Windows-compatible entry
+├── run_server.py               # Multiplatform entry point
 ├── requirements.txt            # Dependencies
 └── README.md                   # This file
 ```
