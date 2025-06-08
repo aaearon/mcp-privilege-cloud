@@ -1,0 +1,94 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+config.json
+credentials.json
+
+# CyberArk specific secrets
+cyberark_credentials.*
+*_credentials.*
+api_keys.*
+tokens.*
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+debug.log
+error.log
+
+# MCP
+*.mcp.json
+mcp_server_config.json
+
+# Claude Desktop configs with credentials
+claude_desktop_config.json
+*config*windows.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# Backup files
+*.bak
+*.backup
+*~
