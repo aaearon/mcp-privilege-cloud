@@ -212,58 +212,12 @@ pytest -v
 
 ## MCP Inspector Testing
 
-The MCP Inspector is a tool for testing and debugging MCP servers.
+For detailed MCP Inspector testing instructions, see the [MCP Inspector Guide](docs/development/MCP_INSPECTOR_GUIDE.md).
 
-### Installation
-
-```bash
-npx @modelcontextprotocol/inspector
-```
-
-### Testing with Inspector
-
-1. **Start the MCP Server**:
-   ```bash
-   python src/cyberark_mcp/mcp_server.py
-   ```
-
-2. **Connect Inspector**:
-   - Open MCP Inspector in your browser
-   - Connect to your server endpoint
-   - Test available tools and resources
-
-3. **Verify Functionality**:
-   - Test `health_check` tool first
-   - Try `list_safes` to verify permissions
-   - Test account operations with appropriate parameters
-
-### Example Inspector Test Sequence
-
-1. **Health Check**:
-   ```json
-   {
-     "tool": "health_check",
-     "arguments": {}
-   }
-   ```
-
-2. **List Safes**:
-   ```json
-   {
-     "tool": "list_safes", 
-     "arguments": {}
-   }
-   ```
-
-3. **List Accounts** (if you have a known safe):
-   ```json
-   {
-     "tool": "list_accounts",
-     "arguments": {
-       "safe_name": "your-safe-name"
-     }
-   }
-   ```
+Quick start:
+1. Install: `npx @modelcontextprotocol/inspector`
+2. Start server: `python run_server.py`
+3. Connect Inspector to test tools interactively
 
 ## Troubleshooting
 
@@ -329,21 +283,34 @@ else:
 
 ```
 mcp-privilege-cloud/
-├── src/cyberark_mcp/
+├── src/cyberark_mcp/           # Core implementation
 │   ├── __init__.py
-│   ├── auth.py              # Authentication module
-│   ├── server.py            # Core server functionality  
-│   └── mcp_server.py        # MCP protocol integration
-├── tests/
-│   ├── test_auth.py         # Authentication tests
-│   ├── test_server.py       # Server tests
-│   ├── test_account_mgmt.py # Account management tests
-│   └── test_integration.py  # Integration tests
-├── requirements.txt         # Python dependencies
-├── pytest.ini             # Test configuration
-├── .env.example            # Environment variable template
-└── README.md              # This file
+│   ├── auth.py                 # Authentication module
+│   ├── server.py               # Core server functionality  
+│   └── mcp_server.py           # MCP protocol integration
+├── tests/                      # Test suite
+│   ├── test_auth.py            # Authentication tests
+│   ├── test_server.py          # Server tests
+│   ├── test_account_mgmt.py    # Account management tests
+│   └── test_integration.py     # Integration tests
+├── docs/development/           # Development documentation
+│   ├── DEVELOPMENT_PLAN.md     # Development strategy
+│   ├── MCP_INSPECTOR_GUIDE.md  # Testing guide
+│   ├── QUICK_START.md          # Setup instructions
+│   ├── SERVER_CAPABILITIES.md  # Feature specifications
+│   └── TASK_LIST.md            # Development tasks
+├── run_server.py               # Main entry point
+├── run_server_windows.py       # Windows-compatible entry
+├── requirements.txt            # Dependencies
+└── README.md                   # This file
 ```
+
+### Development Documentation
+
+- [Development Plan](docs/development/DEVELOPMENT_PLAN.md) - Overall development strategy and phases
+- [Server Capabilities](docs/development/SERVER_CAPABILITIES.md) - Detailed feature specifications  
+- [MCP Inspector Guide](docs/development/MCP_INSPECTOR_GUIDE.md) - Complete testing instructions
+- [Quick Start Guide](docs/development/QUICK_START.md) - Setup and troubleshooting
 
 ### Contributing
 
