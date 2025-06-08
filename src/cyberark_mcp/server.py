@@ -138,7 +138,9 @@ class CyberArkMCPServer:
             "get_account_details",
             "search_accounts", 
             "list_safes",
-            "get_safe_details"
+            "get_safe_details",
+            "list_platforms",
+            "get_platform_details"
         ]
     
     # Account Management Tools
@@ -249,3 +251,36 @@ class CyberArkMCPServer:
                 "timestamp": datetime.utcnow().isoformat(),
                 "error": str(e)
             }
+    
+    # Platform Management Tools
+    
+    async def list_platforms(
+        self,
+        search: Optional[str] = None,
+        active: Optional[bool] = None,
+        system_type: Optional[str] = None,
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """List available platforms from CyberArk Privilege Cloud"""
+        params = {}
+        
+        if search:
+            params["search"] = search
+        if active is not None:
+            params["active"] = "true" if active else "false"
+        if system_type:
+            params["systemType"] = system_type
+        
+        # Add any additional filter parameters
+        params.update(kwargs)
+        
+        self.logger.info(f"Listing platforms with filters: {params}")
+        response = await self._make_api_request("GET", "Platforms", params=params)
+        
+        # CyberArk API returns platforms in 'Platforms' field (capitalized), fallback to 'value' for consistency
+        return response.get("Platforms", response.get("value", []))
+    
+    async def get_platform_details(self, platform_id: str) -> Dict[str, Any]:
+        """Get detailed information about a specific platform"""
+        self.logger.info(f"Getting details for platform ID: {platform_id}")
+        return await self._make_api_request("GET", f"Platforms/{platform_id}")

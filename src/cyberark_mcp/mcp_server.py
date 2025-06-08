@@ -205,6 +205,60 @@ async def health_check() -> Dict[str, Any]:
         raise
 
 
+@mcp.tool()
+async def list_platforms(
+    search: Optional[str] = None,
+    active: Optional[bool] = None,
+    system_type: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    List available platforms in CyberArk Privilege Cloud.
+    
+    Args:
+        search: Search term for platform names
+        active: Filter by active status (true/false)
+        system_type: Filter by system type (e.g., Windows, Unix)
+    
+    Returns:
+        List of platform objects
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        platforms = await server.list_platforms(
+            search=search,
+            active=active,
+            system_type=system_type
+        )
+        logger.info(f"Retrieved {len(platforms)} platforms")
+        return platforms
+    except Exception as e:
+        logger.error(f"Error listing platforms: {e}")
+        raise
+
+
+@mcp.tool()
+async def get_platform_details(
+    platform_id: str
+) -> Dict[str, Any]:
+    """
+    Get detailed information about a specific platform.
+    
+    Args:
+        platform_id: Unique identifier for the platform (e.g., WinServerLocal, UnixSSH)
+    
+    Returns:
+        Platform object with detailed configuration information
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        platform = await server.get_platform_details(platform_id)
+        logger.info(f"Retrieved details for platform {platform_id}")
+        return platform
+    except Exception as e:
+        logger.error(f"Error getting platform details for {platform_id}: {e}")
+        raise
+
+
 # Resources will be added in future versions
 
 

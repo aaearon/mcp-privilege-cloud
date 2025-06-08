@@ -136,7 +136,9 @@ class TestCyberArkMCPServer:
             "get_account_details", 
             "search_accounts",
             "list_safes",
-            "get_safe_details"
+            "get_safe_details",
+            "list_platforms",
+            "get_platform_details"
         ]
         
         for tool_name in expected_tools:
@@ -250,6 +252,159 @@ class TestCyberArkMCPServer:
                 server.list_accounts(),
                 server.list_safes(),
                 server.search_accounts(keywords="test")
+            ]
+            
+            results = await asyncio.gather(*tasks)
+            assert len(results) == 3
+            assert mock_request.call_count == 3
+
+    # Platform Management Tests
+    
+    @pytest.mark.asyncio
+    async def test_list_platforms_tool(self, server):
+        """Test list_platforms tool functionality"""
+        mock_platforms = [
+            {
+                "id": "WinServerLocal",
+                "name": "Windows Server Local",
+                "platformType": "Regular",
+                "active": True,
+                "systemType": "Windows"
+            },
+            {
+                "id": "UnixSSH", 
+                "name": "Unix via SSH",
+                "platformType": "Regular",
+                "active": True,
+                "systemType": "Unix"
+            }
+        ]
+        
+        with patch.object(server, '_make_api_request', return_value={"Platforms": mock_platforms}):
+            result = await server.list_platforms()
+            assert result == mock_platforms
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_search(self, server):
+        """Test list_platforms with search parameter"""
+        search_term = "Windows"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"Platforms": []}
+            await server.list_platforms(search=search_term)
+            mock_request.assert_called_once_with("GET", "Platforms", params={"search": search_term})
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_active_filter(self, server):
+        """Test list_platforms with active filter"""
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"Platforms": []}
+            await server.list_platforms(active=True)
+            mock_request.assert_called_once_with("GET", "Platforms", params={"active": "true"})
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_system_type_filter(self, server):
+        """Test list_platforms with system type filter"""
+        system_type = "Windows"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"Platforms": []}
+            await server.list_platforms(system_type=system_type)
+            mock_request.assert_called_once_with("GET", "Platforms", params={"systemType": system_type})
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_multiple_filters(self, server):
+        """Test list_platforms with multiple filter parameters"""
+        filters = {"search": "Windows", "active": True, "systemType": "Windows"}
+        expected_params = {"search": "Windows", "active": "true", "systemType": "Windows"}
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"Platforms": []}
+            await server.list_platforms(**filters)
+            mock_request.assert_called_once_with("GET", "Platforms", params=expected_params)
+
+    @pytest.mark.asyncio
+    async def test_get_platform_details_tool(self, server):
+        """Test get_platform_details tool functionality"""
+        platform_id = "WinServerLocal"
+        mock_platform = {
+            "id": "WinServerLocal",
+            "name": "Windows Server Local", 
+            "platformType": "Regular",
+            "active": True,
+            "systemType": "Windows",
+            "details": {
+                "credentialsManagementPolicy": {
+                    "change": "on",
+                    "reconcile": "on",
+                    "verify": "on"
+                },
+                "sessionManagementPolicy": {
+                    "requirePrivilegedSessionMonitoring": True,
+                    "recordPrivilegedSession": True
+                },
+                "privilegedAccessWorkflows": {
+                    "requireUsersToSpecifyReasonForAccess": False,
+                    "requireDualControlPasswordAccessApproval": False
+                }
+            }
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_platform):
+            result = await server.get_platform_details(platform_id)
+            assert result == mock_platform
+
+    @pytest.mark.asyncio
+    async def test_get_platform_details_with_invalid_id(self, server):
+        """Test get_platform_details with invalid platform ID"""
+        platform_id = "NonExistentPlatform"
+        
+        import httpx
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 404
+            mock_request.side_effect = httpx.HTTPStatusError(
+                "404 Not Found", request=Mock(), response=mock_response
+            )
+            
+            with pytest.raises(Exception):
+                await server.get_platform_details(platform_id)
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_empty_result(self, server):
+        """Test list_platforms when no platforms are found"""
+        with patch.object(server, '_make_api_request', return_value={"Platforms": []}):
+            result = await server.list_platforms()
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_api_error_handling(self, server):
+        """Test list_platforms error handling"""
+        import httpx
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 403
+            mock_request.side_effect = httpx.HTTPStatusError(
+                "403 Forbidden", request=Mock(), response=mock_response
+            )
+            
+            with pytest.raises(Exception):
+                await server.list_platforms()
+
+    @pytest.mark.asyncio
+    async def test_platform_management_concurrent_calls(self, server):
+        """Test concurrent platform management calls"""
+        import asyncio
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"Platforms": []}
+            
+            # Make concurrent platform management requests
+            tasks = [
+                server.list_platforms(),
+                server.list_platforms(search="Windows"),
+                server.list_platforms(active=True)
             ]
             
             results = await asyncio.gather(*tasks)

@@ -55,6 +55,24 @@ This document defines the capabilities that the MCP server will provide for Cybe
 - **Returns**: Safe object with properties and permissions
 - **API Endpoint**: `GET /PasswordVault/API/Safes/{safeName}`
 
+### 3. Platform Management Tools
+
+#### `list_platforms`
+- **Description**: List all available platforms in CyberArk Privilege Cloud
+- **Parameters**:
+  - `search` (optional): Search term for platform names
+  - `active` (optional): Filter by active status (true/false)
+  - `system_type` (optional): Filter by system type (e.g., Windows, Unix)
+- **Returns**: List of platform objects with basic information
+- **API Endpoint**: `GET /PasswordVault/API/Platforms`
+
+#### `get_platform_details`
+- **Description**: Get detailed information about a specific platform
+- **Parameters**:
+  - `platform_id` (required): Unique identifier for the platform (e.g., WinServerLocal, UnixSSH)
+- **Returns**: Complete platform object with configuration details
+- **API Endpoint**: `GET /PasswordVault/API/Platforms/{platformId}`
+
 ## Environment Configuration
 
 ### Required Environment Variables
@@ -116,8 +134,8 @@ CYBERARK_LOG_LEVEL=INFO
 - `get_session_recordings`: Access session recordings
 
 ### Platform Management
-- `list_platforms`: Get available platforms
-- `get_platform_details`: View platform configuration
+- `list_platforms`: Get available platforms ✅ **IMPLEMENTED**
+- `get_platform_details`: View platform configuration ✅ **IMPLEMENTED**
 
 ### Reporting and Analytics
 - `generate_access_report`: Account access reports
@@ -130,6 +148,7 @@ CYBERARK_LOG_LEVEL=INFO
 1. **Account Discovery**: `list_accounts`, `search_accounts`
 2. **Account Information**: `get_account_details`
 3. **Safe Information**: `list_safes`, `get_safe_details`
+4. **Platform Information**: `list_platforms`, `get_platform_details`
 
 ### Secondary Tools (Future)
 1. **Password Operations**: Password retrieval and management

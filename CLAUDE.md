@@ -19,7 +19,7 @@ This document provides comprehensive context for Claude and other AI assistants 
    - Secure credential management via environment variables
    - Comprehensive error handling and retry logic
 
-2. **Server Module** (`src/cyberark_mcp/server.py`) 
+2. **Server Module** (`src/cyberark_mcp/server.py`)
    - Core CyberArk API integration
    - HTTP client with proper authentication headers
    - Rate limiting and network error handling
@@ -52,6 +52,8 @@ This document provides comprehensive context for Claude and other AI assistants 
 | `search_accounts` | Advanced account search | `keywords`, `safe_name`, `username`, `address`, `platform_id` (all optional) | Array of matching accounts |
 | `get_account_details` | Get specific account info | `account_id` (required) | Detailed account object |
 | `get_safe_details` | Get specific safe info | `safe_name` (required) | Detailed safe object |
+| `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
+| `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
 
 ## Configuration
 
@@ -93,15 +95,13 @@ The project follows strict TDD principles:
 
 ## Entry Points
 
-1. **`run_server.py`** - Main cross-platform entry point
-2. **`run_server_windows.py`** - Windows-specific with encoding fixes
-3. **`run_server.bat`** - Windows batch file for easy execution
+1. **`run_server.py`** - Multiplatform entry point with automatic platform detection
 
 ## Testing Strategy
 
 ### Test Structure
 - `tests/test_auth.py` - Authentication and token management (20+ tests)
-- `tests/test_server.py` - Core server functionality (25+ tests) 
+- `tests/test_server.py` - Core server functionality (25+ tests)
 - `tests/test_account_mgmt.py` - Account operations (20+ tests)
 - `tests/test_integration.py` - End-to-end integration (10+ tests)
 
@@ -122,7 +122,7 @@ pytest --cov=src/cyberark_mcp  # With coverage
 4. **Single tenant support** - No multi-tenant architecture
 
 ### Windows-Specific Issues (Resolved)
-- Unicode encoding errors with console output (fixed in run_server_windows.py)
+- Unicode encoding errors with console output (handled automatically in run_server.py)
 - FastMCP context passing issues (resolved by removing lifespan context)
 
 ## Future Enhancement Opportunities
@@ -144,9 +144,9 @@ pytest --cov=src/cyberark_mcp  # With coverage
    - `terminate_session` - End active sessions
    - `get_session_recordings` - Access session recordings
 
-2. **Platform Management**
-   - `list_platforms` - Get available account platforms
-   - `get_platform_details` - View platform configurations
+2. **~~Platform Management~~ ✅ COMPLETED**
+   - ~~`list_platforms` - Get available account platforms~~ ✅ **IMPLEMENTED**
+   - ~~`get_platform_details` - View platform configurations~~ ✅ **IMPLEMENTED**
 
 ### Low Priority
 1. **Reporting and Analytics**
@@ -167,7 +167,7 @@ pytest --cov=src/cyberark_mcp  # With coverage
   "mcpServers": {
     "cyberark-privilege-cloud": {
       "command": "python",
-      "args": ["C:/path/to/run_server_windows.py"],
+      "args": ["C:/path/to/run_server.py"],
       "env": {
         "PYTHONIOENCODING": "utf-8",
         "PYTHONLEGACYWINDOWSSTDIO": "1"
@@ -180,7 +180,7 @@ pytest --cov=src/cyberark_mcp  # With coverage
 ### MCP Inspector Testing
 ```bash
 npx @modelcontextprotocol/inspector
-# Connect with command: python /path/to/run_server.py
+# Connect with command: python /path/to/run_server.py (works on all platforms)
 ```
 
 ## Troubleshooting Guide
@@ -192,7 +192,7 @@ npx @modelcontextprotocol/inspector
    - Check environment variable names (no typos)
    - Ensure no trailing spaces in values
 
-2. **"Authentication failed"** 
+2. **"Authentication failed"**
    - Verify service account credentials
    - Check OAuth is enabled for service account in CyberArk Identity
    - Confirm tenant ID format (no .id.cyberark.cloud suffix)
@@ -203,7 +203,7 @@ npx @modelcontextprotocol/inspector
    - Test network connectivity to CyberArk
 
 4. **Unicode encoding errors on Windows**
-   - Use `run_server_windows.py` instead of `run_server.py`
+   - The multiplatform `run_server.py` handles Windows encoding automatically
    - Set PYTHONIOENCODING=utf-8 environment variable
 
 ### Debugging Commands
@@ -239,6 +239,7 @@ python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import async
 - Mock external dependencies (CyberArk APIs)
 - Test both success and failure scenarios
 - Include performance/timeout testing where relevant
+- Clean up debug scripts after using them.
 
 ## Security Considerations
 
@@ -282,7 +283,7 @@ python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import async
 1. Define tool specification in SERVER_CAPABILITIES.md
 2. Write comprehensive tests first (TDD)
 3. Implement server method in `server.py`
-4. Add MCP tool wrapper in `mcp_server.py` 
+4. Add MCP tool wrapper in `mcp_server.py`
 5. Update documentation and examples
 6. Test with MCP Inspector and Claude Desktop
 
