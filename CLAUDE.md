@@ -6,9 +6,9 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 **Purpose**: A Model Context Protocol (MCP) server that integrates with CyberArk Privilege Cloud, enabling AI assistants and other MCP clients to securely interact with privileged account management capabilities.
 
-**Current Status**: ✅ MVP+ Complete - Production ready with enhanced platform management functionality
-**Last Updated**: June 8, 2025
-**Recent Enhancement**: Platform Management Tools (list_platforms, get_platform_details)
+**Current Status**: ✅ MVP+ Complete - Production ready with automated CI/CD pipeline
+**Last Updated**: June 9, 2025
+**Recent Enhancement**: GitHub Actions CI/CD workflow with automated unit testing
 
 ## Architecture Overview
 
@@ -17,6 +17,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 1. **Authentication Module** (`src/cyberark_mcp/auth.py`)
    - OAuth 2.0 client credentials flow
    - Automatic token refresh (15-minute expiration with 60-second safety margin)
+   - Double-checked locking pattern for concurrent token requests
    - Secure credential management via environment variables
    - Comprehensive error handling and retry logic
 
@@ -53,6 +54,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 | `list_accounts` | List accounts | `safe_name`, `username`, `address` (all optional) | Array of account objects |
 | `search_accounts` | Advanced account search | `keywords`, `safe_name`, `username`, `address`, `platform_id` (all optional) | Array of matching accounts |
 | `get_account_details` | Get specific account info | `account_id` (required) | Detailed account object |
+| `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
 | `get_safe_details` | Get specific safe info | `safe_name` (required) | Detailed safe object |
 | `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
 | `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
@@ -75,6 +77,22 @@ CYBERARK_LOG_LEVEL=INFO        # Logging level
 ```
 
 ## Development Patterns
+
+### Continuous Integration (CI/CD)
+The project includes automated testing infrastructure to ensure code quality:
+
+**GitHub Actions Workflow** (`.github/workflows/test.yml`):
+- **Triggers**: Runs on every push to any branch and pull requests to main/develop
+- **Environment**: Python 3.13 on Ubuntu latest
+- **Test Scope**: All unit tests excluding integration tests (`pytest -m "not integration"`)
+- **Features**: Dependency caching, coverage reporting, async test support
+- **Purpose**: Catch regressions early and ensure all changes pass tests before merge
+
+**Key CI/CD Benefits**:
+- Immediate feedback on test failures for any code changes
+- Prevents broken code from being merged into main branch
+- Ensures consistent test environment across different development machines
+- Validates that new features don't break existing functionality
 
 ### Test-Driven Development (TDD)
 The project follows strict TDD principles:
@@ -104,14 +122,15 @@ The project follows strict TDD principles:
 ### Test Structure
 - `tests/test_auth.py` - Authentication and token management (20+ tests)
 - `tests/test_server.py` - Core server functionality (35+ tests with platform management)
-- `tests/test_account_mgmt.py` - Account operations (20+ tests)
+- `tests/test_account_mgmt.py` - Account operations (35+ tests with account creation)
 - `tests/test_platform_mgmt.py` - Platform management operations (7+ comprehensive tests)
 - `tests/test_mcp_platform_tools.py` - MCP platform tools integration (5+ tests)
+- `tests/test_create_account_mcp.py` - Account creation MCP tool integration (2+ tests)
 - `tests/test_integration.py` - End-to-end integration (10+ tests)
 
 ### Running Tests
 ```bash
-pytest                    # All tests (100+ total)
+pytest                    # All tests (115+ total)
 pytest -m auth           # Authentication tests only
 pytest -m integration    # Integration tests only
 pytest -k platform      # Platform management tests only
@@ -122,7 +141,7 @@ pytest --cov=src/cyberark_mcp  # With coverage
 
 ### Current Limitations
 1. **No password retrieval** - API supports it but not implemented for security
-2. **No account creation/modification** - Read-only operations only
+2. **No account modification/deletion** - Create and read operations only
 3. **Basic rate limiting** - Could be enhanced with exponential backoff
 4. **Single tenant support** - No multi-tenant architecture
 
@@ -138,8 +157,8 @@ pytest --cov=src/cyberark_mcp  # With coverage
    - `change_password` - Initiate password changes
    - `verify_password` - Check password compliance
 
-2. **Advanced Account Operations**
-   - `create_account` - Add new privileged accounts
+2. **~~Advanced Account Operations~~ ✅ PARTIALLY COMPLETED**
+   - ~~`create_account` - Add new privileged accounts~~ ✅ **IMPLEMENTED**
    - `update_account` - Modify account properties
    - `delete_account` - Remove accounts from safes
 
@@ -311,11 +330,11 @@ python debug_platform_api.py  # Use the debug script for detailed platform analy
 5. Test with real CyberArk environment
 
 ### Release Process
-1. Run full test suite
-2. Test with MCP Inspector
-3. Validate Claude Desktop integration
-4. Update version numbers and documentation
-5. Create git tag and release notes
+1. **Automated Testing**: GitHub Actions automatically runs full test suite on push
+2. **Manual Validation**: Test with MCP Inspector and Claude Desktop integration
+3. **Documentation**: Update version numbers and documentation
+4. **Release**: Create git tag and release notes
+5. **Verification**: Ensure all CI/CD checks pass before release
 
 ## Next Development Priorities
 
@@ -336,11 +355,11 @@ Based on the completed MVP and current enhancement patterns, the following areas
    - **API Endpoints**: `GET /PasswordVault/API/LiveSessions`, `POST /PasswordVault/API/LiveSessions/{sessionId}/Terminate`
 
 ### 🚀 **Medium Priority (Future Sprints)**
-3. **Advanced Account Operations** - Lifecycle management
-   - `create_account` - Onboard new privileged accounts
+3. **~~Advanced Account Operations~~ ✅ PARTIALLY COMPLETED** - Lifecycle management
+   - ~~`create_account` - Onboard new privileged accounts~~ ✅ **IMPLEMENTED**
    - `update_account` - Modify account properties and platform assignments
    - `delete_account` - Secure account removal with audit trail
-   - **API Endpoints**: `POST /PasswordVault/API/Accounts`, `PATCH /PasswordVault/API/Accounts/{accountId}`, `DELETE /PasswordVault/API/Accounts/{accountId}`
+   - **API Endpoints**: ~~`POST /PasswordVault/API/Accounts`~~ ✅ **IMPLEMENTED**, `PATCH /PasswordVault/API/Accounts/{accountId}`, `DELETE /PasswordVault/API/Accounts/{accountId}`
 
 4. **Enhanced Safe Management** - Complete safe lifecycle
    - `create_safe` - Create new vaults for account organization

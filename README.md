@@ -4,8 +4,8 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 
 ## Features
 
-### Current (MVP)
-- **Account Management**: List, search, and retrieve detailed account information
+### Current (MVP+)
+- **Account Management**: List, search, retrieve detailed information, and create new privileged accounts
 - **Safe Management**: List and view safe information
 - **Platform Management**: List available platforms and view detailed platform configurations
 - **OAuth 2.0 Authentication**: Secure API token authentication with CyberArk Identity
@@ -14,8 +14,8 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 - **Error Handling**: Robust error handling with automatic token refresh
 
 ### Planned (Future Releases)
-- Password management operations
-- Account lifecycle management (create, update, delete)
+- Password management operations (retrieve, change, verify)
+- Account lifecycle management (update, delete)
 - Session monitoring and management
 - Advanced reporting and analytics
 
