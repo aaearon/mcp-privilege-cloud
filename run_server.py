@@ -20,10 +20,10 @@ if sys.platform == "win32" or platform.system() == "Windows":
         
         # Set console code page to UTF-8
         import subprocess
-        subprocess.run(['chcp', '65001'], shell=True, capture_output=True)
-    except Exception:
+        subprocess.run(['chcp', '65001'], capture_output=True, check=False)
+    except Exception as e:
         # Fallback - continue without UTF-8 setup
-        pass
+        print(f"[WARN] UTF-8 setup failed: {e}")
 
 # Add src directory to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
