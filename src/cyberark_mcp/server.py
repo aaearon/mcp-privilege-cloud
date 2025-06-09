@@ -302,13 +302,42 @@ class CyberArkMCPServer:
     async def list_safes(
         self,
         search: Optional[str] = None,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+        sort: Optional[str] = None,
+        include_accounts: Optional[bool] = None,
+        extended_details: Optional[bool] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """List all accessible safes"""
+        """
+        List all accessible safes from CyberArk Privilege Cloud.
+        
+        Args:
+            search: Search term for safe names (URL encoded automatically)
+            offset: Offset of the first Safe returned (default: 0)
+            limit: Maximum number of Safes returned (default: 25)
+            sort: Sort order - "safeName asc" or "safeName desc" (default: safeName asc)
+            include_accounts: Whether to include accounts for each Safe (default: False)
+            extended_details: Whether to return all Safe details or only safeName (default: True)
+            **kwargs: Additional query parameters
+            
+        Returns:
+            List of safe objects (excludes Internal Safes)
+        """
         params = {}
         
         if search:
             params["search"] = search
+        if offset is not None:
+            params["offset"] = offset
+        if limit is not None:
+            params["limit"] = limit
+        if sort:
+            params["sort"] = sort
+        if include_accounts is not None:
+            params["includeAccounts"] = "true" if include_accounts else "false"
+        if extended_details is not None:
+            params["extendedDetails"] = "true" if extended_details else "false"
         
         # Add any additional parameters
         params.update(kwargs)
@@ -316,12 +345,47 @@ class CyberArkMCPServer:
         self.logger.info(f"Listing safes with parameters: {params}")
         response = await self._make_api_request("GET", "Safes", params=params)
         
+        # API returns safes in 'value' field
         return response.get("value", [])
     
-    async def get_safe_details(self, safe_name: str) -> Dict[str, Any]:
-        """Get detailed information about a specific safe"""
+    async def get_safe_details(
+        self, 
+        safe_name: str,
+        include_accounts: Optional[bool] = None,
+        use_cache: Optional[bool] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific safe.
+        
+        Args:
+            safe_name: The Safe name (URL encoding handled automatically by httpx)
+            include_accounts: Whether to include accounts for the Safe (default: False)
+            use_cache: Whether to retrieve from session cache (default: False)
+            **kwargs: Additional query parameters
+            
+        Returns:
+            Safe object with detailed information
+            
+        Note:
+            Safe name should be URL encoded for special characters.
+            For dots (.), add forward slash (/) at end of URL.
+        """
+        params = {}
+        
+        if include_accounts is not None:
+            params["includeAccounts"] = "true" if include_accounts else "false"
+        if use_cache is not None:
+            params["useCache"] = "true" if use_cache else "false"
+            
+        # Add any additional parameters
+        params.update(kwargs)
+        
         self.logger.info(f"Getting details for safe: {safe_name}")
-        return await self._make_api_request("GET", f"Safes/{safe_name}")
+        if params:
+            self.logger.debug(f"Using query parameters: {params}")
+            
+        return await self._make_api_request("GET", f"Safes/{safe_name}", params=params if params else None)
     
     # Health and Status Methods
     

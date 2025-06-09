@@ -182,25 +182,196 @@ class TestCyberArkMCPServer:
             result = await server.search_accounts(**search_params)
             assert result == mock_results
 
-    async def test_list_safes_tool(self, server):
-        """Test list_safes tool functionality"""
+    # Safe Management Tests
+    
+    @pytest.mark.asyncio
+    async def test_list_safes_basic(self, server):
+        """Test basic list_safes functionality"""
         mock_safes = [
-            {"safeName": "safe1", "description": "Test safe 1"},
-            {"safeName": "safe2", "description": "Test safe 2"}
+            {
+                "safeUrlId": "VaultInternal",
+                "safeName": "VaultInternal", 
+                "safeNumber": 2,
+                "description": "",
+                "location": "\\",
+                "creator": {
+                    "id": "84425267_6da7_4c2c_9ad6_26aef85c83be",
+                    "name": "Administrator"
+                },
+                "olacEnabled": False,
+                "managingCPM": "",
+                "numberOfVersionsRetention": None,
+                "numberOfDaysRetention": 30,
+                "autoPurgeEnabled": False,
+                "creationTime": 1608827926,
+                "lastModificationTime": 1610319618268452,
+                "isExpiredMember": False
+            },
+            {
+                "safeUrlId": "HRSafe",
+                "safeName": "HRSafe",
+                "safeNumber": 687,
+                "description": "HR Safe for sensitive data",
+                "location": "\\",
+                "creator": {
+                    "id": "user123",
+                    "name": "HRAdmin"
+                },
+                "olacEnabled": True,
+                "managingCPM": "PasswordManager",
+                "numberOfVersionsRetention": 5,
+                "numberOfDaysRetention": 90,
+                "autoPurgeEnabled": True,
+                "creationTime": 1621412613,
+                "lastModificationTime": 1622361852859451,
+                "isExpiredMember": False
+            }
         ]
         
-        with patch.object(server, '_make_api_request', return_value={"value": mock_safes}):
+        mock_response = {
+            "value": mock_safes,
+            "count": 2,
+            "nextLink": None
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
             result = await server.list_safes()
             assert result == mock_safes
+            assert len(result) == 2
+            assert result[0]["safeName"] == "VaultInternal"
+            assert result[1]["safeName"] == "HRSafe"
 
-    async def test_get_safe_details_tool(self, server):
-        """Test get_safe_details tool functionality"""
-        safe_name = "test-safe"
-        mock_safe = {"safeName": "test-safe", "description": "Test safe", "location": "\\"}
+    @pytest.mark.asyncio
+    async def test_list_safes_with_search(self, server):
+        """Test list_safes with search parameter"""
+        search_term = "HR"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"value": [], "count": 0}
+            await server.list_safes(search=search_term)
+            mock_request.assert_called_once_with("GET", "Safes", params={"search": search_term})
+
+    @pytest.mark.asyncio
+    async def test_list_safes_with_pagination_params(self, server):
+        """Test list_safes with pagination parameters"""
+        params = {
+            "search": "test",
+            "offset": 10,
+            "limit": 5,
+            "sort": "safeName desc",
+            "includeAccounts": True,
+            "extendedDetails": False
+        }
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"value": [], "count": 0}
+            await server.list_safes(**params)
+            mock_request.assert_called_once_with("GET", "Safes", params=params)
+
+    @pytest.mark.asyncio
+    async def test_list_safes_with_pagination_response(self, server):
+        """Test list_safes with paginated response"""
+        mock_response = {
+            "value": [{"safeName": "TestSafe", "safeUrlId": "TestSafe"}],
+            "count": 100,
+            "nextLink": "api/safes?offset=25&limit=25&useCache=False"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.list_safes(limit=25)
+            assert result == mock_response["value"]
+            assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_list_safes_empty_response(self, server):
+        """Test list_safes with empty response"""
+        mock_response = {"value": [], "count": 0}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.list_safes()
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_safes_no_value_field(self, server):
+        """Test list_safes when API returns no 'value' field"""
+        mock_response = {"count": 0}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.list_safes()
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_safe_details_basic(self, server):
+        """Test basic get_safe_details functionality"""
+        safe_name = "HRSafe"
+        mock_safe = {
+            "safeUrlId": "HRSafe",
+            "safeName": "HRSafe",
+            "safeNumber": 687,
+            "description": "HRSafe_Desc",
+            "location": "\\",
+            "creator": {
+                "id": "84425267_6da7_4c2c_9ad6_26aef85c83be",
+                "name": "Administrator"
+            },
+            "olacEnabled": False,
+            "managingCPM": "",
+            "numberOfVersionsRetention": None,
+            "numberOfDaysRetention": 6,
+            "autoPurgeEnabled": False,
+            "creationTime": 1621412613,
+            "lastModificationTime": 1622361852859451,
+            "accounts": [],
+            "isExpiredMember": False
+        }
         
         with patch.object(server, '_make_api_request', return_value=mock_safe):
             result = await server.get_safe_details(safe_name)
             assert result == mock_safe
+            assert result["safeName"] == safe_name
+            assert result["safeNumber"] == 687
+
+    @pytest.mark.asyncio 
+    async def test_get_safe_details_with_url_encoding(self, server):
+        """Test get_safe_details with special characters requiring URL encoding"""
+        safe_name = "My Safe With Spaces"
+        expected_endpoint = f"Safes/{safe_name}"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"safeName": safe_name}
+            await server.get_safe_details(safe_name)
+            mock_request.assert_called_once_with("GET", expected_endpoint, params=None)
+
+    @pytest.mark.asyncio
+    async def test_get_safe_details_with_query_params(self, server):
+        """Test get_safe_details with query parameters"""
+        safe_name = "TestSafe"
+        params = {
+            "includeAccounts": True,
+            "useCache": False
+        }
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.return_value = {"safeName": safe_name}
+            await server.get_safe_details(safe_name, **params)
+            mock_request.assert_called_once_with("GET", f"Safes/{safe_name}", params=params)
+
+    @pytest.mark.asyncio
+    async def test_get_safe_details_with_accounts(self, server):
+        """Test get_safe_details with accounts included"""
+        safe_name = "HRSafe"
+        mock_safe = {
+            "safeName": "HRSafe",
+            "accounts": [
+                {"id": "123", "name": "hr-admin"},
+                {"id": "456", "name": "hr-user"}
+            ]
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_safe):
+            result = await server.get_safe_details(safe_name, includeAccounts=True)
+            assert result == mock_safe
+            assert len(result["accounts"]) == 2
 
     def test_error_handling_configuration(self, server):
         """Test that error handling is properly configured"""
