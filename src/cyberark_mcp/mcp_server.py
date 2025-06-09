@@ -195,20 +195,37 @@ async def create_account(
 
 @mcp.tool()
 async def list_safes(
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None,
+    sort: Optional[str] = None,
+    include_accounts: Optional[bool] = None,
+    extended_details: Optional[bool] = None
 ) -> List[Dict[str, Any]]:
     """
     List all accessible safes in CyberArk Privilege Cloud.
     
     Args:
-        search: Search term for safe names
+        search: Search term for safe names (URL encoded automatically)
+        offset: Offset of the first Safe returned (default: 0)
+        limit: Maximum number of Safes returned (default: 25)
+        sort: Sort order - "safeName asc" or "safeName desc" (default: safeName asc)
+        include_accounts: Whether to include accounts for each Safe (default: False)
+        extended_details: Whether to return all Safe details or only safeName (default: True)
     
     Returns:
-        List of safe objects
+        List of safe objects (excludes Internal Safes)
     """
     try:
         server = CyberArkMCPServer.from_environment()
-        safes = await server.list_safes(search=search)
+        safes = await server.list_safes(
+            search=search,
+            offset=offset,
+            limit=limit,
+            sort=sort,
+            include_accounts=include_accounts,
+            extended_details=extended_details
+        )
         logger.info(f"Retrieved {len(safes)} safes")
         return safes
     except Exception as e:
@@ -218,20 +235,32 @@ async def list_safes(
 
 @mcp.tool()
 async def get_safe_details(
-    safe_name: str
+    safe_name: str,
+    include_accounts: Optional[bool] = None,
+    use_cache: Optional[bool] = None
 ) -> Dict[str, Any]:
     """
     Get detailed information about a specific safe.
     
     Args:
-        safe_name: Name of the safe
+        safe_name: Name of the safe (special characters will be URL encoded automatically)
+        include_accounts: Whether to include accounts for the Safe (default: False)
+        use_cache: Whether to retrieve from session cache (default: False)
     
     Returns:
         Safe object with detailed information
+        
+    Note:
+        For safe names with special characters like dots (.), the API may require
+        special handling. Contact your CyberArk administrator if you encounter issues.
     """
     try:
         server = CyberArkMCPServer.from_environment()
-        safe = await server.get_safe_details(safe_name)
+        safe = await server.get_safe_details(
+            safe_name,
+            include_accounts=include_accounts,
+            use_cache=use_cache
+        )
         logger.info(f"Retrieved details for safe {safe_name}")
         return safe
     except Exception as e:

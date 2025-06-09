@@ -12,9 +12,7 @@ This document outlines the development plan for creating a Model Context Protoco
 ## Phase 1: Research & Design
 
 ### 1. Research CyberArk Privilege Cloud APIs
-- Study the official API documentation: https://docs.cyberark.com/privilege-cloud-shared-services/latest/en/content/webservices/implementing%20privileged%20account%20security%20web%20services%20.htm
-- Review API token authentication: https://stoplight.io/api/v1/projects/cHJqOjI1MDczMQ/nodes/2c297daca8a97-api-token-authentication-for-cyber-ark-identity-security-platform-shared-services
-- Reference Bruno collection: https://github.com/IAM-Jah/CyberArk-REST-API-Bruno/tree/main/Privilege%20Cloud%20and%20Shared%20Services%20REST%20API
+- Ask me to provide the information for all CyberArk Privilege Cloud API endpoints as the documentation is not accessible.
 
 ### 2. Study MCP Protocol
 - Review MCP Protocol documentation: https://modelcontextprotocol.io
@@ -69,11 +67,19 @@ This document outlines the development plan for creating a Model Context Protoco
 - Document any issues and resolutions
 
 ## Future Enhancements (Post-MVP)
-- Safe management operations
-- Password retrieval and management
-- Session monitoring capabilities
+
+### 🔥 **Immediate Priority (Next Sprint)**
+- Password retrieval and management operations
+- Advanced account operations (update, delete)
+
+### 🚀 **Medium Priority (Future Sprints)**  
+- Enhanced safe management operations
 - Advanced error handling and retry logic
 - Performance optimizations
+
+### 📊 **Lower Priority (Long-term)**
+- Session monitoring capabilities
+- Reporting and analytics features
 
 ## Success Criteria
 - [ ] Server authenticates successfully with CyberArk Privilege Cloud

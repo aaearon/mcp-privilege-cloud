@@ -8,7 +8,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 **Current Status**: ✅ MVP+ Complete - Production ready with automated CI/CD pipeline
 **Last Updated**: June 9, 2025
-**Recent Enhancement**: GitHub Actions CI/CD workflow with automated unit testing
+**Recent Enhancement**: Enhanced safe management tools with full Gen2 API compliance and comprehensive test coverage
 
 ## Architecture Overview
 
@@ -29,7 +29,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
    - FastMCP server implementation
-   - 8 exposed tools for CyberArk operations
+   - 10 exposed tools for CyberArk operations
    - Proper tool parameter validation
    - Windows-compatible encoding handling
 
@@ -44,18 +44,19 @@ This document provides comprehensive context for Claude and other AI assistants 
 - API responses use `value` field for array results, except Platforms API which uses `Platforms` field
 - Proper error handling for 401 (auth), 403 (permissions), 429 (rate limiting)
 - Platform APIs require Privilege Cloud Administrator role membership
+- **API Version Policy**: When CyberArk documentation offers both Gen1 and Gen2 endpoints, ALWAYS use Gen2 endpoints only. Gen1 endpoints are legacy and should be avoided for new implementations.
 
 ## Available MCP Tools
 
 | Tool | Purpose | Parameters | Returns |
 |------|---------|------------|---------|
 | `health_check` | Verify connectivity | None | Health status with safe count |
-| `list_safes` | List accessible safes | `search` (optional) | Array of safe objects |
+| `list_safes` | List accessible safes with pagination | `search`, `offset`, `limit`, `sort`, `include_accounts`, `extended_details` (all optional) | Array of safe objects (excludes Internal Safes) |
 | `list_accounts` | List accounts | `safe_name`, `username`, `address` (all optional) | Array of account objects |
 | `search_accounts` | Advanced account search | `keywords`, `safe_name`, `username`, `address`, `platform_id` (all optional) | Array of matching accounts |
 | `get_account_details` | Get specific account info | `account_id` (required) | Detailed account object |
 | `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
-| `get_safe_details` | Get specific safe info | `safe_name` (required) | Detailed safe object |
+| `get_safe_details` | Get specific safe info with options | `safe_name` (required); `include_accounts`, `use_cache` (optional) | Detailed safe object |
 | `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
 | `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
 
@@ -121,19 +122,21 @@ The project follows strict TDD principles:
 
 ### Test Structure
 - `tests/test_auth.py` - Authentication and token management (20+ tests)
-- `tests/test_server.py` - Core server functionality (35+ tests with platform management)
+- `tests/test_server.py` - Core server functionality (45+ tests with enhanced safe management)
 - `tests/test_account_mgmt.py` - Account operations (35+ tests with account creation)
 - `tests/test_platform_mgmt.py` - Platform management operations (7+ comprehensive tests)
 - `tests/test_mcp_platform_tools.py` - MCP platform tools integration (5+ tests)
 - `tests/test_create_account_mcp.py` - Account creation MCP tool integration (2+ tests)
+- `tests/test_safe_management_mcp.py` - Safe management MCP tools integration (8+ comprehensive tests)
 - `tests/test_integration.py` - End-to-end integration (10+ tests)
 
 ### Running Tests
 ```bash
-pytest                    # All tests (115+ total)
+pytest                    # All tests (118+ total)
 pytest -m auth           # Authentication tests only
 pytest -m integration    # Integration tests only
 pytest -k platform      # Platform management tests only
+pytest -k safe          # Safe management tests only
 pytest --cov=src/cyberark_mcp  # With coverage
 ```
 
@@ -312,6 +315,37 @@ python debug_platform_api.py  # Use the debug script for detailed platform analy
 - Batch operation support for multiple accounts
 - Asynchronous operation improvements
 
+## Recent Safe Management Enhancements (June 2025)
+
+### Enhanced Safe Management Tools
+The safe management functionality has been significantly improved with full Gen2 API compliance:
+
+#### **`list_safes` Tool Enhancements**:
+- **Pagination Support**: `offset`, `limit` parameters for handling large safe collections
+- **Advanced Sorting**: `sort` parameter ("safeName asc" or "safeName desc")
+- **Account Inclusion**: `include_accounts` option to include account lists with each safe
+- **Detail Control**: `extended_details` parameter to control response verbosity
+- **Search Enhancement**: Improved search functionality with URL encoding support
+
+#### **`get_safe_details` Tool Enhancements**:
+- **Account Integration**: `include_accounts` parameter for comprehensive safe information
+- **Performance Optimization**: `use_cache` parameter for session-based caching
+- **Special Character Support**: Proper URL encoding for safe names with spaces and special characters
+- **Query Parameter Support**: Full support for additional API parameters
+
+#### **API Compliance Improvements**:
+- **Gen2 Endpoint Usage**: Exclusively uses Gen2 API endpoints as per best practices
+- **Response Parsing**: Proper handling of `value`, `count`, and `nextLink` fields
+- **Error Handling**: Enhanced error handling for pagination and special characters
+- **URL Encoding**: Automatic handling of special characters in safe names
+
+#### **Test Coverage Enhancements**:
+- **10 New Server Tests**: Comprehensive unit tests for safe management functionality
+- **8 New MCP Integration Tests**: Complete MCP tool wrapper testing
+- **Pagination Testing**: Full pagination scenario coverage
+- **Error Scenario Testing**: Comprehensive error handling validation
+- **Special Character Testing**: URL encoding and special character support
+
 ## Development Workflow
 
 ### Adding New Tools
@@ -348,26 +382,26 @@ Based on the completed MVP and current enhancement patterns, the following areas
    - **API Endpoints**: `POST /PasswordVault/API/Accounts/{accountId}/Password/Retrieve`, `POST /PasswordVault/API/Accounts/{accountId}/Change`
    - **Security Considerations**: Requires additional authentication, audit logging, secure token handling
 
-2. **Session Management** - Critical for monitoring and compliance
-   - `list_sessions` - View active PSM sessions
-   - `terminate_session` - Emergency session termination
-   - `get_session_recordings` - Access to session recordings
-   - **API Endpoints**: `GET /PasswordVault/API/LiveSessions`, `POST /PasswordVault/API/LiveSessions/{sessionId}/Terminate`
-
-### 🚀 **Medium Priority (Future Sprints)**
-3. **~~Advanced Account Operations~~ ✅ PARTIALLY COMPLETED** - Lifecycle management
+2. **~~Advanced Account Operations~~ ✅ PARTIALLY COMPLETED** - Complete lifecycle management
    - ~~`create_account` - Onboard new privileged accounts~~ ✅ **IMPLEMENTED**
    - `update_account` - Modify account properties and platform assignments
    - `delete_account` - Secure account removal with audit trail
    - **API Endpoints**: ~~`POST /PasswordVault/API/Accounts`~~ ✅ **IMPLEMENTED**, `PATCH /PasswordVault/API/Accounts/{accountId}`, `DELETE /PasswordVault/API/Accounts/{accountId}`
 
-4. **Enhanced Safe Management** - Complete safe lifecycle
+### 🚀 **Medium Priority (Future Sprints)**
+3. **Enhanced Safe Management** - Complete safe lifecycle
    - `create_safe` - Create new vaults for account organization
    - `update_safe` - Modify safe permissions and properties
    - `list_safe_members` - View safe member permissions
    - **API Endpoints**: `POST /PasswordVault/API/Safes`, `PUT /PasswordVault/API/Safes/{safeName}`
 
 ### 📊 **Lower Priority (Long-term)**
+4. **Session Management** - Monitoring and compliance capabilities
+   - `list_sessions` - View active PSM sessions
+   - `terminate_session` - Emergency session termination
+   - `get_session_recordings` - Access to session recordings
+   - **API Endpoints**: `GET /PasswordVault/API/LiveSessions`, `POST /PasswordVault/API/LiveSessions/{sessionId}/Terminate`
+
 5. **Reporting and Analytics** - Business intelligence
    - `generate_access_report` - Account access patterns and compliance
    - `get_compliance_status` - Security posture dashboard
