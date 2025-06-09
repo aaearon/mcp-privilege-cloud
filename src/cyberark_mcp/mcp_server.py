@@ -142,6 +142,58 @@ async def search_accounts(
 
 
 @mcp.tool()
+async def create_account(
+    platform_id: str,
+    safe_name: str,
+    name: Optional[str] = None,
+    address: Optional[str] = None,
+    user_name: Optional[str] = None,
+    secret: Optional[str] = None,
+    secret_type: Optional[str] = None,
+    platform_account_properties: Optional[Dict[str, Any]] = None,
+    secret_management: Optional[Dict[str, Any]] = None,
+    remote_machines_access: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create a new privileged account in CyberArk Privilege Cloud.
+    
+    Args:
+        platform_id: Platform ID for the account (required, e.g., WinServerLocal, UnixSSH)
+        safe_name: Safe where the account will be created (required)
+        name: Account name/identifier (optional)
+        address: Target address/hostname (optional)
+        user_name: Username for the account (optional)
+        secret: Password or SSH key (optional)
+        secret_type: Type of secret - 'password' or 'key' (optional, defaults to 'password')
+        platform_account_properties: Platform-specific properties (optional, e.g., {"LogonDomain": "CORP", "Port": "3389"})
+        secret_management: Secret management configuration (optional, e.g., {"automaticManagementEnabled": true})
+        remote_machines_access: Remote access configuration (optional, e.g., {"remoteMachines": "server1;server2", "accessRestrictedToRemoteMachines": true})
+    
+    Returns:
+        Created account object with ID and metadata
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        account = await server.create_account(
+            platform_id=platform_id,
+            safe_name=safe_name,
+            name=name,
+            address=address,
+            user_name=user_name,
+            secret=secret,
+            secret_type=secret_type,
+            platform_account_properties=platform_account_properties,
+            secret_management=secret_management,
+            remote_machines_access=remote_machines_access
+        )
+        logger.info(f"Created account with ID: {account.get('id', 'unknown')}")
+        return account
+    except Exception as e:
+        logger.error(f"Error creating account: {e}")
+        raise
+
+
+@mcp.tool()
 async def list_safes(
     search: Optional[str] = None
 ) -> List[Dict[str, Any]]:

@@ -64,6 +64,7 @@ class CyberArkMCPServer:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         retry_count: int = 0
     ) -> Dict[str, Any]:
         """Make an authenticated API request to CyberArk"""
@@ -83,9 +84,9 @@ class CyberArkMCPServer:
                 if method.upper() == "GET":
                     response = await client.get(url, headers=headers, params=params)
                 elif method.upper() == "POST":
-                    response = await client.post(url, headers=headers, json=data, params=params)
+                    response = await client.post(url, headers=headers, json=json or data, params=params)
                 elif method.upper() == "PUT":
-                    response = await client.put(url, headers=headers, json=data, params=params)
+                    response = await client.put(url, headers=headers, json=json or data, params=params)
                 elif method.upper() == "DELETE":
                     response = await client.delete(url, headers=headers, params=params)
                 else:
@@ -104,7 +105,7 @@ class CyberArkMCPServer:
                 self.logger.warning("Received 401, refreshing token and retrying")
                 # Force token refresh by clearing cached token
                 self.authenticator._token = None
-                return await self._make_api_request(method, endpoint, params, data, retry_count + 1)
+                return await self._make_api_request(method, endpoint, params, data, json, retry_count + 1)
             else:
                 self._handle_api_error(e)
                 raise CyberArkAPIError(f"API request failed: {e}")
@@ -136,7 +137,8 @@ class CyberArkMCPServer:
         return [
             "list_accounts",
             "get_account_details",
-            "search_accounts", 
+            "search_accounts",
+            "create_account",
             "list_safes",
             "get_safe_details",
             "list_platforms",
@@ -206,6 +208,94 @@ class CyberArkMCPServer:
         response = await self._make_api_request("GET", "Accounts", params=params)
         
         return response.get("value", [])
+    
+    async def create_account(
+        self,
+        platform_id: str,
+        safe_name: str,
+        name: Optional[str] = None,
+        address: Optional[str] = None,
+        user_name: Optional[str] = None,
+        secret: Optional[str] = None,
+        secret_type: Optional[str] = None,
+        platform_account_properties: Optional[Dict[str, Any]] = None,
+        secret_management: Optional[Dict[str, Any]] = None,
+        remote_machines_access: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Create a new privileged account in CyberArk Privilege Cloud"""
+        
+        # Validate required parameters
+        if not platform_id:
+            raise ValueError("platformId is required")
+        if not safe_name:
+            raise ValueError("safeName is required")
+        
+        # Validate secret type if provided
+        if secret_type and secret_type not in ["password", "key"]:
+            raise ValueError("secretType must be 'password' or 'key'")
+        
+        # Validate account name for special characters if provided
+        if name:
+            invalid_chars = r'\/:;*?"<>|	 '  # Includes tab and space
+            if any(char in name for char in invalid_chars):
+                raise ValueError("Account name contains invalid characters")
+        
+        # Build request payload, filtering out None and empty values
+        payload = {}
+        
+        # Required fields
+        payload["platformId"] = platform_id
+        payload["safeName"] = safe_name
+        
+        # Optional fields - only add if not None or empty
+        if name:
+            payload["name"] = name
+        if address:
+            payload["address"] = address
+        if user_name:
+            payload["userName"] = user_name
+        if secret:
+            payload["secret"] = secret
+        if secret_type:
+            payload["secretType"] = secret_type
+        if platform_account_properties:
+            payload["platformAccountProperties"] = platform_account_properties
+        if secret_management:
+            payload["secretManagement"] = secret_management
+        if remote_machines_access:
+            payload["remoteMachinesAccess"] = remote_machines_access
+        
+        # Add any additional parameters
+        for key, value in kwargs.items():
+            if value is not None and value != "":
+                # Convert snake_case to camelCase for API compatibility
+                if key == "platform_account_properties":
+                    payload["platformAccountProperties"] = value
+                elif key == "secret_management":
+                    payload["secretManagement"] = value
+                elif key == "remote_machines_access":
+                    payload["remoteMachinesAccess"] = value
+                elif key == "secret_type":
+                    payload["secretType"] = value
+                elif key == "user_name":
+                    payload["userName"] = value
+                elif key == "safe_name":
+                    payload["safeName"] = value
+                elif key == "platform_id":
+                    payload["platformId"] = value
+                else:
+                    payload[key] = value
+        
+        self.logger.info(f"Creating account in safe '{safe_name}' with platform '{platform_id}'")
+        
+        try:
+            response = await self._make_api_request("POST", "Accounts", json=payload)
+            self.logger.info(f"Successfully created account with ID: {response.get('id', 'unknown')}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to create account: {e}")
+            raise
     
     # Safe Management Tools
     

@@ -39,6 +39,24 @@ This document defines the capabilities that the MCP server will provide for Cybe
 - **Returns**: List of matching accounts
 - **API Endpoint**: `GET /PasswordVault/API/Accounts` with query parameters
 
+#### `create_account` ✅ **IMPLEMENTED**
+- **Description**: Create a new privileged account in CyberArk Privilege Cloud
+- **Parameters**:
+  - `platform_id` (required): Platform ID for the account (e.g., WinServerLocal, UnixSSH)
+  - `safe_name` (required): Safe where the account will be created
+  - `name` (optional): Account name/identifier
+  - `address` (optional): Target address/hostname
+  - `user_name` (optional): Username for the account
+  - `secret` (optional): Password or SSH key
+  - `secret_type` (optional): Type of secret - 'password' or 'key'
+  - `platform_account_properties` (optional): Platform-specific properties
+  - `secret_management` (optional): Secret management configuration
+  - `remote_machines_access` (optional): Remote access configuration
+- **Returns**: Created account object with ID and metadata
+- **API Endpoint**: `POST /PasswordVault/API/Accounts`
+- **Validation**: Required parameters, special character checking, secret type validation
+- **Security**: Secure credential handling, comprehensive input validation
+
 ### 2. Safe Management Tools (Basic)
 
 #### `list_safes`
