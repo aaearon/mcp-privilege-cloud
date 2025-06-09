@@ -466,95 +466,121 @@ class TestAccountManagement:
 
     async def test_create_account_with_platform_properties(self, server, minimal_account_data, created_account_response):
         """Test creating account with platform-specific properties"""
-        account_data = {
+        platform_properties = {
+            "LogonDomain": "CORPORATE",
+            "Port": "22",
+            "Location": "DataCenter1"
+        }
+        
+        expected_api_call = {
             **minimal_account_data,
-            "platformAccountProperties": {
-                "LogonDomain": "CORPORATE",
-                "Port": "22",
-                "Location": "DataCenter1"
-            }
+            "platformAccountProperties": platform_properties
         }
         
         with patch.object(server, '_make_api_request', return_value=created_account_response) as mock_request:
-            result = await server.create_account(**account_data)
+            result = await server.create_account(
+                platform_id=minimal_account_data["platformId"],
+                safe_name=minimal_account_data["safeName"],
+                platform_account_properties=platform_properties
+            )
             
             assert result == created_account_response
-            mock_request.assert_called_once_with("POST", "Accounts", json=account_data)
+            mock_request.assert_called_once_with("POST", "Accounts", json=expected_api_call)
 
     async def test_create_account_with_manual_secret_management(self, server, minimal_account_data, created_account_response):
         """Test creating account with manual secret management"""
-        account_data = {
-            **minimal_account_data,
-            "secretManagement": {
-                "automaticManagementEnabled": False,
-                "manualManagementReason": "Legacy system compatibility"
-            }
+        secret_mgmt = {
+            "automaticManagementEnabled": False,
+            "manualManagementReason": "Legacy system compatibility"
         }
         
         expected_response = {
             **created_account_response,
-            "secretManagement": {
-                "automaticManagementEnabled": False,
-                "manualManagementReason": "Legacy system compatibility"
-            }
+            "secretManagement": secret_mgmt
+        }
+        
+        expected_api_call = {
+            **minimal_account_data,
+            "secretManagement": secret_mgmt
         }
         
         with patch.object(server, '_make_api_request', return_value=expected_response) as mock_request:
-            result = await server.create_account(**account_data)
+            result = await server.create_account(
+                platform_id=minimal_account_data["platformId"],
+                safe_name=minimal_account_data["safeName"],
+                secret_management=secret_mgmt
+            )
             
             assert result == expected_response
             assert result["secretManagement"]["automaticManagementEnabled"] is False
-            mock_request.assert_called_once_with("POST", "Accounts", json=account_data)
+            mock_request.assert_called_once_with("POST", "Accounts", json=expected_api_call)
 
     async def test_create_account_with_remote_machines_access(self, server, minimal_account_data, created_account_response):
         """Test creating account with remote machine access restrictions"""
-        account_data = {
+        remote_access = {
+            "remoteMachines": "web01.example.com;web02.example.com;db01.example.com",
+            "accessRestrictedToRemoteMachines": True
+        }
+        
+        expected_api_call = {
             **minimal_account_data,
-            "remoteMachinesAccess": {
-                "remoteMachines": "web01.example.com;web02.example.com;db01.example.com",
-                "accessRestrictedToRemoteMachines": True
-            }
+            "remoteMachinesAccess": remote_access
         }
         
         with patch.object(server, '_make_api_request', return_value=created_account_response) as mock_request:
-            result = await server.create_account(**account_data)
+            result = await server.create_account(
+                platform_id=minimal_account_data["platformId"],
+                safe_name=minimal_account_data["safeName"],
+                remote_machines_access=remote_access
+            )
             
             assert result == created_account_response
-            mock_request.assert_called_once_with("POST", "Accounts", json=account_data)
+            mock_request.assert_called_once_with("POST", "Accounts", json=expected_api_call)
 
     async def test_create_account_api_permission_error(self, server, minimal_account_data):
         """Test creating account with insufficient permissions"""
         with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Insufficient permissions")):
             with pytest.raises(CyberArkAPIError, match="Insufficient permissions"):
-                await server.create_account(**minimal_account_data)
+                await server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"]
+                )
 
     async def test_create_account_duplicate_account_error(self, server, minimal_account_data):
         """Test creating account that already exists"""
         with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Account already exists")):
             with pytest.raises(CyberArkAPIError, match="Account already exists"):
-                await server.create_account(**minimal_account_data)
+                await server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"]
+                )
 
     async def test_create_account_invalid_platform_error(self, server, minimal_account_data):
         """Test creating account with non-existent platform"""
-        account_data = {**minimal_account_data, "platformId": "NonExistentPlatform"}
-        
         with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Platform not found")):
             with pytest.raises(CyberArkAPIError, match="Platform not found"):
-                await server.create_account(**account_data)
+                await server.create_account(
+                    platform_id="NonExistentPlatform",
+                    safe_name=minimal_account_data["safeName"]
+                )
 
     async def test_create_account_invalid_safe_error(self, server, minimal_account_data):
         """Test creating account in non-existent safe"""
-        account_data = {**minimal_account_data, "safeName": "NonExistentSafe"}
-        
         with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Safe not found")):
             with pytest.raises(CyberArkAPIError, match="Safe not found"):
-                await server.create_account(**account_data)
+                await server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name="NonExistentSafe"
+                )
 
     async def test_create_account_network_error(self, server, minimal_account_data):
         """Test creating account with network connectivity issues"""
         with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Network error")):
             with pytest.raises(CyberArkAPIError, match="Network error"):
-                await server.create_account(**minimal_account_data)
+                await server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"]
+                )
 
     async def test_create_account_logging(self, server, minimal_account_data, created_account_response, caplog):
         """Test that account creation generates appropriate log messages"""
@@ -562,7 +588,10 @@ class TestAccountManagement:
         
         with patch.object(server, '_make_api_request', return_value=created_account_response):
             with caplog.at_level(logging.INFO):
-                await server.create_account(**minimal_account_data)
+                await server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"]
+                )
                 
                 # Check that appropriate log message was generated
                 assert "Creating account in safe" in caplog.text
@@ -571,22 +600,15 @@ class TestAccountManagement:
 
     async def test_create_account_parameter_sanitization(self, server, minimal_account_data):
         """Test that None and empty parameters are properly handled"""
-        account_data = {
-            **minimal_account_data,
-            "name": "",
-            "address": None,
-            "userName": "",
-            "secret": None
-        }
-        
-        # Mock to capture the actual request data
-        expected_clean_data = {
-            "platformId": "WinServerLocal",
-            "safeName": "IT-Infrastructure"
-        }
-        
         with patch.object(server, '_make_api_request', return_value={"id": "123"}) as mock_request:
-            await server.create_account(**account_data)
+            await server.create_account(
+                platform_id=minimal_account_data["platformId"],
+                safe_name=minimal_account_data["safeName"],
+                name="",
+                address=None,
+                user_name="",
+                secret=None
+            )
             
             # Verify that empty/None values were filtered out
             called_args = mock_request.call_args
@@ -602,9 +624,6 @@ class TestAccountManagement:
         """Test concurrent account creation operations"""
         import asyncio
         
-        account_data_1 = {**minimal_account_data, "userName": "admin1"}
-        account_data_2 = {**minimal_account_data, "userName": "admin2"}
-        
         response_1 = {**created_account_response, "id": "123_1", "userName": "admin1"}
         response_2 = {**created_account_response, "id": "123_2", "userName": "admin2"}
         
@@ -619,8 +638,16 @@ class TestAccountManagement:
         with patch.object(server, '_make_api_request', side_effect=mock_request_side_effect):
             # Run account creations concurrently
             tasks = [
-                server.create_account(**account_data_1),
-                server.create_account(**account_data_2)
+                server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"],
+                    user_name="admin1"
+                ),
+                server.create_account(
+                    platform_id=minimal_account_data["platformId"],
+                    safe_name=minimal_account_data["safeName"],
+                    user_name="admin2"
+                )
             ]
             
             results = await asyncio.gather(*tasks)
