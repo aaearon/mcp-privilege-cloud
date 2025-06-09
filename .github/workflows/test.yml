@@ -35,10 +35,10 @@ jobs:
 
     - name: Run unit tests
       run: |
-        pytest tests/ -v --tb=short -m "not integration"
+        pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto
 
     - name: Run unit tests with coverage
       if: matrix.python-version == '3.13'
       run: |
         pip install pytest-cov
-        pytest tests/ -v --tb=short -m "not integration" --cov=src/cyberark_mcp --cov-report=term
+        pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto --cov=src/cyberark_mcp --cov-report=term
