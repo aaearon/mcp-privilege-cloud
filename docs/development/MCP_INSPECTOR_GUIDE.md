@@ -52,15 +52,18 @@ Once connected, you should see these tools in the Inspector:
 - `list_accounts` 
 - `get_account_details`
 - `search_accounts`
+- `create_account`
 - `list_safes`
 - `get_safe_details`
+- `list_platforms`
+- `get_platform_details`
 
 ## 🧪 Testing Without Real Credentials
 
 You can test the tool structure and validation even without CyberArk credentials:
 
 ### Test 1: Tool Discovery
-In MCP Inspector, you should see all 6 tools listed. Click on each to see their parameters:
+In MCP Inspector, you should see all 10 tools listed. Click on each to see their parameters:
 
 #### `health_check`
 - **Parameters**: None
@@ -96,6 +99,32 @@ In MCP Inspector, you should see all 6 tools listed. Click on each to see their 
 - **Parameters**:
   - `safe_name` (required): Name of the safe
 - **Purpose**: Get detailed safe information
+
+#### `create_account`
+- **Parameters**:
+  - `platform_id` (required): Platform ID (e.g., WinServerLocal)
+  - `safe_name` (required): Safe where account will be created
+  - `name` (optional): Account name/identifier
+  - `address` (optional): Target address/hostname
+  - `user_name` (optional): Username for the account
+  - `secret` (optional): Password or SSH key
+  - `secret_type` (optional): Type of secret ('password' or 'key')
+  - `platform_account_properties` (optional): Platform-specific properties
+  - `secret_management` (optional): Secret management configuration
+  - `remote_machines_access` (optional): Remote access configuration
+- **Purpose**: Create new privileged accounts
+
+#### `list_platforms`
+- **Parameters**:
+  - `search` (optional): Search term for platform names
+  - `active` (optional): Filter by active status (true/false)
+  - `system_type` (optional): Filter by system type (e.g., Windows, Unix)
+- **Purpose**: List available platforms
+
+#### `get_platform_details`
+- **Parameters**:
+  - `platform_id` (required): Unique platform identifier
+- **Purpose**: Get detailed platform configuration
 
 ### Test 2: Parameter Validation
 Try calling tools with invalid parameters to test validation:
@@ -283,7 +312,7 @@ python src/cyberark_mcp/mcp_server.py
 ## 📊 Expected Test Results
 
 ### Successful Connection
-- ✅ 6 tools appear in Inspector interface
+- ✅ 10 tools appear in Inspector interface
 - ✅ Tool parameters are correctly displayed
 - ✅ Tools can be called without errors
 

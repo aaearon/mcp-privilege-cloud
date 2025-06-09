@@ -167,8 +167,10 @@ CYBERARK_LOG_LEVEL=INFO
 ### Primary Tools (MVP)
 1. **Account Discovery**: `list_accounts`, `search_accounts`
 2. **Account Information**: `get_account_details`
-3. **Safe Information**: `list_safes`, `get_safe_details`
-4. **Platform Information**: `list_platforms`, `get_platform_details`
+3. **Account Management**: `create_account`
+4. **Safe Information**: `list_safes`, `get_safe_details`
+5. **Platform Information**: `list_platforms`, `get_platform_details`
+6. **Health Monitoring**: `health_check`
 
 ### Secondary Tools (Future)
 1. **Password Operations**: Password retrieval and management
@@ -179,12 +181,14 @@ CYBERARK_LOG_LEVEL=INFO
 ## Success Metrics
 
 ### MVP Success Criteria
-- [ ] Successful authentication with CyberArk Privilege Cloud
-- [ ] Ability to list and search accounts
-- [ ] Retrieve detailed account information
-- [ ] List and view safe information
-- [ ] Proper error handling and logging
-- [ ] Integration with MCP Inspector for testing
+- [x] Successful authentication with CyberArk Privilege Cloud
+- [x] Ability to list and search accounts
+- [x] Retrieve detailed account information
+- [x] Create new privileged accounts
+- [x] List and view safe information
+- [x] List and view platform information
+- [x] Proper error handling and logging
+- [x] Integration with MCP Inspector for testing
 
 ### Performance Targets
 - **Response Time**: < 5 seconds for typical API calls

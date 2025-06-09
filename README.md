@@ -201,6 +201,37 @@ Get detailed information about a specific platform.
 await client.call_tool("get_platform_details", {"platform_id": "WinServerLocal"})
 ```
 
+#### `create_account`
+Create a new privileged account in CyberArk Privilege Cloud.
+
+```python
+# Parameters:
+# - platform_id (required): Platform ID (e.g., WinServerLocal, UnixSSH)
+# - safe_name (required): Safe where account will be created
+# - name (optional): Account name/identifier
+# - address (optional): Target address/hostname
+# - user_name (optional): Username for the account
+# - secret (optional): Password or SSH key
+# - secret_type (optional): Type of secret ('password' or 'key')
+# - platform_account_properties (optional): Platform-specific properties
+# - secret_management (optional): Secret management configuration
+# - remote_machines_access (optional): Remote access configuration
+
+# Example:
+await client.call_tool("create_account", {
+    "platform_id": "WinServerLocal",
+    "safe_name": "IT-Infrastructure",
+    "name": "ServerAdmin",
+    "address": "server.domain.com",
+    "user_name": "admin",
+    "secret": "SecurePassword123!",
+    "platform_account_properties": {
+        "LogonDomain": "CORP",
+        "Port": "3389"
+    }
+})
+```
+
 #### `health_check`
 Perform a health check of the CyberArk connection.
 

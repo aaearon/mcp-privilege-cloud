@@ -29,7 +29,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
    - FastMCP server implementation
-   - 8 exposed tools for CyberArk operations
+   - 10 exposed tools for CyberArk operations
    - Proper tool parameter validation
    - Windows-compatible encoding handling
 
@@ -130,7 +130,7 @@ The project follows strict TDD principles:
 
 ### Running Tests
 ```bash
-pytest                    # All tests (115+ total)
+pytest                    # All tests (108 total)
 pytest -m auth           # Authentication tests only
 pytest -m integration    # Integration tests only
 pytest -k platform      # Platform management tests only
