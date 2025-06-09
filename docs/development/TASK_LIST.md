@@ -91,10 +91,16 @@
 
 ## Future Enhancements (Post-MVP)
 
-### 🚀 Advanced Features (Planned for later)
-- Safe management operations (list, get, create safes)
-- Password operations (retrieve, change passwords)
-- Session monitoring operations
+### 🔥 **Immediate Priority (Next Sprint)**
+- Password operations (retrieve, change, verify passwords)
+- Advanced account operations (update_account, delete_account)
+
+### 🚀 **Medium Priority (Future Sprints)**
+- Enhanced safe management operations (create_safe, update_safe, list_safe_members)
+
+### 📊 **Lower Priority (Long-term)**
+- Session monitoring operations (list, terminate, recordings)
+- Reporting and analytics operations
 - Advanced logging and error handling
 - Performance optimizations
 - Comprehensive error recovery
