@@ -234,13 +234,25 @@ class TestCyberArkAuthenticator:
     async def test_concurrent_token_requests(self, authenticator):
         """Test that concurrent token requests don't cause race conditions"""
         import asyncio
+        from datetime import datetime, timedelta
         
-        with patch.object(authenticator, '_request_new_token', return_value="concurrent-token") as mock_request:
+        # Make sure there's no valid token initially
+        authenticator._token = None
+        authenticator._token_expiry = None
+        
+        async def mock_request_new_token():
+            # Simulate some delay and side effects
+            await asyncio.sleep(0.1)
+            authenticator._token = "concurrent-token"
+            authenticator._token_expiry = datetime.utcnow() + timedelta(minutes=15)
+            return "concurrent-token"
+        
+        with patch.object(authenticator, '_request_new_token', side_effect=mock_request_new_token) as mock_request:
             # Simulate multiple concurrent requests
             tasks = [authenticator.get_valid_token() for _ in range(5)]
             tokens = await asyncio.gather(*tasks)
             
             # All should return the same token
             assert all(token == "concurrent-token" for token in tokens)
-            # Should only make one actual request
+            # Should only make one actual request due to locking
             assert mock_request.call_count == 1

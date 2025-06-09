@@ -123,10 +123,16 @@ class TestIntegration:
 
     def test_server_lifecycle_management(self):
         """Test that server lifecycle is managed properly"""
-        # This would test the lifespan context manager
-        # For now, just verify the structure exists
-        from src.cyberark_mcp.mcp_server import server_lifespan
-        assert server_lifespan is not None
+        # Test that the MCP server can be imported and has required components
+        from src.cyberark_mcp.mcp_server import mcp
+        assert mcp is not None
+        assert mcp.name == "CyberArk Privilege Cloud MCP Server"
+        
+        # Verify that essential functions exist
+        from src.cyberark_mcp.mcp_server import list_accounts, get_account_details, health_check
+        assert list_accounts is not None
+        assert get_account_details is not None
+        assert health_check is not None
 
     def test_resource_endpoints(self):
         """Test that resource endpoints are defined"""

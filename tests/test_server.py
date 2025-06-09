@@ -219,8 +219,10 @@ class TestCyberArkMCPServer:
             call_count += 1
             if call_count == 1:
                 mock_response = Mock()
+                mock_error_response = Mock()
+                mock_error_response.status_code = 401
                 mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-                    "401 Unauthorized", request=Mock(), response=Mock()
+                    "401 Unauthorized", request=Mock(), response=mock_error_response
                 )
                 return mock_response
             else:

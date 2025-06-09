@@ -122,9 +122,17 @@ class CyberArkAuthenticator:
     
     async def get_valid_token(self) -> str:
         """Get a valid OAuth token, refreshing if necessary"""
+        # Quick check without lock first
+        if self._is_token_valid():
+            logger.debug("Using cached token")
+            return self._token
+            
+        # Need to refresh token, acquire lock
         async with self._token_lock:
+            # Double-check token validity after acquiring lock
+            # Another coroutine might have refreshed it while we were waiting
             if self._is_token_valid():
-                logger.debug("Using cached token")
+                logger.debug("Using cached token (refreshed by concurrent request)")
                 return self._token
             
             logger.debug("Token invalid or near expiry, requesting new token")
