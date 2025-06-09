@@ -69,11 +69,19 @@ This document outlines the development plan for creating a Model Context Protoco
 - Document any issues and resolutions
 
 ## Future Enhancements (Post-MVP)
-- Safe management operations
-- Password retrieval and management
-- Session monitoring capabilities
+
+### 🔥 **Immediate Priority (Next Sprint)**
+- Password retrieval and management operations
+- Advanced account operations (update, delete)
+
+### 🚀 **Medium Priority (Future Sprints)**  
+- Enhanced safe management operations
 - Advanced error handling and retry logic
 - Performance optimizations
+
+### 📊 **Lower Priority (Long-term)**
+- Session monitoring capabilities
+- Reporting and analytics features
 
 ## Success Criteria
 - [ ] Server authenticates successfully with CyberArk Privilege Cloud
