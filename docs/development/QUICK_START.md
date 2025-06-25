@@ -3,6 +3,26 @@
 ## ✅ Issue Resolved
 The import error has been fixed! You now have multiple ways to start the server.
 
+## 📋 Prerequisites
+
+Before starting the server, ensure you have:
+- Python 3.8 or higher
+- pipenv installed (`pip install pipenv`)
+
+## 🚀 Setup and Installation
+
+### First Time Setup
+```bash
+# Navigate to project directory
+cd /mnt/c/Users/Tim/Projects/mcp-privilege-cloud
+
+# Install dependencies and create virtual environment
+pipenv install --dev
+
+# Verify installation
+pipenv graph
+```
+
 ## 🚀 How to Start the Server
 
 ### Option 1: Using the New Entry Point (Recommended)
@@ -10,11 +30,8 @@ The import error has been fixed! You now have multiple ways to start the server.
 # Navigate to project directory
 cd /mnt/c/Users/Tim/Projects/mcp-privilege-cloud
 
-# Activate virtual environment
-source venv/bin/activate
-
-# Start server using the dedicated entry point
-python run_server.py
+# Start server using pipenv (automatically handles virtual environment)
+pipenv run python run_server.py
 ```
 
 ### Option 2: Using the Original MCP Server File
@@ -22,11 +39,8 @@ python run_server.py
 # Navigate to project directory
 cd /mnt/c/Users/Tim/Projects/mcp-privilege-cloud
 
-# Activate virtual environment  
-source venv/bin/activate
-
-# Start server (now with fixed imports)
-python src/cyberark_mcp/mcp_server.py
+# Start server using pipenv (now with fixed imports)
+pipenv run python src/cyberark_mcp/mcp_server.py
 ```
 
 ### Option 3: Using the Inspector Helper Script
@@ -34,11 +48,8 @@ python src/cyberark_mcp/mcp_server.py
 # Navigate to project directory
 cd /mnt/c/Users/Tim/Projects/mcp-privilege-cloud
 
-# Activate virtual environment
-source venv/bin/activate
-
-# Start with helpful Inspector instructions
-python start_for_inspector.py
+# Start with helpful Inspector instructions using pipenv
+pipenv run python start_for_inspector.py
 ```
 
 ## 🔧 What Was Fixed
@@ -59,7 +70,7 @@ ImportError: attempted relative import with no known parent package
 
 ### Step 1: Start the Server
 ```bash
-python run_server.py
+pipenv run python run_server.py
 ```
 
 **Expected Output:**
@@ -77,8 +88,10 @@ npm install -g @modelcontextprotocol/inspector
 ### Step 3: Connect Inspector
 1. Open MCP Inspector in your browser
 2. Choose **"Command"** connection type
-3. Enter: `python /mnt/c/Users/Tim/Projects/mcp-privilege-cloud/run_server.py`
+3. Enter: `pipenv run python /mnt/c/Users/Tim/Projects/mcp-privilege-cloud/run_server.py`
 4. Click **"Connect"**
+
+**Note**: Make sure you're in the project directory when running the Inspector command, or use the full path with pipenv.
 
 ### Step 4: Test Tools
 You should see these 6 tools available:
@@ -99,7 +112,7 @@ You should see these 6 tools available:
 
 2. **Test connectivity:**
    ```bash
-   python -c "
+   pipenv run python -c "
    import asyncio, sys, os
    sys.path.insert(0, 'src')
    from cyberark_mcp.server import CyberArkMCPServer
@@ -111,7 +124,7 @@ You should see these 6 tools available:
 
 3. **Start server with real credentials:**
    ```bash
-   python run_server.py
+   pipenv run python run_server.py
    ```
 
 ## 🆘 Troubleshooting
@@ -122,11 +135,15 @@ You should see these 6 tools available:
 which python
 python --version
 
-# Check dependencies
-pip list | grep mcp
+# Check pipenv installation
+which pipenv
+pipenv --version
+
+# Check virtual environment and dependencies
+pipenv graph
 
 # Run MVP test
-python test_mvp.py
+pipenv run python test_mvp.py
 ```
 
 ### Import Errors
@@ -137,6 +154,10 @@ ls -la run_server.py
 
 # Check src directory exists
 ls -la src/cyberark_mcp/
+
+# Check pipenv virtual environment status
+pipenv --venv
+pipenv check
 ```
 
 ### Inspector Connection Issues

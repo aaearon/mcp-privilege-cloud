@@ -23,10 +23,14 @@ MANIFEST
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 env.bak/
 venv.bak/
+
+# Pipenv
+# Pipfile.lock should be committed - DO NOT ignore
 
 # Environment variables and secrets
 .env

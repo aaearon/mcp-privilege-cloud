@@ -132,12 +132,12 @@ The project follows strict TDD principles:
 
 ### Running Tests
 ```bash
-pytest                    # All tests (118+ total)
-pytest -m auth           # Authentication tests only
-pytest -m integration    # Integration tests only
-pytest -k platform      # Platform management tests only
-pytest -k safe          # Safe management tests only
-pytest --cov=src/cyberark_mcp  # With coverage
+pipenv run pytest                    # All tests (118+ total)
+pipenv run pytest -m auth           # Authentication tests only
+pipenv run pytest -m integration    # Integration tests only
+pipenv run pytest -k platform      # Platform management tests only
+pipenv run pytest -k safe          # Safe management tests only
+pipenv run pytest --cov=src/cyberark_mcp  # With coverage
 ```
 
 ## Known Issues and Limitations
@@ -241,19 +241,19 @@ npx @modelcontextprotocol/inspector
 ### Debugging Commands
 ```bash
 # Test configuration
-python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print(asyncio.run(server.health_check()))"
+pipenv run python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print(asyncio.run(server.health_check()))"
 
 # Verify MCP server loads
-python -c "from src.cyberark_mcp.mcp_server import mcp; print('MCP server loaded:', mcp.name)"
+pipenv run python -c "from src.cyberark_mcp.mcp_server import mcp; print('MCP server loaded:', mcp.name)"
 
 # Test authentication only
-python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import asyncio; auth = CyberArkAuthenticator.from_environment(); print(asyncio.run(auth.get_auth_header()))"
+pipenv run python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import asyncio; auth = CyberArkAuthenticator.from_environment(); print(asyncio.run(auth.get_auth_header()))"
 
 # Test platform management specifically
-python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); platforms = asyncio.run(server.list_platforms()); print(f'Found {len(platforms)} platforms')"
+pipenv run python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); platforms = asyncio.run(server.list_platforms()); print(f'Found {len(platforms)} platforms')"
 
 # Debug platform API response structure
-python debug_platform_api.py  # Use the debug script for detailed platform analysis
+pipenv run python debug_platform_api.py  # Use the debug script for detailed platform analysis
 ```
 
 ## Code Quality Standards

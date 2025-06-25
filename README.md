@@ -22,6 +22,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 ## Prerequisites
 
 - Python 3.8 or higher
+- pipenv (install with `pip install pipenv`)
 - CyberArk Privilege Cloud tenant
 - CyberArk Identity service account with appropriate permissions
 
@@ -33,15 +34,14 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
    cd mcp-privilege-cloud
    ```
 
-2. **Create and activate virtual environment**:
+2. **Install pipenv (if not already installed)**:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install pipenv
    ```
 
-3. **Install dependencies**:
+3. **Install dependencies and create virtual environment**:
    ```bash
-   pip install -r requirements.txt
+   pipenv install --dev
    ```
 
 ## Configuration
@@ -85,7 +85,7 @@ CYBERARK_LOG_LEVEL=INFO
 
 3. **Test Configuration**:
    ```bash
-   python -c "
+   pipenv run python -c "
    from src.cyberark_mcp.server import CyberArkMCPServer
    import asyncio
    server = CyberArkMCPServer.from_environment()
@@ -100,13 +100,13 @@ CYBERARK_LOG_LEVEL=INFO
 
 ```bash
 # Recommended: Use the multiplatform launcher
-python run_server.py
+pipenv run python run_server.py
 
 # Alternative: Direct execution
-python src/cyberark_mcp/mcp_server.py
+pipenv run python src/cyberark_mcp/mcp_server.py
 
 # Or using the module
-python -m src.cyberark_mcp.mcp_server
+pipenv run python -m src.cyberark_mcp.mcp_server
 ```
 
 ### Available Tools
@@ -248,18 +248,18 @@ await client.call_tool("health_check", {})
 
 ```bash
 # Run all tests
-pytest
+pipenv run pytest
 
 # Run specific test categories
-pytest -m auth      # Authentication tests
-pytest -m unit      # Unit tests
-pytest -m integration  # Integration tests
+pipenv run pytest -m auth      # Authentication tests
+pipenv run pytest -m unit      # Unit tests
+pipenv run pytest -m integration  # Integration tests
 
 # Run with coverage
-pytest --cov=src/cyberark_mcp
+pipenv run pytest --cov=src/cyberark_mcp
 
 # Verbose output
-pytest -v
+pipenv run pytest -v
 ```
 
 ### Test Structure
@@ -277,7 +277,7 @@ For detailed MCP Inspector testing instructions, see the [MCP Inspector Guide](d
 
 Quick start:
 1. Install: `npx @modelcontextprotocol/inspector`
-2. Start server: `python run_server.py` (works on all platforms)
+2. Start server: `pipenv run python run_server.py` (works on all platforms)
 3. Connect Inspector to test tools interactively
 
 ## Troubleshooting
@@ -308,7 +308,7 @@ Enable debug logging:
 
 ```bash
 export CYBERARK_LOG_LEVEL=DEBUG
-python src/cyberark_mcp/mcp_server.py
+pipenv run python src/cyberark_mcp/mcp_server.py
 ```
 
 ### Health Check
@@ -316,7 +316,7 @@ python src/cyberark_mcp/mcp_server.py
 Use the built-in health check to verify connectivity:
 
 ```bash
-python -c "
+pipenv run python -c "
 import asyncio
 from src.cyberark_mcp.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
@@ -363,7 +363,8 @@ mcp-privilege-cloud/
 │   ├── SERVER_CAPABILITIES.md  # Feature specifications
 │   └── TASK_LIST.md            # Development tasks
 ├── run_server.py               # Multiplatform entry point
-├── requirements.txt            # Dependencies
+├── Pipfile                     # Pipenv dependencies
+├── Pipfile.lock               # Locked dependency versions
 └── README.md                   # This file
 ```
 
