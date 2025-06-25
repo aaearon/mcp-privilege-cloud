@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.13"]
+        python-version: ["3.10"]
 
     steps:
     - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         pipenv run pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto
 
     - name: Run unit tests with coverage
-      if: matrix.python-version == '3.13'
+      if: matrix.python-version == '3.10'
       run: |
         pipenv install pytest-cov
         pipenv run pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto --cov=src/cyberark_mcp --cov-report=term
