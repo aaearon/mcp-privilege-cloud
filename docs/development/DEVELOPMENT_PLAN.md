@@ -12,6 +12,7 @@ This document outlines the development plan for creating a Model Context Protoco
 ## Phase 1: Research & Design
 
 ### 1. Research CyberArk Privilege Cloud APIs
+- Refer to the official [Python SDK for CyberArk](https://github.com/cyberark/ark-sdk-python) for information about API endpoints.
 - Ask me to provide the information for all CyberArk Privilege Cloud API endpoints as the documentation is not accessible.
 
 ### 2. Study MCP Protocol
@@ -72,7 +73,7 @@ This document outlines the development plan for creating a Model Context Protoco
 - Password retrieval and management operations
 - Advanced account operations (update, delete)
 
-### 🚀 **Medium Priority (Future Sprints)**  
+### 🚀 **Medium Priority (Future Sprints)**
 - Enhanced safe management operations
 - Advanced error handling and retry logic
 - Performance optimizations

@@ -79,6 +79,8 @@ CYBERARK_LOG_LEVEL=INFO        # Logging level
 
 ## Development Patterns
 
+See @INSTRUCTIONS.md.
+
 ### Continuous Integration (CI/CD)
 The project includes automated testing infrastructure to ensure code quality:
 
