@@ -123,23 +123,29 @@ The project follows strict TDD principles:
 ## Testing Strategy
 
 ### Test Structure
-- `tests/test_auth.py` - Authentication and token management (20+ tests)
-- `tests/test_server.py` - Core server functionality (45+ tests with enhanced safe management)
-- `tests/test_account_mgmt.py` - Account operations (35+ tests with account creation)
-- `tests/test_platform_mgmt.py` - Platform management operations (7+ comprehensive tests)
-- `tests/test_mcp_platform_tools.py` - MCP platform tools integration (5+ tests)
-- `tests/test_create_account_mcp.py` - Account creation MCP tool integration (2+ tests)
-- `tests/test_safe_management_mcp.py` - Safe management MCP tools integration (8+ comprehensive tests)
-- `tests/test_integration.py` - End-to-end integration (10+ tests)
+- `tests/test_core_functionality.py` - Authentication, server core, and platform management (64+ tests)
+  - TestAuthentication - Token management and OAuth flow (20+ tests)
+  - TestServerCore - Basic server operations and safe management (28+ tests) 
+  - TestPlatformManagement - Platform operations and API integration (16+ tests)
+- `tests/test_account_operations.py` - Account lifecycle management (35+ tests)
+  - Account listing, details, search, and creation operations
+  - Comprehensive validation and error handling scenarios
+- `tests/test_mcp_integration.py` - MCP tool wrappers and integration (15+ tests)
+  - TestMCPAccountTools - Account creation MCP tools (2+ tests)
+  - TestMCPPlatformTools - Platform MCP tools integration (5+ tests)
+  - TestMCPSafeTools - Safe management MCP tools integration (8+ tests)
+- `tests/test_integration.py` - End-to-end integration and system tests (10+ tests)
 
 ### Running Tests
 ```bash
-pytest                    # All tests (118+ total)
-pytest -m auth           # Authentication tests only
-pytest -m integration    # Integration tests only
-pytest -k platform      # Platform management tests only
-pytest -k safe          # Safe management tests only
-pytest --cov=src/cyberark_mcp  # With coverage
+pytest                              # All tests (124+ total)
+pytest tests/test_core_functionality.py    # Core functionality tests only
+pytest tests/test_account_operations.py    # Account operations tests only
+pytest tests/test_mcp_integration.py       # MCP integration tests only
+pytest -m integration              # Integration tests only
+pytest -k platform                 # Platform management tests only
+pytest -k safe                     # Safe management tests only
+pytest --cov=src/cyberark_mcp      # With coverage
 ```
 
 ## Known Issues and Limitations

@@ -264,12 +264,10 @@ pytest -v
 
 ### Test Structure
 
-- `tests/test_auth.py`: Authentication and token management tests
-- `tests/test_server.py`: Core server functionality tests
-- `tests/test_account_mgmt.py`: Account management operation tests
-- `tests/test_platform_mgmt.py`: Platform management operation tests
-- `tests/test_mcp_platform_tools.py`: MCP platform tools integration tests
-- `tests/test_integration.py`: End-to-end integration tests
+- `tests/test_core_functionality.py`: Authentication, server core, and platform management tests (64+ tests)
+- `tests/test_account_operations.py`: Account lifecycle management tests (35+ tests)
+- `tests/test_mcp_integration.py`: MCP tool wrappers and integration tests (15+ tests)
+- `tests/test_integration.py`: End-to-end integration tests (10+ tests)
 
 ## MCP Inspector Testing
 
@@ -349,13 +347,11 @@ mcp-privilege-cloud/
 │   ├── auth.py                 # Authentication module
 │   ├── server.py               # Core server functionality  
 │   └── mcp_server.py           # MCP protocol integration
-├── tests/                      # Test suite
-│   ├── test_auth.py            # Authentication tests
-│   ├── test_server.py          # Server tests
-│   ├── test_account_mgmt.py    # Account management tests
-│   ├── test_platform_mgmt.py   # Platform management tests
-│   ├── test_mcp_platform_tools.py # MCP platform tools tests
-│   └── test_integration.py     # Integration tests
+├── tests/                      # Test suite (124+ tests)
+│   ├── test_core_functionality.py    # Core functionality tests
+│   ├── test_account_operations.py    # Account operations tests  
+│   ├── test_mcp_integration.py       # MCP integration tests
+│   └── test_integration.py           # End-to-end integration tests
 ├── docs/development/           # Development documentation
 │   ├── DEVELOPMENT_PLAN.md     # Development strategy
 │   ├── MCP_INSPECTOR_GUIDE.md  # Testing guide
