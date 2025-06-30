@@ -27,6 +27,32 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 
 ## Installation
 
+### Recommended Installation (using `uv`)
+
+1. **Install uv** (Python package manager):
+   ```bash
+   # macOS/Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Windows
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   
+   # Or via pip
+   pip install uv
+   ```
+
+2. **Install the MCP server**:
+   ```bash
+   # Production installation
+   uvx mcp-privilege-cloud
+   
+   # Or clone for development
+   git clone <repository-url>
+   cd mcp-privilege-cloud
+   ```
+
+### Alternative Installation (traditional Python)
+
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
@@ -67,16 +93,33 @@ For detailed setup instructions, service account configuration, and troubleshoot
 
 ### Running the MCP Server
 
+#### Standardized Execution Methods (Recommended)
+
 ```bash
-# Recommended: Use the multiplatform launcher
+# Primary: Production execution (requires installation via uvx)
+uvx mcp-privilege-cloud
+
+# Development: Execute from project directory
+uv run mcp-privilege-cloud
+
+# Module execution: Standard Python module approach
+python -m cyberark_mcp
+```
+
+#### Legacy Execution Methods
+
+```bash
+# Legacy: Multiplatform launcher (deprecated)
 python run_server.py
 
-# Alternative: Direct execution
+# Legacy: Direct execution (deprecated)  
 python src/cyberark_mcp/mcp_server.py
 
-# Or using the module
+# Legacy: Module path execution (deprecated)
 python -m src.cyberark_mcp.mcp_server
 ```
+
+> **Note**: The standardized execution methods (`uvx` and `uv run`) are now the recommended approach for running the MCP server. Legacy methods are maintained for backward compatibility but may be removed in future versions.
 
 ### Available Tools
 
@@ -88,6 +131,29 @@ The server provides 10 MCP tools for CyberArk operations:
 - **System**: `health_check`
 
 For detailed tool specifications, parameters, and examples, see [API Reference](docs/API_REFERENCE.md).
+
+## Standardized MCP Server Approach
+
+This project follows the MCP server standardization guidelines with:
+
+### Modern Execution Methods
+- **`uvx mcp-privilege-cloud`**: Direct execution without local installation
+- **`uv run mcp-privilege-cloud`**: Development execution with dependency management
+- **`python -m cyberark_mcp`**: Standard Python module execution
+
+### Key Benefits
+- **Simplified deployment**: No manual dependency management required
+- **Consistent experience**: Standardized across all MCP servers
+- **Development efficiency**: `uv` handles virtual environments automatically
+- **Production ready**: Direct execution with `uvx` for end users
+
+### Migration from Legacy Methods
+If you're currently using legacy execution methods (`python run_server.py`), we recommend migrating to the standardized approach:
+
+1. Install `uv`: Follow the installation instructions above
+2. Use `uvx mcp-privilege-cloud` for production deployments
+3. Use `uv run mcp-privilege-cloud` for development work
+4. Update any automation or integration scripts
 
 ## Testing
 
@@ -120,7 +186,7 @@ pytest -v
 
 Quick start for testing with MCP Inspector:
 1. Install: `npx @modelcontextprotocol/inspector`
-2. Start server: `python run_server.py` (works on all platforms)
+2. Start server: `uvx mcp-privilege-cloud` (recommended) or `python run_server.py` (legacy)
 3. Connect Inspector to test tools interactively
 
 For detailed testing instructions, see [Testing Guide](docs/TESTING.md).
