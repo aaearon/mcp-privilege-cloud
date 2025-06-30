@@ -112,6 +112,212 @@ class TestMCPAccountTools:
                 remote_machines_access=None
             )
 
+    @pytest.mark.asyncio
+    async def test_change_account_password_mcp_tool_cpm_managed(self):
+        """Test change_account_password MCP tool for CPM-managed accounts"""
+        from src.cyberark_mcp.mcp_server import change_account_password
+        
+        account_id = "123_456_789"
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Password change initiated successfully"
+        }
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance and its method
+            mock_server = Mock()
+            mock_server.change_account_password = AsyncMock(return_value=mock_response)
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool
+            result = await change_account_password(account_id=account_id)
+            
+            # Verify result
+            assert result == mock_response
+            assert result["id"] == account_id
+            assert "lastModifiedTime" in result
+            
+            # Verify server method was called correctly
+            mock_server.change_account_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_change_account_password_mcp_tool_manual_password(self):
+        """Test change_account_password MCP tool with manual password"""
+        from src.cyberark_mcp.mcp_server import change_account_password
+        
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Password changed successfully"
+        }
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance and its method
+            mock_server = Mock()
+            mock_server.change_account_password = AsyncMock(return_value=mock_response)
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool
+            result = await change_account_password(
+                account_id=account_id,
+                new_password=new_password
+            )
+            
+            # Verify result
+            assert result == mock_response
+            assert result["id"] == account_id
+            
+            # Verify server method was called correctly
+            mock_server.change_account_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=new_password
+            )
+
+    @pytest.mark.asyncio
+    async def test_change_account_password_mcp_tool_error_handling(self):
+        """Test change_account_password MCP tool error handling"""
+        from src.cyberark_mcp.mcp_server import change_account_password
+        from src.cyberark_mcp.server import CyberArkAPIError
+        
+        account_id = "invalid_account"
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance to raise an error
+            mock_server = Mock()
+            mock_server.change_account_password = AsyncMock(
+                side_effect=CyberArkAPIError("Account not found", 404)
+            )
+            mock_server_factory.return_value = mock_server
+            
+            # Verify that the error is propagated
+            with pytest.raises(CyberArkAPIError, match="Account not found"):
+                await change_account_password(account_id=account_id)
+            
+            # Verify server method was called
+            mock_server.change_account_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_verify_account_password_mcp_tool_success(self):
+        """Test verify account password MCP tool with successful verification"""
+        account_id = "123_456_789"
+        
+        mock_response = {
+            "id": account_id,
+            "lastVerifiedDateTime": "2025-06-30T10:30:00Z",
+            "verified": True,
+            "status": "Password verified successfully"
+        }
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer') as mock_server_class:
+            mock_server = AsyncMock()
+            mock_server.verify_account_password.return_value = mock_response
+            mock_server_class.from_environment.return_value = mock_server
+            
+            # Import and call the MCP tool function
+            from src.cyberark_mcp.mcp_server import verify_account_password
+            
+            result = await verify_account_password(account_id=account_id)
+            
+            # Verify the result
+            assert result["id"] == account_id
+            assert result["verified"] is True
+            assert "lastVerifiedDateTime" in result
+            assert "status" in result
+            
+            # Verify server method was called correctly
+            mock_server.verify_account_password.assert_called_once_with(account_id=account_id)
+    
+    @pytest.mark.asyncio
+    async def test_verify_account_password_mcp_tool_error_handling(self):
+        """Test verify account password MCP tool error handling"""
+        account_id = "invalid_account"
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer') as mock_server_class:
+            mock_server = AsyncMock()
+            mock_server.verify_account_password.side_effect = Exception("Account not found")
+            mock_server_class.from_environment.return_value = mock_server
+            
+            # Import and call the MCP tool function
+            from src.cyberark_mcp.mcp_server import verify_account_password
+            
+            with pytest.raises(Exception, match="Account not found"):
+                await verify_account_password(account_id=account_id)
+            
+            # Verify server method was called
+            mock_server.verify_account_password.assert_called_once_with(account_id=account_id)
+
+    @pytest.mark.asyncio
+    async def test_reconcile_account_password_mcp_tool_success(self):
+        """Test the reconcile_account_password MCP tool with successful reconciliation"""
+        from src.cyberark_mcp.mcp_server import reconcile_account_password
+        
+        account_id = "test_account_123"
+        
+        # Mock response from server
+        mock_response = {
+            "id": account_id,
+            "reconciled": True,
+            "status": "Password reconciled successfully",
+            "lastReconciledDateTime": "2025-06-30T10:30:00Z",
+            "platformId": "WinDomain",
+            "safeName": "TestSafe"
+        }
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance
+            mock_server = Mock()
+            mock_server.reconcile_account_password = AsyncMock(return_value=mock_response)
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool function
+            result = await reconcile_account_password(account_id=account_id)
+            
+            # Verify the result
+            assert result == mock_response
+            assert result["id"] == account_id
+            assert result["reconciled"] is True
+            assert result["status"] == "Password reconciled successfully"
+            assert result["lastReconciledDateTime"] == "2025-06-30T10:30:00Z"
+            
+            # Verify server method was called correctly
+            mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
+
+    @pytest.mark.asyncio
+    async def test_reconcile_account_password_mcp_tool_error_handling(self):
+        """Test the reconcile_account_password MCP tool error handling"""
+        from src.cyberark_mcp.mcp_server import reconcile_account_password
+        from src.cyberark_mcp.server import CyberArkAPIError
+        
+        account_id = "invalid_account"
+        
+        with patch('src.cyberark_mcp.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance to raise an error
+            mock_server = Mock()
+            mock_server.reconcile_account_password = AsyncMock(
+                side_effect=CyberArkAPIError("Account not found", 404)
+            )
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool function and expect error
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await reconcile_account_password(account_id=account_id)
+            
+            # Verify the error details
+            assert exc_info.value.status_code == 404
+            assert "Account not found" in str(exc_info.value)
+            
+            # Verify server method was called
+            mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
+
 
 class TestMCPPlatformTools:
     """Test MCP platform management tools integration"""
