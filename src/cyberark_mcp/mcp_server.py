@@ -192,6 +192,105 @@ async def create_account(
         logger.error(f"Error creating account: {e}")
         raise
 
+@mcp.tool()
+async def change_account_password(
+    account_id: str,
+    new_password: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Change the password for an existing account in CyberArk Privilege Cloud.
+    
+    This operation initiates an immediate password change for the specified account.
+    If no new password is provided, the Central Password Manager (CPM) will generate
+    a new password according to the platform's password policy.
+    
+    Args:
+        account_id: The unique ID of the account to change password for (required)
+        new_password: Optional new password. If not provided, CPM will generate one automatically
+    
+    Returns:
+        Password change response containing status, timestamps, and account metadata
+        
+    Security Notes:
+        - This operation requires appropriate permissions for password management
+        - Password changes are audited and logged in CyberArk
+        - Use CPM-generated passwords when possible for better security compliance
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        result = await server.change_account_password(
+            account_id=account_id,
+            new_password=new_password
+        )
+        logger.info(f"Password change initiated for account ID: {account_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error changing password for account ID: {account_id} - {e}")
+        raise
+
+@mcp.tool()
+async def verify_account_password(
+    account_id: str
+) -> Dict[str, Any]:
+    """
+    Verify the password for an existing account in CyberArk Privilege Cloud.
+    
+    This operation verifies that the current password for the specified account
+    is valid and up-to-date. It's useful for checking password status before
+    performing other operations or as part of compliance checks.
+    
+    Args:
+        account_id: The unique ID of the account to verify password for (required)
+    
+    Returns:
+        Password verification response containing verification status, timestamps, and account metadata
+        
+    Security Notes:
+        - This operation requires appropriate permissions for password verification
+        - Password verifications are audited and logged in CyberArk
+        - This operation does not expose the actual password, only verification status
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        result = await server.verify_account_password(account_id=account_id)
+        logger.info(f"Password verification completed for account ID: {account_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error verifying password for account ID: {account_id} - {e}")
+        raise
+
+@mcp.tool()
+async def reconcile_account_password(
+    account_id: str
+) -> Dict[str, Any]:
+    """
+    Reconcile the password for an existing account in CyberArk Privilege Cloud.
+    
+    This operation synchronizes the password between the CyberArk Vault and the target system.
+    It's useful when passwords may have been changed outside of CyberArk or when there's
+    a mismatch between the vault and target system credentials.
+    
+    Args:
+        account_id: The unique ID of the account to reconcile password for (required)
+    
+    Returns:
+        Password reconciliation response containing reconciliation status, timestamps, and account metadata
+        
+    Security Notes:
+        - This operation requires appropriate permissions for password management
+        - Password reconciliations are audited and logged in CyberArk
+        - This operation may take longer to complete as it involves communication with target systems
+        - The operation synchronizes credentials between vault and target without exposing passwords
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        result = await server.reconcile_account_password(account_id=account_id)
+        logger.info(f"Password reconciliation completed for account ID: {account_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error reconciling password for account ID: {account_id} - {e}")
+        raise
+
 
 @mcp.tool()
 async def list_safes(

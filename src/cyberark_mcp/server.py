@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 class CyberArkAPIError(Exception):
     """Raised when CyberArk API returns an error"""
-    pass
+    
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class CyberArkMCPServer:
@@ -108,7 +111,7 @@ class CyberArkMCPServer:
                 return await self._make_api_request(method, endpoint, params, data, json, retry_count + 1)
             else:
                 self._handle_api_error(e)
-                raise CyberArkAPIError(f"API request failed: {e}")
+                raise CyberArkAPIError(f"API request failed: {e}", e.response.status_code)
         except httpx.ConnectError as e:
             self._log_error(f"Network error: {e}")
             raise CyberArkAPIError(f"Network error: {e}")
@@ -139,6 +142,9 @@ class CyberArkMCPServer:
             "get_account_details",
             "search_accounts",
             "create_account",
+            "change_account_password",
+            "verify_account_password",
+            "reconcile_account_password",
             "list_safes",
             "get_safe_details",
             "list_platforms",
@@ -296,6 +302,150 @@ class CyberArkMCPServer:
             return response
         except Exception as e:
             self.logger.error(f"Failed to create account: {e}")
+            raise
+
+    async def change_account_password(
+        self,
+        account_id: str,
+        new_password: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Change the password for an existing account in CyberArk Privilege Cloud
+        
+        Args:
+            account_id: The unique ID of the account to change password for
+            new_password: Optional new password. If not provided, CPM will generate one
+            **kwargs: Additional parameters (not used currently)
+            
+        Returns:
+            Dict containing password change response with status and timestamps
+            
+        Raises:
+            ValueError: If account_id is missing or invalid
+            CyberArkAPIError: If the API request fails
+        """
+        # Validate required parameters
+        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
+            raise ValueError("account_id is required")
+        
+        # Ensure account_id is a string
+        if not isinstance(account_id, str):
+            raise ValueError("account_id is required")
+            
+        # Clean account_id
+        account_id = account_id.strip()
+        
+        # Build request payload
+        payload = {"ChangeImmediately": True}
+        
+        # Add new password if provided
+        if new_password and isinstance(new_password, str) and new_password.strip():
+            payload["NewCredentials"] = new_password
+        
+        # Log operation (without sensitive data)
+        if new_password:
+            self.logger.info(f"Changing password for account ID: {account_id} with manual password")
+        else:
+            self.logger.info(f"Initiating CPM password change for account ID: {account_id}")
+        
+        try:
+            response = await self._make_api_request(
+                "POST", 
+                f"Accounts/{account_id}/Change/",
+                json=payload
+            )
+            self.logger.info(f"Password change initiated successfully for account ID: {account_id}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to change password for account ID: {account_id} - {e}")
+            raise
+
+    async def verify_account_password(
+        self,
+        account_id: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Verify the password for an existing account in CyberArk Privilege Cloud
+        
+        Args:
+            account_id: The unique ID of the account to verify password for
+            **kwargs: Additional parameters (not used currently)
+            
+        Returns:
+            Dict containing password verification response with status and timestamps
+            
+        Raises:
+            ValueError: If account_id is missing or invalid
+            CyberArkAPIError: If the API request fails
+        """
+        # Validate required parameters
+        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
+            raise ValueError("account_id is required")
+        
+        # Ensure account_id is a string
+        if not isinstance(account_id, str):
+            raise ValueError("account_id is required")
+            
+        # Clean account_id
+        account_id = account_id.strip()
+        
+        # Log operation (without sensitive data)
+        self.logger.info(f"Initiating password verification for account ID: {account_id}")
+        
+        try:
+            response = await self._make_api_request(
+                "POST", 
+                f"Accounts/{account_id}/Verify/",
+                json={}
+            )
+            self.logger.info(f"Password verification completed successfully for account ID: {account_id}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to verify password for account ID: {account_id} - {e}")
+            raise
+
+    async def reconcile_account_password(
+        self,
+        account_id: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Reconcile the password for an existing account in CyberArk Privilege Cloud
+        
+        Args:
+            account_id: The unique ID of the account to reconcile password for
+            **kwargs: Additional parameters (not used currently)
+            
+        Returns:
+            Dict containing password reconciliation response with status and timestamps
+            
+        Raises:
+            ValueError: If account_id is missing or invalid
+            CyberArkAPIError: If the API request fails
+        """
+        # Validate required parameters
+        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
+            raise ValueError("account_id is required")
+        
+        # Ensure account_id is a string
+        if not isinstance(account_id, str):
+            raise ValueError("account_id is required")
+            
+        # Clean account_id
+        account_id = account_id.strip()
+        
+        # Log operation (without sensitive data)
+        self.logger.info(f"Initiating password reconciliation for account ID: {account_id}")
+        
+        try:
+            response = await self._make_api_request(
+                "POST", 
+                f"Accounts/{account_id}/Reconcile/",
+                json={}
+            )
+            self.logger.info(f"Password reconciliation completed successfully for account ID: {account_id}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to reconcile password for account ID: {account_id} - {e}")
             raise
     
     # Safe Management Tools
