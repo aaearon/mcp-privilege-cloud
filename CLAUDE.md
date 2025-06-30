@@ -72,6 +72,12 @@ This document provides essential context for AI assistants developing the CyberA
 3. Refactor while maintaining green tests
 4. Comprehensive test coverage with mocked external dependencies
 
+### Modern Development Workflow
+1. **Use `uv` for dependency management**: `uv run pytest` for testing
+2. **Standardized execution**: `uv run mcp-privilege-cloud` for development
+3. **Production deployment**: `uvx mcp-privilege-cloud` for end users
+4. **Module testing**: `python -m cyberark_mcp` for compatibility verification
+
 ### Error Handling Strategy
 - **401 Errors**: Automatic token refresh and retry
 - **403 Errors**: Clear error messages with guidance
@@ -84,8 +90,16 @@ This document provides essential context for AI assistants developing the CyberA
 - OAuth token caching with automatic refresh
 - Secure .gitignore patterns
 
-### Entry Point
-- **`run_server.py`** - Multiplatform entry point with automatic platform detection
+### Entry Points
+
+#### Standardized Execution Methods (Recommended)
+- **`uvx mcp-privilege-cloud`** - Primary production execution method
+- **`uv run mcp-privilege-cloud`** - Development execution with dependency management
+- **`python -m cyberark_mcp`** - Standard Python module execution
+
+#### Legacy Entry Points (Deprecated)
+- **`run_server.py`** - Legacy multiplatform entry point (deprecated)
+- **`python src/cyberark_mcp/mcp_server.py`** - Legacy direct execution (deprecated)
 
 ## Testing Strategy
 
@@ -95,7 +109,9 @@ This document provides essential context for AI assistants developing the CyberA
 - `tests/test_mcp_integration.py` - MCP tool wrappers and integration (15+ tests)
 - `tests/test_integration.py` - End-to-end integration tests (10+ tests)
 
-**Key Commands**: `pytest`, `pytest --cov=src/cyberark_mcp`, `pytest -m integration`
+**Key Commands**: 
+- Modern: `uv run pytest`, `uv run pytest --cov=src/cyberark_mcp`, `uv run pytest -m integration`
+- Legacy: `pytest`, `pytest --cov=src/cyberark_mcp`, `pytest -m integration`
 
 *See TESTING.md for comprehensive testing documentation*
 
@@ -108,7 +124,7 @@ This document provides essential context for AI assistants developing the CyberA
 
 ## Integration Examples
 
-**Claude Desktop**: Connect via `python /path/to/run_server.py`  
+**Claude Desktop**: Connect via `uvx mcp-privilege-cloud` (recommended) or `python /path/to/run_server.py` (legacy)  
 **MCP Inspector**: Use `npx @modelcontextprotocol/inspector`
 
 *See README.md for complete integration configuration*

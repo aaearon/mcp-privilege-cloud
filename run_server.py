@@ -32,6 +32,27 @@ sys.path.insert(0, src_path)
 
 def main():
     """Main entry point with multiplatform support"""
+    
+    # Deprecation warning for legacy entry point
+    print("=" * 80)
+    print("⚠️  DEPRECATION WARNING: run_server.py is deprecated")
+    print("=" * 80)
+    print("This entry point is maintained for backward compatibility but is deprecated.")
+    print("Please migrate to one of the following standardized methods:")
+    print()
+    print("📦 Primary (recommended):")
+    print("   uvx mcp-privilege-cloud")
+    print()
+    print("🔧 Development:")
+    print("   uv run mcp-privilege-cloud")
+    print()
+    print("🐍 Fallback:")
+    print("   python -m cyberark_mcp")
+    print()
+    print("These methods provide better dependency management and standardized execution.")
+    print("=" * 80)
+    print()
+    
     # Load .env file if it exists
     env_file = os.path.join(project_root, '.env')
     if os.path.exists(env_file):
