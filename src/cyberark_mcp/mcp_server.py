@@ -339,6 +339,34 @@ async def get_platform_details(
         logger.error(f"Error getting platform details for {platform_id}: {e}")
         raise
 
+@mcp.tool()
+async def import_platform_package(
+    platform_package_file: str
+) -> Dict[str, Any]:
+    """
+    Import a platform package to CyberArk Privilege Cloud.
+    
+    Args:
+        platform_package_file: Path to the platform package ZIP file to import.
+                              Must be a valid ZIP file and not exceed 20MB.
+    
+    Returns:
+        Dict containing the imported platform ID
+    
+    Note:
+        - The platform package file must be a ZIP file containing platform definition and dependencies
+        - Maximum file size is 20MB
+        - Supports all four platform types: Target, Dependent, Group, and Rotational group
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        result = await server.import_platform_package(platform_package_file)
+        logger.info(f"Successfully imported platform package. Platform ID: {result.get('PlatformID', 'Unknown')}")
+        return result
+    except Exception as e:
+        logger.error(f"Error importing platform package: {e}")
+        raise
+
 
 # Resources will be added in future versions
 

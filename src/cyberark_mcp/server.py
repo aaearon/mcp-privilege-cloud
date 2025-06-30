@@ -2,7 +2,7 @@ import asyncio
 import httpx
 import os
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 
 from .auth import CyberArkAuthenticator
@@ -142,7 +142,8 @@ class CyberArkMCPServer:
             "list_safes",
             "get_safe_details",
             "list_platforms",
-            "get_platform_details"
+            "get_platform_details",
+            "import_platform_package"
         ]
     
     # Account Management Tools
@@ -438,3 +439,56 @@ class CyberArkMCPServer:
         """Get detailed information about a specific platform"""
         self.logger.info(f"Getting details for platform ID: {platform_id}")
         return await self._make_api_request("GET", f"Platforms/{platform_id}")
+
+    async def import_platform_package(
+        self,
+        platform_package_file: Union[str, bytes],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Import a platform package to CyberArk Privilege Cloud
+        
+        Args:
+            platform_package_file: Either a file path (str) or file content (bytes) of the platform package ZIP file
+            **kwargs: Additional parameters
+            
+        Returns:
+            Dict containing the imported platform ID
+            
+        Raises:
+            CyberArkAPIError: If import fails
+            ValueError: If file is invalid or too large
+        """
+        import base64
+        import os
+        
+        # Handle file input - convert to base64 encoded bytes
+        if isinstance(platform_package_file, str):
+            # It's a file path
+            if not os.path.exists(platform_package_file):
+                raise ValueError(f"Platform package file not found: {platform_package_file}")
+            
+            with open(platform_package_file, 'rb') as f:
+                file_content = f.read()
+        elif isinstance(platform_package_file, bytes):
+            # It's already file content
+            file_content = platform_package_file
+        else:
+            raise ValueError("platform_package_file must be either a file path (str) or file content (bytes)")
+        
+        # Check file size (20MB limit according to API docs)
+        max_size = 20 * 1024 * 1024  # 20MB in bytes
+        if len(file_content) > max_size:
+            raise ValueError(f"Platform package file is too large. Maximum size is 20MB, got {len(file_content)} bytes")
+        
+        # Encode to base64
+        import_file_b64 = base64.b64encode(file_content).decode('utf-8')
+        
+        # Prepare request body
+        body = {
+            "ImportFile": import_file_b64
+        }
+        
+        self.logger.info(f"Importing platform package ({len(file_content)} bytes)")
+        response = await self._make_api_request("POST", "Platforms/Import", json=body)
+        
+        return response

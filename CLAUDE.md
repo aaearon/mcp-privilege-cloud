@@ -25,8 +25,10 @@ This document provides essential context for AI assistants developing the CyberA
    - Error handling for 401/403/429 status codes
 
 3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
-   - FastMCP server with 10 exposed tools
-   - Parameter validation and Windows encoding support
+   - FastMCP server implementation
+   - 11 exposed tools for CyberArk operations
+   - Proper tool parameter validation
+   - Windows-compatible encoding handling
 
 ### Critical API Integration Notes
 
@@ -50,6 +52,7 @@ This document provides essential context for AI assistants developing the CyberA
 | `get_safe_details` | Get specific safe info with options | `safe_name` (required); `include_accounts`, `use_cache` (optional) | Detailed safe object |
 | `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
 | `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
+| `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
 
 ## Configuration
 
