@@ -92,3 +92,6 @@ claude_desktop_config.json
 *.bak
 *.backup
 *~
+
+# serena
+.serena/cache/*
