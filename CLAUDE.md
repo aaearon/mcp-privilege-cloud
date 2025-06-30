@@ -29,7 +29,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 
 3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
    - FastMCP server implementation
-   - 10 exposed tools for CyberArk operations
+   - 11 exposed tools for CyberArk operations
    - Proper tool parameter validation
    - Windows-compatible encoding handling
 
@@ -59,6 +59,7 @@ This document provides comprehensive context for Claude and other AI assistants 
 | `get_safe_details` | Get specific safe info with options | `safe_name` (required); `include_accounts`, `use_cache` (optional) | Detailed safe object |
 | `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
 | `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
+| `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
 
 ## Configuration
 

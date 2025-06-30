@@ -1,9 +1,10 @@
 import pytest
 import httpx
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, mock_open
 from datetime import datetime, timedelta
 import os
 import asyncio
+import base64
 
 from src.cyberark_mcp.auth import CyberArkAuthenticator, AuthenticationError
 from src.cyberark_mcp.server import CyberArkMCPServer
@@ -1027,7 +1028,7 @@ class TestPlatformManagement:
         expected_tools = [
             "list_accounts", "get_account_details", "search_accounts",
             "list_safes", "get_safe_details",
-            "list_platforms", "get_platform_details"
+            "list_platforms", "get_platform_details", "import_platform_package"
         ]
         for tool in expected_tools:
             assert tool in tools
@@ -1070,3 +1071,131 @@ class TestPlatformManagement:
             with patch.object(platform_server.logger, 'info') as mock_log:
                 await platform_server.get_platform_details("TestPlatform")
                 mock_log.assert_called_with("Getting details for platform ID: TestPlatform")
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_with_file_path(self, platform_server):
+        """Test import_platform_package with file path"""
+        mock_platform_file = "/tmp/test_platform.zip"
+        mock_file_content = b"PK\x03\x04test_zip_content"  # Mock ZIP file content
+        expected_b64 = base64.b64encode(mock_file_content).decode('utf-8')
+        mock_response = {"PlatformID": "ImportedPlatform123"}
+        
+        with patch('os.path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data=mock_file_content)), \
+             patch.object(platform_server, '_make_api_request', return_value=mock_response):
+            
+            result = await platform_server.import_platform_package(mock_platform_file)
+            
+            # Verify the result
+            assert result == mock_response
+            assert result["PlatformID"] == "ImportedPlatform123"
+            
+            # Verify the API call was made correctly
+            platform_server._make_api_request.assert_called_once_with(
+                "POST", "Platforms/Import", json={"ImportFile": expected_b64}
+            )
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_with_bytes(self, platform_server):
+        """Test import_platform_package with bytes content"""
+        mock_file_content = b"PK\x03\x04test_zip_content"
+        expected_b64 = base64.b64encode(mock_file_content).decode('utf-8')
+        mock_response = {"PlatformID": "ImportedPlatform456"}
+        
+        with patch.object(platform_server, '_make_api_request', return_value=mock_response):
+            result = await platform_server.import_platform_package(mock_file_content)
+            
+            assert result == mock_response
+            platform_server._make_api_request.assert_called_once_with(
+                "POST", "Platforms/Import", json={"ImportFile": expected_b64}
+            )
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_file_not_found(self, platform_server):
+        """Test import_platform_package with non-existent file"""
+        non_existent_file = "/tmp/does_not_exist.zip"
+        
+        with patch('os.path.exists', return_value=False):
+            with pytest.raises(ValueError, match="Platform package file not found"):
+                await platform_server.import_platform_package(non_existent_file)
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_invalid_input_type(self, platform_server):
+        """Test import_platform_package with invalid input type"""
+        with pytest.raises(ValueError, match="platform_package_file must be either a file path"):
+            await platform_server.import_platform_package(123)  # Invalid type
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_file_too_large(self, platform_server):
+        """Test import_platform_package with file exceeding 20MB limit"""
+        # Create mock file content larger than 20MB
+        large_content = b"x" * (21 * 1024 * 1024)  # 21MB
+        
+        with pytest.raises(ValueError, match="Platform package file is too large"):
+            await platform_server.import_platform_package(large_content)
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_max_size_allowed(self, platform_server):
+        """Test import_platform_package with exactly 20MB file (should succeed)"""
+        # Create mock file content exactly 20MB
+        max_content = b"x" * (20 * 1024 * 1024)  # 20MB
+        expected_b64 = base64.b64encode(max_content).decode('utf-8')
+        mock_response = {"PlatformID": "LargePlatform"}
+        
+        with patch.object(platform_server, '_make_api_request', return_value=mock_response):
+            result = await platform_server.import_platform_package(max_content)
+            
+            assert result == mock_response
+            platform_server._make_api_request.assert_called_once_with(
+                "POST", "Platforms/Import", json={"ImportFile": expected_b64}
+            )
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_api_error(self, platform_server):
+        """Test import_platform_package with API error"""
+        mock_file_content = b"PK\x03\x04test_zip_content"
+        
+        with patch.object(platform_server, '_make_api_request') as mock_request:
+            mock_response = Mock()
+            mock_response.status_code = 400
+            mock_request.side_effect = httpx.HTTPStatusError(
+                "400 Bad Request", request=Mock(), response=mock_response
+            )
+            
+            with pytest.raises(Exception):
+                await platform_server.import_platform_package(mock_file_content)
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_logging(self, platform_server):
+        """Test that import_platform_package logs appropriately"""
+        mock_file_content = b"PK\x03\x04test_zip_content"
+        mock_response = {"PlatformID": "TestPlatform"}
+        
+        with patch.object(platform_server, '_make_api_request', return_value=mock_response), \
+             patch.object(platform_server.logger, 'info') as mock_log:
+            
+            await platform_server.import_platform_package(mock_file_content)
+            
+            mock_log.assert_called_with(f"Importing platform package ({len(mock_file_content)} bytes)")
+
+    @pytest.mark.asyncio
+    async def test_import_platform_package_comprehensive(self, platform_server):
+        """Comprehensive test for import_platform_package functionality"""
+        # Test with various file sizes and types
+        test_cases = [
+            (b"small_content", "SmallPlatform"),
+            (b"x" * 1024, "MediumPlatform"),  # 1KB
+            (b"x" * (1024 * 1024), "LargePlatform"),  # 1MB
+        ]
+        
+        for content, platform_id in test_cases:
+            mock_response = {"PlatformID": platform_id}
+            expected_b64 = base64.b64encode(content).decode('utf-8')
+            
+            with patch.object(platform_server, '_make_api_request', return_value=mock_response):
+                result = await platform_server.import_platform_package(content)
+                
+                assert result["PlatformID"] == platform_id
+                platform_server._make_api_request.assert_called_with(
+                    "POST", "Platforms/Import", json={"ImportFile": expected_b64}
+                )

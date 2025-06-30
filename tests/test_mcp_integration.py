@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from cyberark_mcp.mcp_server import create_account
 
 # Platform management MCP tools  
-from cyberark_mcp.mcp_server import list_platforms, get_platform_details
+from cyberark_mcp.mcp_server import list_platforms, get_platform_details, import_platform_package
 from cyberark_mcp.server import CyberArkMCPServer
 
 # Safe management MCP tools
@@ -214,6 +214,31 @@ class TestMCPPlatformTools:
             
             with pytest.raises(ValueError):
                 await get_platform_details("TestPlatform")
+
+    @pytest.mark.asyncio
+    async def test_mcp_import_platform_package_tool(self, platform_mock_env_vars):
+        """Test the MCP import_platform_package tool"""
+        platform_file = "/tmp/test_platform.zip"
+        mock_response = {"PlatformID": "ImportedPlatform123"}
+        
+        with patch.dict(os.environ, platform_mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'import_platform_package', new_callable=AsyncMock) as mock_import:
+                mock_import.return_value = mock_response
+                
+                result = await import_platform_package(platform_file)
+                
+                assert result == mock_response
+                mock_import.assert_called_once_with(platform_file)
+
+    @pytest.mark.asyncio
+    async def test_mcp_import_platform_package_error_handling(self, platform_mock_env_vars):
+        """Test MCP import_platform_package tool handles errors properly"""
+        with patch.dict(os.environ, platform_mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'import_platform_package', new_callable=AsyncMock) as mock_import:
+                mock_import.side_effect = ValueError("Platform package file not found")
+                
+                with pytest.raises(ValueError, match="Platform package file not found"):
+                    await import_platform_package("/tmp/nonexistent.zip")
 
 
 class TestMCPSafeTools:
