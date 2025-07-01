@@ -53,7 +53,7 @@ This comprehensive guide provides everything developers need to contribute to th
    ```bash
    # Test basic functionality
    python -c "
-   from src.cyberark_mcp.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.server import CyberArkMCPServer
    import asyncio
    server = CyberArkMCPServer.from_environment()
    health = asyncio.run(server.health_check())
@@ -79,7 +79,7 @@ The project includes several entry points for development:
 The project follows a layered architecture with clear separation of concerns:
 
 ```
-src/cyberark_mcp/
+src/mcp_privilege_cloud/
 ├── auth.py          # OAuth 2.0 authentication module
 ├── server.py        # Core CyberArk API integration
 └── mcp_server.py    # MCP protocol implementation
@@ -133,7 +133,7 @@ The project strictly follows TDD principles:
 
 2. **Implement Minimal Code**:
    ```python
-   # src/cyberark_mcp/server.py
+   # src/mcp_privilege_cloud/server.py
    def new_functionality(self):
        # Minimal implementation to pass test
        pass
@@ -145,7 +145,7 @@ The project strictly follows TDD principles:
    pytest tests/test_new_feature.py
    
    # Refactor while maintaining passing tests
-   pytest --cov=src/cyberark_mcp
+   pytest --cov=src/mcp_privilege_cloud
    ```
 
 ### Git Workflow
@@ -202,7 +202,7 @@ Follow this systematic approach:
 
 3. **Implement Server Method**:
    ```python
-   # src/cyberark_mcp/server.py
+   # src/mcp_privilege_cloud/server.py
    async def new_tool(self, param1: str) -> Dict[str, Any]:
        """Tool description with type hints and docstring."""
        # Implementation
@@ -210,7 +210,7 @@ Follow this systematic approach:
 
 4. **Add MCP Tool Wrapper**:
    ```python
-   # src/cyberark_mcp/mcp_server.py
+   # src/mcp_privilege_cloud/mcp_server.py
    @mcp.tool()
    async def new_tool(param1: str) -> Dict[str, Any]:
        """MCP tool wrapper with parameter validation."""
@@ -309,7 +309,7 @@ pytest -k platform      # Platform management tests
 pytest -k safe          # Safe management tests
 
 # With coverage
-pytest --cov=src/cyberark_mcp
+pytest --cov=src/mcp_privilege_cloud
 
 # Verbose output with detailed failures
 pytest -v --tb=short
@@ -373,7 +373,7 @@ async def test_api_error_handling(mock_server, mocker):
 3. **Ensure Quality**:
    ```bash
    # Run full test suite
-   pytest --cov=src/cyberark_mcp
+   pytest --cov=src/mcp_privilege_cloud
    
    # Check style compliance
    flake8 src/
@@ -427,11 +427,11 @@ pip install -r requirements.txt
 #### Import Errors
 ```bash
 # Verify project structure
-ls -la src/cyberark_mcp/
+ls -la src/mcp_privilege_cloud/
 python -c "import sys; print(sys.path)"
 
 # Test imports directly
-python -c "from src.cyberark_mcp.server import CyberArkMCPServer"
+python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer"
 ```
 
 ### API Integration Issues
@@ -440,7 +440,7 @@ python -c "from src.cyberark_mcp.server import CyberArkMCPServer"
 ```bash
 # Test authentication separately
 python -c "
-from src.cyberark_mcp.auth import CyberArkAuthenticator
+from src.mcp_privilege_cloud.auth import CyberArkAuthenticator
 import asyncio
 auth = CyberArkAuthenticator.from_environment()
 result = asyncio.run(auth.get_auth_header())
@@ -491,14 +491,14 @@ export CYBERARK_LOG_LEVEL=DEBUG
 python run_server.py
 
 # Test with different connection methods
-python src/cyberark_mcp/mcp_server.py  # Direct execution
+python src/mcp_privilege_cloud/mcp_server.py  # Direct execution
 ```
 
 #### Tool Validation
 ```bash
 # Verify tool definitions
 python -c "
-from src.cyberark_mcp.mcp_server import mcp
+from src.mcp_privilege_cloud.mcp_server import mcp
 print('Available tools:')
 for tool in mcp.list_tools():
     print(f'- {tool.name}')
@@ -516,7 +516,7 @@ export CYBERARK_API_TIMEOUT=60
 # Test with minimal operations
 python -c "
 import time, asyncio
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 start = time.time()
 health = asyncio.run(server.health_check())
@@ -532,7 +532,7 @@ Quick diagnostic commands for common issues:
 # Complete environment verification
 python -c "
 import os, sys
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 print('Python:', sys.version)
 print('Environment variables set:', bool(os.getenv('CYBERARK_CLIENT_ID')))
 try:
@@ -544,7 +544,7 @@ except Exception as e:
 
 # MCP server validation
 python -c "
-from src.cyberark_mcp.mcp_server import mcp
+from src.mcp_privilege_cloud.mcp_server import mcp
 print(f'MCP server: {mcp.name}')
 print(f'Tools available: {len(list(mcp.list_tools()))}')
 "

@@ -12,9 +12,9 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 - **Environment**: Virtual environments with .env configuration
 
 ## Key Components
-- **Authentication Module** (`src/cyberark_mcp/auth.py`): OAuth 2.0 token management
-- **Server Module** (`src/cyberark_mcp/server.py`): Core CyberArk API integration  
-- **MCP Integration** (`src/cyberark_mcp/mcp_server.py`): FastMCP server with 10+ tools
+- **Authentication Module** (`src/mcp_privilege_cloud/auth.py`): OAuth 2.0 token management
+- **Server Module** (`src/mcp_privilege_cloud/server.py`): Core CyberArk API integration  
+- **MCP Integration** (`src/mcp_privilege_cloud/mcp_server.py`): FastMCP server with 10+ tools
 - **Entry Point** (`run_server.py`): Multiplatform server runner with Windows UTF-8 support
 
 ## API Integration

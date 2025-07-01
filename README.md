@@ -84,7 +84,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 
 2. **Test configuration**:
    ```bash
-   python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
+   python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
    ```
 
 For detailed setup instructions, service account configuration, and troubleshooting, see [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
@@ -103,7 +103,7 @@ uvx mcp-privilege-cloud
 uv run mcp-privilege-cloud
 
 # Module execution: Standard Python module approach
-python -m cyberark_mcp
+python -m mcp_privilege_cloud
 ```
 
 #### Legacy Execution Methods
@@ -113,10 +113,10 @@ python -m cyberark_mcp
 python run_server.py
 
 # Legacy: Direct execution (deprecated)  
-python src/cyberark_mcp/mcp_server.py
+python src/mcp_privilege_cloud/mcp_server.py
 
 # Legacy: Module path execution (deprecated)
-python -m src.cyberark_mcp.mcp_server
+python -m src.mcp_privilege_cloud.mcp_server
 ```
 
 > **Note**: The standardized execution methods (`uvx` and `uv run`) are now the recommended approach for running the MCP server. Legacy methods are maintained for backward compatibility but may be removed in future versions.
@@ -139,7 +139,7 @@ This project follows the MCP server standardization guidelines with:
 ### Modern Execution Methods
 - **`uvx mcp-privilege-cloud`**: Direct execution without local installation
 - **`uv run mcp-privilege-cloud`**: Development execution with dependency management
-- **`python -m cyberark_mcp`**: Standard Python module execution
+- **`python -m mcp_privilege_cloud`**: Standard Python module execution
 
 ### Key Benefits
 - **Simplified deployment**: No manual dependency management required
@@ -169,7 +169,7 @@ pytest -m unit      # Unit tests
 pytest -m integration  # Integration tests
 
 # Run with coverage
-pytest --cov=src/cyberark_mcp
+pytest --cov=src/mcp_privilege_cloud
 
 # Verbose output
 pytest -v

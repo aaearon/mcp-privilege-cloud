@@ -14,7 +14,7 @@ pytest -k platform      # Platform management tests
 pytest -k safe          # Safe management tests
 
 # Run with coverage
-pytest --cov=src/cyberark_mcp
+pytest --cov=src/mcp_privilege_cloud
 
 # Exclude integration tests (for CI)
 pytest -m "not integration"
@@ -26,7 +26,7 @@ pytest -m "not integration"
 python run_server.py
 
 # Alternative direct execution
-python -m cyberark_mcp.mcp_server
+python -m mcp_privilege_cloud.mcp_server
 ```
 
 ### Environment Setup
@@ -74,8 +74,8 @@ EOF
 ### Debug Commands
 ```bash
 # Test configuration
-python -c "from src.cyberark_mcp.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print(asyncio.run(server.health_check()))"
+python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print(asyncio.run(server.health_check()))"
 
 # Test authentication
-python -c "from src.cyberark_mcp.auth import CyberArkAuthenticator; import asyncio; auth = CyberArkAuthenticator.from_environment(); print(asyncio.run(auth.get_auth_header()))"
+python -c "from src.mcp_privilege_cloud.auth import CyberArkAuthenticator; import asyncio; auth = CyberArkAuthenticator.from_environment(); print(asyncio.run(auth.get_auth_header()))"
 ```

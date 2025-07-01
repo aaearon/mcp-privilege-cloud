@@ -2,9 +2,9 @@ import pytest
 import os
 from unittest.mock import patch, Mock, AsyncMock
 
-from src.cyberark_mcp.mcp_server import mcp
-from src.cyberark_mcp.server import CyberArkMCPServer
-from src.cyberark_mcp.auth import CyberArkAuthenticator
+from src.mcp_privilege_cloud.mcp_server import mcp
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.auth import CyberArkAuthenticator
 
 
 class TestIntegration:
@@ -30,10 +30,10 @@ class TestIntegration:
     def test_required_environment_variables_validation(self):
         """Test validation of required environment variables"""
         # Import the main function to test validation
-        from src.cyberark_mcp.mcp_server import main
+        from src.mcp_privilege_cloud.mcp_server import main
         
         with patch.dict(os.environ, {}, clear=True):
-            with patch('src.cyberark_mcp.mcp_server.logger') as mock_logger:
+            with patch('src.mcp_privilege_cloud.mcp_server.logger') as mock_logger:
                 main()  # Should exit gracefully with error log
                 mock_logger.error.assert_called()
 
@@ -78,7 +78,7 @@ class TestIntegration:
 
     def test_error_handling_in_tools(self):
         """Test that tools handle errors appropriately"""
-        from src.cyberark_mcp.server import CyberArkAPIError
+        from src.mcp_privilege_cloud.server import CyberArkAPIError
         
         # Mock server that raises errors
         mock_server = Mock(spec=CyberArkMCPServer)
@@ -100,10 +100,10 @@ class TestIntegration:
         import logging
         
         # Import to trigger logging configuration
-        from src.cyberark_mcp import mcp_server
+        from src.mcp_privilege_cloud import mcp_server
         
         # Verify that logging is configured
-        logger = logging.getLogger("src.cyberark_mcp.mcp_server")
+        logger = logging.getLogger("src.mcp_privilege_cloud.mcp_server")
         assert logger is not None
 
     def test_health_check_functionality(self):
@@ -124,12 +124,12 @@ class TestIntegration:
     def test_server_lifecycle_management(self):
         """Test that server lifecycle is managed properly"""
         # Test that the MCP server can be imported and has required components
-        from src.cyberark_mcp.mcp_server import mcp
+        from src.mcp_privilege_cloud.mcp_server import mcp
         assert mcp is not None
         assert mcp.name == "CyberArk Privilege Cloud MCP Server"
         
         # Verify that essential functions exist
-        from src.cyberark_mcp.mcp_server import list_accounts, get_account_details, health_check
+        from src.mcp_privilege_cloud.mcp_server import list_accounts, get_account_details, health_check
         assert list_accounts is not None
         assert get_account_details is not None
         assert health_check is not None
@@ -137,7 +137,7 @@ class TestIntegration:
     def test_resource_endpoints(self):
         """Test that resource endpoints are defined"""
         # Import the MCP server to check resource definitions
-        from src.cyberark_mcp import mcp_server
+        from src.mcp_privilege_cloud import mcp_server
         
         # Verify that the mcp object has the expected structure
         assert hasattr(mcp_server, 'mcp')

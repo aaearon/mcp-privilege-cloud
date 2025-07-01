@@ -14,7 +14,7 @@ def main() -> NoReturn:
     Main entry point for the CyberArk Privilege Cloud MCP Server.
     
     This function serves as the primary entry point when the package is installed
-    and called via `uvx cyberark-mcp-server` or similar console scripts.
+    and called via `uvx mcp-privilege-cloud` or similar console scripts.
     
     It delegates to the main() function in mcp_server.py which handles:
     - Environment variable validation

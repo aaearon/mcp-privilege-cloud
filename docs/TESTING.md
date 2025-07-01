@@ -38,7 +38,7 @@ pytest
 pytest -v
 
 # Run with coverage report
-pytest --cov=src/cyberark_mcp
+pytest --cov=src/mcp_privilege_cloud
 
 # Run specific test categories
 pytest -m unit          # Unit tests only
@@ -160,16 +160,16 @@ pytest -k account
 ### Coverage Testing
 ```bash
 # Generate coverage report
-pytest --cov=src/cyberark_mcp
+pytest --cov=src/mcp_privilege_cloud
 
 # Coverage with HTML report
-pytest --cov=src/cyberark_mcp --cov-report=html
+pytest --cov=src/mcp_privilege_cloud --cov-report=html
 
 # Coverage with missing lines
-pytest --cov=src/cyberark_mcp --cov-report=term-missing
+pytest --cov=src/mcp_privilege_cloud --cov-report=term-missing
 
 # Coverage for specific module
-pytest --cov=src/cyberark_mcp/auth tests/test_core_functionality.py::TestAuthentication
+pytest --cov=src/mcp_privilege_cloud/auth tests/test_core_functionality.py::TestAuthentication
 ```
 
 ### Parallel Test Execution
@@ -203,7 +203,7 @@ npx @modelcontextprotocol/inspector
 python run_server.py
 
 # Alternative: Direct execution
-python src/cyberark_mcp/mcp_server.py
+python src/mcp_privilege_cloud/mcp_server.py
 ```
 
 ### Testing Without Credentials
@@ -298,7 +298,7 @@ Test configuration before MCP Inspector testing:
 ```bash
 python -c "
 import asyncio
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 health = asyncio.run(server.health_check())
 print('Health Status:', health['status'])
@@ -453,7 +453,7 @@ pytest tests/ --benchmark-only
 pip install memory-profiler
 
 # Profile memory usage
-python -m memory_profiler src/cyberark_mcp/server.py
+python -m memory_profiler src/mcp_privilege_cloud/server.py
 ```
 
 ## Debug Testing
@@ -507,7 +507,7 @@ The project includes automated testing:
 ```bash
 # Commands used in CI environment
 pytest -m "not integration"
-pytest --cov=src/cyberark_mcp --cov-report=xml
+pytest --cov=src/mcp_privilege_cloud --cov-report=xml
 ```
 
 ## Success Criteria

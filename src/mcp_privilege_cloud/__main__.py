@@ -2,7 +2,7 @@
 Entry point for running the CyberArk MCP server as a module.
 
 Usage:
-    python -m cyberark_mcp
+    python -m mcp_privilege_cloud
 """
 
 if __name__ == "__main__":

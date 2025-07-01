@@ -14,17 +14,17 @@ This document provides essential context for AI assistants developing the CyberA
 
 ### Core Components
 
-1. **Authentication Module** (`src/cyberark_mcp/auth.py`)
+1. **Authentication Module** (`src/mcp_privilege_cloud/auth.py`)
    - OAuth 2.0 client credentials flow with 15-minute token expiration
    - Automatic token refresh with double-checked locking
    - Environment variable-based credential management
 
-2. **Server Module** (`src/cyberark_mcp/server.py`)
+2. **Server Module** (`src/mcp_privilege_cloud/server.py`)
    - CyberArk API integration with authentication headers
    - Account, safe, and platform management operations
    - Error handling for 401/403/429 status codes
 
-3. **MCP Integration** (`src/cyberark_mcp/mcp_server.py`)
+3. **MCP Integration** (`src/mcp_privilege_cloud/mcp_server.py`)
    - FastMCP server implementation
    - 11 exposed tools for CyberArk operations
    - Proper tool parameter validation
@@ -76,7 +76,7 @@ This document provides essential context for AI assistants developing the CyberA
 1. **Use `uv` for dependency management**: `uv run pytest` for testing
 2. **Standardized execution**: `uv run mcp-privilege-cloud` for development
 3. **Production deployment**: `uvx mcp-privilege-cloud` for end users
-4. **Module testing**: `python -m cyberark_mcp` for compatibility verification
+4. **Module testing**: `python -m mcp_privilege_cloud` for compatibility verification
 
 ### Error Handling Strategy
 - **401 Errors**: Automatic token refresh and retry
@@ -95,11 +95,11 @@ This document provides essential context for AI assistants developing the CyberA
 #### Standardized Execution Methods (Recommended)
 - **`uvx mcp-privilege-cloud`** - Primary production execution method
 - **`uv run mcp-privilege-cloud`** - Development execution with dependency management
-- **`python -m cyberark_mcp`** - Standard Python module execution
+- **`python -m mcp_privilege_cloud`** - Standard Python module execution
 
 #### Legacy Entry Points (Deprecated)
 - **`run_server.py`** - Legacy multiplatform entry point (deprecated)
-- **`python src/cyberark_mcp/mcp_server.py`** - Legacy direct execution (deprecated)
+- **`python src/mcp_privilege_cloud/mcp_server.py`** - Legacy direct execution (deprecated)
 
 ## Testing Strategy
 
@@ -110,8 +110,8 @@ This document provides essential context for AI assistants developing the CyberA
 - `tests/test_integration.py` - End-to-end integration tests (10+ tests)
 
 **Key Commands**: 
-- Modern: `uv run pytest`, `uv run pytest --cov=src/cyberark_mcp`, `uv run pytest -m integration`
-- Legacy: `pytest`, `pytest --cov=src/cyberark_mcp`, `pytest -m integration`
+- Modern: `uv run pytest`, `uv run pytest --cov=src/mcp_privilege_cloud`, `uv run pytest -m integration`
+- Legacy: `pytest`, `pytest --cov=src/mcp_privilege_cloud`, `pytest -m integration`
 
 *See TESTING.md for comprehensive testing documentation*
 

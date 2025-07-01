@@ -3,8 +3,8 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from typing import List, Dict, Any
 
-from src.cyberark_mcp.server import CyberArkMCPServer, CyberArkAPIError
-from src.cyberark_mcp.auth import CyberArkAuthenticator
+from src.mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
+from src.mcp_privilege_cloud.auth import CyberArkAuthenticator
 
 
 class TestAccountManagement:

@@ -22,7 +22,7 @@ Run this command first to verify overall system health:
 ```bash
 python -c "
 import asyncio
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 health = asyncio.run(server.health_check())
 print(f'Status: {health['status']}')
@@ -105,7 +105,7 @@ pip list | grep fastapi
 
 # Verify project structure
 ls -la run_server.py
-ls -la src/cyberark_mcp/
+ls -la src/mcp_privilege_cloud/
 ```
 
 **Solutions:**
@@ -143,7 +143,7 @@ UnicodeEncodeError: 'charmap' codec can't encode character
    ```bash
    set PYTHONIOENCODING=utf-8
    set PYTHONLEGACYWINDOWSSTDIO=1
-   python src/cyberark_mcp/mcp_server.py
+   python src/mcp_privilege_cloud/mcp_server.py
    ```
 
 3. **Claude Desktop configuration:**
@@ -198,7 +198,7 @@ Error: Authentication failed
 4. **Test authentication only:**
    ```bash
    python -c "
-   from src.cyberark_mcp.auth import CyberArkAuthenticator
+   from src.mcp_privilege_cloud.auth import CyberArkAuthenticator
    import asyncio
    auth = CyberArkAuthenticator.from_environment()
    print(asyncio.run(auth.get_auth_header()))
@@ -228,7 +228,7 @@ Error: Insufficient permissions
 3. **Test with specific safe:**
    ```bash
    python -c "
-   from src.cyberark_mcp.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.server import CyberArkMCPServer
    import asyncio
    server = CyberArkMCPServer.from_environment()
    safes = asyncio.run(server.list_safes())
@@ -304,7 +304,7 @@ Rate limit exceeded
 3. **Monitor request patterns:**
    ```bash
    export CYBERARK_LOG_LEVEL=DEBUG
-   python src/cyberark_mcp/mcp_server.py
+   python src/mcp_privilege_cloud/mcp_server.py
    ```
 
 ## MCP Inspector Problems
@@ -363,7 +363,7 @@ Rate limit exceeded
 3. **Test tool loading:**
    ```bash
    python -c "
-   from src.cyberark_mcp.mcp_server import mcp
+   from src.mcp_privilege_cloud.mcp_server import mcp
    print('MCP server loaded:', mcp.name)
    print('Available tools:', len(mcp._handlers.get('tools', {})))
    "
@@ -426,17 +426,17 @@ python run_server.py  # ✅ Recommended
 ```bash
 # Add project root to Python path
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-python src/cyberark_mcp/mcp_server.py
+python src/mcp_privilege_cloud/mcp_server.py
 
 # Or use module execution
-python -m src.cyberark_mcp.mcp_server
+python -m src.mcp_privilege_cloud.mcp_server
 ```
 
 ### 2. Module Not Found Errors
 
 **Symptoms:**
 ```
-ModuleNotFoundError: No module named 'cyberark_mcp'
+ModuleNotFoundError: No module named 'mcp_privilege_cloud'
 ModuleNotFoundError: No module named 'fastmcp'
 ```
 
@@ -454,7 +454,7 @@ ModuleNotFoundError: No module named 'fastmcp'
 
 3. **Check project structure:**
    ```bash
-   ls -la src/cyberark_mcp/
+   ls -la src/mcp_privilege_cloud/
    # Should show: __init__.py, auth.py, server.py, mcp_server.py
    ```
 
@@ -476,7 +476,7 @@ Empty platform list returned
 2. **Test platform API specifically:**
    ```bash
    python -c "
-   from src.cyberark_mcp.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.server import CyberArkMCPServer
    import asyncio
    server = CyberArkMCPServer.from_environment()
    platforms = asyncio.run(server.list_platforms())
@@ -577,7 +577,7 @@ curl -v "https://${CYBERARK_IDENTITY_TENANT_ID}.id.cyberark.cloud/oauth2/platfor
 ```bash
 python -c "
 import asyncio
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 health = asyncio.run(server.health_check())
 print('Health Status:', health['status'])
@@ -595,7 +595,7 @@ else:
 #### Authentication Test
 ```bash
 python -c "
-from src.cyberark_mcp.auth import CyberArkAuthenticator
+from src.mcp_privilege_cloud.auth import CyberArkAuthenticator
 import asyncio
 try:
     auth = CyberArkAuthenticator.from_environment()
@@ -609,7 +609,7 @@ except Exception as e:
 #### Server Connection Test
 ```bash
 python -c "
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 import asyncio
 try:
     server = CyberArkMCPServer.from_environment()
@@ -624,7 +624,7 @@ except Exception as e:
 ```bash
 python -c "
 try:
-    from src.cyberark_mcp.mcp_server import mcp
+    from src.mcp_privilege_cloud.mcp_server import mcp
     print('✅ MCP integration loaded successfully')
     print(f'Server name: {mcp.name}')
 except Exception as e:
@@ -637,12 +637,12 @@ except Exception as e:
 ### Python Debugger
 ```bash
 # Run with Python debugger
-python -m pdb src/cyberark_mcp/mcp_server.py
+python -m pdb src/mcp_privilege_cloud/mcp_server.py
 
 # Set breakpoint in code and run
 python -c "
 import pdb; pdb.set_trace()
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 "
 ```
@@ -653,10 +653,10 @@ server = CyberArkMCPServer.from_environment()
 pip install memory-profiler line-profiler
 
 # Profile memory usage
-python -m memory_profiler src/cyberark_mcp/server.py
+python -m memory_profiler src/mcp_privilege_cloud/server.py
 
 # Profile execution time
-kernprof -l -v src/cyberark_mcp/server.py
+kernprof -l -v src/mcp_privilege_cloud/server.py
 ```
 
 ### Network Traffic Analysis
@@ -717,7 +717,7 @@ When seeking support, gather this information:
    ```bash
    python -c "
    import asyncio
-   from src.cyberark_mcp.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.server import CyberArkMCPServer
    server = CyberArkMCPServer.from_environment()
    health = asyncio.run(server.health_check())
    print('Health:', health)
