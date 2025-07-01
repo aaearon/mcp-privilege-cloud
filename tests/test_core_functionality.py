@@ -6,8 +6,8 @@ import os
 import asyncio
 import base64
 
-from src.cyberark_mcp.auth import CyberArkAuthenticator, AuthenticationError
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.auth import CyberArkAuthenticator, AuthenticationError
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 
 
 class TestAuthentication:
@@ -677,7 +677,7 @@ class TestServerCore:
         """Test that logging is properly configured"""
         assert hasattr(server_instance, 'logger')
         # Verify logger is configured for the correct module
-        assert server_instance.logger.name == 'src.cyberark_mcp.server'
+        assert server_instance.logger.name == 'src.mcp_privilege_cloud.server'
 
     @pytest.mark.asyncio
     async def test_concurrent_requests(self, server_instance):

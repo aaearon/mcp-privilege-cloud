@@ -41,4 +41,4 @@ jobs:
       if: matrix.python-version == '3.13'
       run: |
         pip install pytest-cov
-        pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto --cov=src/cyberark_mcp --cov-report=term
+        pytest tests/ -v --tb=short -m "not integration" --asyncio-mode=auto --cov=src/mcp_privilege_cloud --cov-report=term

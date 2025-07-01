@@ -63,10 +63,10 @@ test = [
 "Documentation" = "https://github.com/aaearon/mcp-privilege-cloud#readme"
 
 [project.scripts]
-cyberark-mcp-server = "cyberark_mcp:main"
+cyberark-mcp-server = "mcp_privilege_cloud:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cyberark_mcp"]
+packages = ["src/mcp_privilege_cloud"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -84,7 +84,7 @@ addopts = [
     "--strict-config",
     "--tb=short",
     "-ra",
-    "--cov=src/cyberark_mcp",
+    "--cov=src/mcp_privilege_cloud",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -101,7 +101,7 @@ markers = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src/cyberark_mcp"]
+source = ["src/mcp_privilege_cloud"]
 branch = true
 omit = [
     "*/tests/*",
@@ -154,7 +154,7 @@ ignore = [
 "tests/*" = ["E501"]
 
 [tool.ruff.isort]
-known-first-party = ["cyberark_mcp"]
+known-first-party = ["mcp_privilege_cloud"]
 
 # MyPy configuration
 [tool.mypy]

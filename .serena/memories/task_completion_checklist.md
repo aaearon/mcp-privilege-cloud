@@ -7,7 +7,7 @@
 - [ ] All tests pass: `pytest`
 - [ ] Specific test categories pass if applicable
 - [ ] Integration tests excluded for unit testing: `pytest -m "not integration"`
-- [ ] Coverage maintained: `pytest --cov=src/cyberark_mcp`
+- [ ] Coverage maintained: `pytest --cov=src/mcp_privilege_cloud`
 
 ### 2. Code Quality
 - [ ] Follow PEP 8 style guidelines

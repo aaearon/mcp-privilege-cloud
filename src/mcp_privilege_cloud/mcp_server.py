@@ -20,7 +20,7 @@ try:
     from .server import CyberArkMCPServer
 except ImportError:
     # Fallback for direct execution
-    from cyberark_mcp.server import CyberArkMCPServer
+    from mcp_privilege_cloud.server import CyberArkMCPServer
 
 # Load environment variables from .env file
 try:

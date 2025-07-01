@@ -7,7 +7,7 @@ This script helps verify that the API response parsing fix is working correctly.
 import asyncio
 import os
 import json
-from src.cyberark_mcp.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
 
 async def test_platform_api():
     """Test the platform API directly"""

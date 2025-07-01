@@ -47,7 +47,7 @@ def main():
     print("   uv run mcp-privilege-cloud")
     print()
     print("🐍 Fallback:")
-    print("   python -m cyberark_mcp")
+    print("   python -m mcp_privilege_cloud")
     print()
     print("These methods provide better dependency management and standardized execution.")
     print("=" * 80)
@@ -88,7 +88,7 @@ def main():
     
     try:
         # Import the main function from the MCP server module
-        from cyberark_mcp.mcp_server import main as server_main
+        from mcp_privilege_cloud.mcp_server import main as server_main
         
         print(f"[INFO] Starting CyberArk Privilege Cloud MCP Server on {platform.system()}...")
         server_main()
