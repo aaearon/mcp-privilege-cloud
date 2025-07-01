@@ -43,15 +43,15 @@ This document provides essential context for AI assistants developing the CyberA
 
 | Tool | Purpose | Parameters | Returns |
 |------|---------|------------|---------|
-| `health_check` | Verify connectivity | None | Health status with safe count |
 | `list_safes` | List accessible safes with pagination | `search`, `offset`, `limit`, `sort`, `include_accounts`, `extended_details` (all optional) | Array of safe objects (excludes Internal Safes) |
 | `list_accounts` | List accounts | `safe_name`, `username`, `address` (all optional) | Array of account objects |
 | `search_accounts` | Advanced account search | `keywords`, `safe_name`, `username`, `address`, `platform_id` (all optional) | Array of matching accounts |
-| `get_account_details` | Get specific account info | `account_id` (required) | Detailed account object |
 | `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
-| `get_safe_details` | Get specific safe info with options | `safe_name` (required); `include_accounts`, `use_cache` (optional) | Detailed safe object |
+| `change_account_password` | Change password for an account | `account_id` (required); `new_password` (optional) | Operation result |
+| `set_next_password` | Set the next password for an account | `account_id`, `password` (required) | Operation result |
+| `verify_account_password` | Verify the current password for an account | `account_id` (required) | Verification result |
+| `reconcile_account_password` | Reconcile account password with target system | `account_id` (required) | Reconciliation result |
 | `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
-| `get_platform_details` | Get platform configuration | `platform_id` (required) | Detailed platform object |
 | `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
 
 ## Configuration
@@ -103,11 +103,12 @@ This document provides essential context for AI assistants developing the CyberA
 
 ## Testing Strategy
 
-**Test Files**: 124+ total tests across 4 test files
+**Test Files**: 148+ total tests across 5 test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (64+ tests)
 - `tests/test_account_operations.py` - Account lifecycle management (35+ tests)  
 - `tests/test_mcp_integration.py` - MCP tool wrappers and integration (15+ tests)
 - `tests/test_integration.py` - End-to-end integration tests (10+ tests)
+- `tests/test_resources.py` - MCP resource implementation tests (24+ tests)
 
 **Key Commands**: 
 - Modern: `uv run pytest`, `uv run pytest --cov=src/mcp_privilege_cloud`, `uv run pytest -m integration`

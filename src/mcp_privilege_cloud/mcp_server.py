@@ -6,6 +6,7 @@ This server provides tools for interacting with CyberArk Privilege Cloud
 through the Model Context Protocol (MCP).
 """
 
+import json
 import logging
 import os
 import sys
@@ -107,31 +108,6 @@ async def list_accounts(
         logger.error(f"Error listing accounts: {e}")
         raise
 
-
-@mcp.tool()
-async def get_account_details(
-    account_id: str
-) -> Dict[str, Any]:
-    """
-    Get detailed information about a specific privileged account.
-    
-    Args:
-        account_id: Unique identifier for the account (required) - Numeric string, e.g., "12345"
-    
-    Returns:
-        Account object with detailed information including platform properties, last password change, status
-        
-    Example:
-        get_account_details("12345")
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        account = await server.get_account_details(account_id)
-        logger.info(f"Retrieved details for account {account_id}")
-        return account
-    except Exception as e:
-        logger.error(f"Error getting account details for {account_id}: {e}")
-        raise
 
 
 @mcp.tool()
@@ -409,68 +385,7 @@ async def list_safes(
         raise
 
 
-@mcp.tool()
-async def get_safe_details(
-    safe_name: str,
-    include_accounts: Optional[bool] = None,
-    use_cache: Optional[bool] = None
-) -> Dict[str, Any]:
-    """
-    Get detailed information about a specific safe including configuration and permissions.
-    
-    Args:
-        safe_name: Safe name (required) - Examples: "Production-Servers", "Database.Accounts"
-        include_accounts: Include account list (optional) - Default: false
-        use_cache: Use session cache (optional) - Default: false for real-time data
-    
-    Returns:
-        Safe object with detailed configuration, permissions, location, and optionally account list
-        
-    Example:
-        get_safe_details("Production-Servers", include_accounts=true)
-        
-    Note:
-        Safe names with special characters (dots, spaces) are automatically URL encoded
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        safe = await server.get_safe_details(
-            safe_name,
-            include_accounts=include_accounts,
-            use_cache=use_cache
-        )
-        logger.info(f"Retrieved details for safe {safe_name}")
-        return safe
-    except Exception as e:
-        logger.error(f"Error getting safe details for {safe_name}: {e}")
-        raise
 
-
-@mcp.tool()
-async def health_check() -> Dict[str, Any]:
-    """
-    Perform a comprehensive health check of the CyberArk Privilege Cloud connection and services.
-    
-    Returns:
-        Health status information including connectivity, authentication, and service availability
-        
-    Example:
-        health_check()
-        
-    Response includes:
-        - status: "healthy" or "unhealthy"
-        - timestamp: Check execution time
-        - safe_count: Number of accessible safes (indicates proper permissions)
-        - response_time: API response time in milliseconds
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        health = await server.health_check()
-        logger.info(f"Health check completed: {health['status']}")
-        return health
-    except Exception as e:
-        logger.error(f"Error performing health check: {e}")
-        raise
 
 
 @mcp.tool()
@@ -509,32 +424,6 @@ async def list_platforms(
         raise
 
 
-@mcp.tool()
-async def get_platform_details(
-    platform_id: str
-) -> Dict[str, Any]:
-    """
-    Get detailed configuration information about a specific platform.
-    
-    Args:
-        platform_id: Platform identifier (required) - Examples: "WinServerLocal", "UnixSSH", "Oracle"
-    
-    Returns:
-        Platform object with detailed configuration including connection components, properties, and policies
-        
-    Example:
-        get_platform_details("WinServerLocal")
-        
-    Response includes platform settings, connection components, password policies, and capabilities
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        platform = await server.get_platform_details(platform_id)
-        logger.info(f"Retrieved details for platform {platform_id}")
-        return platform
-    except Exception as e:
-        logger.error(f"Error getting platform details for {platform_id}: {e}")
-        raise
 
 @mcp.tool()
 async def import_platform_package(
@@ -570,12 +459,106 @@ async def import_platform_package(
         raise
 
 
-# Resources will be added in future versions
+# Initialize resource registry and register all resource types
+from mcp.types import Resource
+from .resources import (
+    ResourceRegistry,
+    HealthResource,
+    SafeCollectionResource, SafeEntityResource, SafeAccountsResource,
+    AccountCollectionResource, AccountEntityResource, AccountSearchResource,
+    PlatformCollectionResource, PlatformEntityResource, PlatformPackagesResource
+)
+
+# Create global resource registry
+resource_registry = ResourceRegistry()
+
+# Register all resource types with their URI patterns
+def setup_resources():
+    """Set up all resource types with the registry and register with MCP."""
+    # System resources
+    resource_registry.register_resource("health", HealthResource)
+    
+    # Safe resources
+    resource_registry.register_resource("safes", SafeCollectionResource)
+    resource_registry.register_resource("safes/{safe_name}", SafeEntityResource)
+    resource_registry.register_resource("safes/{safe_name}/accounts", SafeAccountsResource)
+    
+    # Account resources
+    resource_registry.register_resource("accounts", AccountCollectionResource)
+    resource_registry.register_resource("accounts/{account_id}", AccountEntityResource)
+    resource_registry.register_resource("accounts/search", AccountSearchResource)
+    
+    # Platform resources
+    resource_registry.register_resource("platforms", PlatformCollectionResource)
+    resource_registry.register_resource("platforms/{platform_id}", PlatformEntityResource)
+    resource_registry.register_resource("platforms/packages", PlatformPackagesResource)
+    
+    # Resources are registered via @mcp.resource decorators below
+
+
+@mcp.resource("cyberark://health/", name="CyberArk Health", description="System health status")
+async def get_health_resource() -> str:
+    """Get health resource content."""
+    return await _read_resource_content("cyberark://health/")
+
+
+@mcp.resource("cyberark://safes/", name="CyberArk Safes", description="All accessible safes")
+async def get_safes_resource() -> str:
+    """Get safes collection resource content."""
+    return await _read_resource_content("cyberark://safes/")
+
+
+@mcp.resource("cyberark://accounts/", name="CyberArk Accounts", description="All accessible accounts")
+async def get_accounts_resource() -> str:
+    """Get accounts collection resource content."""
+    return await _read_resource_content("cyberark://accounts/")
+
+
+@mcp.resource("cyberark://platforms/", name="CyberArk Platforms", description="All available platforms")
+async def get_platforms_resource() -> str:
+    """Get platforms collection resource content."""
+    return await _read_resource_content("cyberark://platforms/")
+
+
+async def _read_resource_content(uri: str) -> str:
+    """Read specific CyberArk resource by URI."""
+    try:
+        # Ensure server is initialized and set in registry
+        server = CyberArkMCPServer()
+        resource_registry.set_server(server)
+        
+        # Create resource instance for the URI
+        resource = await resource_registry.create_resource(uri)
+        if not resource:
+            error_data = {
+                "error": "resource_not_found",
+                "message": f"No resource handler found for URI: {uri}",
+                "available_patterns": resource_registry.get_registered_patterns()
+            }
+            return json.dumps(error_data, indent=2)
+        
+        # Get resource content
+        content = await resource.get_content()
+        logger.info(f"Successfully read resource: {uri}")
+        return content
+        
+    except Exception as e:
+        logger.error(f"Error reading resource {uri}: {e}")
+        error_data = {
+            "error": "resource_read_error", 
+            "message": str(e),
+            "uri": uri
+        }
+        return json.dumps(error_data, indent=2)
 
 
 def main():
     """Main entry point for the MCP server"""
     logger.info("Starting CyberArk Privilege Cloud MCP Server")
+    
+    # Set up resource registry
+    setup_resources()
+    logger.info("Resource registry initialized with all CyberArk resources")
     
     # Verify required environment variables
     required_vars = [

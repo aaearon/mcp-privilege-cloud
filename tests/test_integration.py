@@ -129,10 +129,8 @@ class TestIntegration:
         assert mcp.name == "CyberArk Privilege Cloud MCP Server"
         
         # Verify that essential functions exist
-        from src.mcp_privilege_cloud.mcp_server import list_accounts, get_account_details, health_check
+        from src.mcp_privilege_cloud.mcp_server import list_accounts
         assert list_accounts is not None
-        assert get_account_details is not None
-        assert health_check is not None
 
     def test_resource_endpoints(self):
         """Test that resource endpoints are defined"""

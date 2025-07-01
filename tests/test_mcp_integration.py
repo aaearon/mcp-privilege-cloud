@@ -19,12 +19,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from mcp_privilege_cloud.mcp_server import create_account, set_next_password
 
 # Platform management MCP tools  
-from mcp_privilege_cloud.mcp_server import list_platforms, get_platform_details, import_platform_package
+from mcp_privilege_cloud.mcp_server import list_platforms, import_platform_package
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
 # Safe management MCP tools
 from mcp_privilege_cloud.mcp_server import list_safes as mcp_list_safes
-from mcp_privilege_cloud.mcp_server import get_safe_details as mcp_get_safe_details
+# get_safe_details removed - use cyberark://safes/{safe_name}/ resource instead
 
 
 class TestMCPAccountTools:
