@@ -143,6 +143,7 @@ class CyberArkMCPServer:
             "search_accounts",
             "create_account",
             "change_account_password",
+            "set_next_password",
             "verify_account_password",
             "reconcile_account_password",
             "list_safes",
@@ -157,21 +158,30 @@ class CyberArkMCPServer:
     async def list_accounts(
         self,
         safe_name: Optional[str] = None,
-        username: Optional[str] = None,
-        address: Optional[str] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """List accounts from CyberArk Privilege Cloud"""
+        """List accounts from CyberArk Privilege Cloud
+        
+        Args:
+            safe_name: Optional safe name to filter accounts by
+            **kwargs: Additional valid API parameters including:
+                - search: Keywords to search for
+                - searchType: "contains" or "startswith"
+                - sort: Sort order
+                - offset: Pagination offset
+                - limit: Maximum results to return
+                - filter: Filter expression (e.g., "safeName eq MySafe")
+                - savedfilter: Predefined filter names
+        
+        Returns:
+            List of account dictionaries
+        """
         params = {}
         
         if safe_name:
-            params["safeName"] = safe_name
-        if username:
-            params["userName"] = username
-        if address:
-            params["address"] = address
+            params["filter"] = f"safeName eq {safe_name}"
         
-        # Add any additional filter parameters
+        # Add any additional valid API parameters
         params.update(kwargs)
         
         self.logger.info(f"Listing accounts with filters: {params}")
@@ -194,19 +204,45 @@ class CyberArkMCPServer:
         platform_id: Optional[str] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """Search for accounts with various criteria"""
-        params = {}
+        """Search for accounts with various criteria using proper API filter syntax
         
+        Args:
+            keywords: General search keywords (mapped to 'search' parameter)
+            safe_name: Filter by safe name (added to filter expression)
+            username: Filter by username (added to filter expression)
+            address: Filter by address (added to filter expression)
+            platform_id: Filter by platform ID (added to filter expression)
+            **kwargs: Additional search parameters
+            
+        Returns:
+            List of account objects matching the search criteria
+            
+        Note:
+            This method uses the GET /Accounts endpoint with proper parameter names:
+            - 'search' for general keywords
+            - 'filter' for complex filtering with expressions like "safeName eq MySafe AND userName eq myuser"
+            - Other parameters like searchType can be passed via kwargs
+        """
+        params = {}
+        filter_expressions = []
+        
+        # Handle general keyword search
         if keywords:
             params["search"] = keywords
+        
+        # Build filter expressions for specific criteria
         if safe_name:
-            params["safeName"] = safe_name
+            filter_expressions.append(f"safeName eq {safe_name}")
         if username:
-            params["userName"] = username
+            filter_expressions.append(f"userName eq {username}")
         if address:
-            params["address"] = address
+            filter_expressions.append(f"address eq {address}")
         if platform_id:
-            params["platformId"] = platform_id
+            filter_expressions.append(f"platformId eq {platform_id}")
+        
+        # Combine filter expressions with AND operator
+        if filter_expressions:
+            params["filter"] = " AND ".join(filter_expressions)
         
         # Add any additional search parameters
         params.update(kwargs)
@@ -358,6 +394,70 @@ class CyberArkMCPServer:
             return response
         except Exception as e:
             self.logger.error(f"Failed to change password for account ID: {account_id} - {e}")
+            raise
+
+    async def set_next_password(
+        self,
+        account_id: str,
+        new_password: str,
+        change_immediately: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Set the next password for an existing account in CyberArk Privilege Cloud
+        
+        This method manually sets the next password for an account, which is different from
+        CPM-managed password changes. The password will be set immediately by default.
+        
+        Args:
+            account_id: The unique ID of the account to set password for
+            new_password: The new password to set for the account
+            change_immediately: Whether to change the password immediately (default: True)
+            **kwargs: Additional parameters (not used currently)
+            
+        Returns:
+            Dict containing password set response with status and timestamps
+            
+        Raises:
+            ValueError: If account_id or new_password is missing or invalid
+            CyberArkAPIError: If the API request fails
+        """
+        # Validate required parameters
+        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
+            raise ValueError("account_id is required")
+        
+        if not new_password or (isinstance(new_password, str) and not new_password.strip()):
+            raise ValueError("new_password is required")
+        
+        # Ensure account_id is a string
+        if not isinstance(account_id, str):
+            raise ValueError("account_id must be a string")
+            
+        # Ensure new_password is a string
+        if not isinstance(new_password, str):
+            raise ValueError("new_password must be a string")
+            
+        # Clean account_id
+        account_id = account_id.strip()
+        
+        # Build request payload
+        payload = {
+            "ChangeImmediately": change_immediately,
+            "NewCredentials": new_password
+        }
+        
+        # Log operation (without sensitive data)
+        self.logger.info(f"Setting next password for account ID: {account_id} (change_immediately={change_immediately})")
+        
+        try:
+            response = await self._make_api_request(
+                "POST", 
+                f"Accounts/{account_id}/SetNextPassword/",
+                json=payload
+            )
+            self.logger.info(f"Next password set successfully for account ID: {account_id}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to set next password for account ID: {account_id} - {e}")
             raise
 
     async def verify_account_password(
