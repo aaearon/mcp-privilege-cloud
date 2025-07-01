@@ -343,14 +343,16 @@ class CyberArkMCPServer:
     async def change_account_password(
         self,
         account_id: str,
-        new_password: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """Change the password for an existing account in CyberArk Privilege Cloud
+        """Initiate CPM-managed password change for an existing account in CyberArk Privilege Cloud
+        
+        This method triggers the Central Policy Manager (CPM) to change the account password
+        according to the platform's password policy. The CPM will automatically generate
+        a new password based on the platform configuration.
         
         Args:
             account_id: The unique ID of the account to change password for
-            new_password: Optional new password. If not provided, CPM will generate one
             **kwargs: Additional parameters (not used currently)
             
         Returns:
@@ -371,18 +373,11 @@ class CyberArkMCPServer:
         # Clean account_id
         account_id = account_id.strip()
         
-        # Build request payload
-        payload = {"ChangeImmediately": True}
+        # Build request payload for CPM-managed password change
+        payload = {"ChangeCredsForGroup": True}
         
-        # Add new password if provided
-        if new_password and isinstance(new_password, str) and new_password.strip():
-            payload["NewCredentials"] = new_password
-        
-        # Log operation (without sensitive data)
-        if new_password:
-            self.logger.info(f"Changing password for account ID: {account_id} with manual password")
-        else:
-            self.logger.info(f"Initiating CPM password change for account ID: {account_id}")
+        # Log operation
+        self.logger.info(f"Initiating CPM-managed password change for account ID: {account_id}")
         
         try:
             response = await self._make_api_request(
@@ -390,10 +385,10 @@ class CyberArkMCPServer:
                 f"Accounts/{account_id}/Change/",
                 json=payload
             )
-            self.logger.info(f"Password change initiated successfully for account ID: {account_id}")
+            self.logger.info(f"CPM-managed password change initiated successfully for account ID: {account_id}")
             return response
         except Exception as e:
-            self.logger.error(f"Failed to change password for account ID: {account_id} - {e}")
+            self.logger.error(f"Failed to initiate CPM-managed password change for account ID: {account_id} - {e}")
             raise
 
     async def set_next_password(

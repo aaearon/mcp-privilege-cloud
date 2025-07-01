@@ -1002,7 +1002,7 @@ class TestAccountManagement:
                 # Check that appropriate info was logged (account ID should be present)
                 log_messages = [record.message for record in caplog.records]
                 assert any(account_id in message for message in log_messages)
-                assert any("CPM password change" in message for message in log_messages)
+                assert any("CPM-managed password change" in message for message in log_messages)
 
     async def test_change_account_password_concurrent_operations(self, server):
         """Test concurrent password change operations"""
