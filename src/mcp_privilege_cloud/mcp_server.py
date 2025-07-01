@@ -56,15 +56,18 @@ async def list_accounts(
     address: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    List accounts from CyberArk Privilege Cloud.
+    List privileged accounts from CyberArk Privilege Cloud with optional filtering.
     
     Args:
-        safe_name: Filter accounts by safe name
-        username: Filter accounts by username
-        address: Filter accounts by address/hostname
+        safe_name: Filter by safe name (optional) - Examples: "Production-Servers", "Database-Accounts"
+        username: Filter by username (optional) - Examples: "admin", "service_account"
+        address: Filter by address/hostname (optional) - Examples: "server01.corp.com", "192.168.1.100"
     
     Returns:
-        List of account objects
+        List of account objects containing id, name, address, userName, safeName, platformId
+        
+    Example:
+        list_accounts(safe_name="Production-Servers", username="admin")
     """
     try:
         # Get the server instance from the current context
@@ -86,13 +89,16 @@ async def get_account_details(
     account_id: str
 ) -> Dict[str, Any]:
     """
-    Get detailed information about a specific account.
+    Get detailed information about a specific privileged account.
     
     Args:
-        account_id: Unique identifier for the account
+        account_id: Unique identifier for the account (required) - Numeric string, e.g., "12345"
     
     Returns:
-        Account object with detailed information
+        Account object with detailed information including platform properties, last password change, status
+        
+    Example:
+        get_account_details("12345")
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -113,17 +119,20 @@ async def search_accounts(
     platform_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Search for accounts using various criteria.
+    Search for privileged accounts using advanced criteria and keywords.
     
     Args:
-        keywords: Search keywords
-        safe_name: Filter by safe name
-        username: Filter by username
-        address: Filter by address/hostname
-        platform_id: Filter by platform ID
+        keywords: Search keywords (optional) - Free text search across account properties
+        safe_name: Filter by safe name (optional) - Examples: "Production-Servers", "Database-Accounts"
+        username: Filter by username (optional) - Examples: "admin", "service_account"
+        address: Filter by address/hostname (optional) - Examples: "server01.corp.com", "192.168.1.100"
+        platform_id: Filter by platform ID (optional) - Examples: "WinServerLocal", "UnixSSH"
     
     Returns:
-        List of matching account objects
+        List of matching account objects with relevance scoring
+        
+    Example:
+        search_accounts(keywords="production database", platform_id="UnixSSH")
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -158,19 +167,22 @@ async def create_account(
     Create a new privileged account in CyberArk Privilege Cloud.
     
     Args:
-        platform_id: Platform ID for the account (required, e.g., WinServerLocal, UnixSSH)
-        safe_name: Safe where the account will be created (required)
-        name: Account name/identifier (optional)
-        address: Target address/hostname (optional)
-        user_name: Username for the account (optional)
-        secret: Password or SSH key (optional)
-        secret_type: Type of secret - 'password' or 'key' (optional, defaults to 'password')
-        platform_account_properties: Platform-specific properties (optional, e.g., {"LogonDomain": "CORP", "Port": "3389"})
-        secret_management: Secret management configuration (optional, e.g., {"automaticManagementEnabled": true})
-        remote_machines_access: Remote access configuration (optional, e.g., {"remoteMachines": "server1;server2", "accessRestrictedToRemoteMachines": true})
+        platform_id: Platform ID (required) - Examples: "WinServerLocal", "UnixSSH", "Oracle"
+        safe_name: Target safe name (required) - Must exist and be accessible
+        name: Account identifier (optional) - Account display name
+        address: Target address (optional) - Examples: "server01.corp.com", "192.168.1.100"
+        user_name: Username (optional) - Examples: "admin", "oracle", "service_account"
+        secret: Password/key (optional) - Will be auto-generated if not provided
+        secret_type: Secret type (optional) - "password" (default) or "key"
+        platform_account_properties: Platform properties (optional) - {"LogonDomain": "CORP", "Port": "3389"}
+        secret_management: Management config (optional) - {"automaticManagementEnabled": true}
+        remote_machines_access: Access config (optional) - {"remoteMachines": "server1;server2"}
     
     Returns:
         Created account object with ID and metadata
+        
+    Example:
+        create_account("WinServerLocal", "Production-Servers", address="web01.corp.com", user_name="admin")
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -302,18 +314,21 @@ async def list_safes(
     extended_details: Optional[bool] = None
 ) -> List[Dict[str, Any]]:
     """
-    List all accessible safes in CyberArk Privilege Cloud.
+    List all accessible safes in CyberArk Privilege Cloud with pagination and filtering.
     
     Args:
-        search: Search term for safe names (URL encoded automatically)
-        offset: Offset of the first Safe returned (default: 0)
-        limit: Maximum number of Safes returned (default: 25)
-        sort: Sort order - "safeName asc" or "safeName desc" (default: safeName asc)
-        include_accounts: Whether to include accounts for each Safe (default: False)
-        extended_details: Whether to return all Safe details or only safeName (default: True)
+        search: Search term for safe names (optional) - Partial match, automatically URL encoded
+        offset: Pagination offset (optional) - Default: 0, Max: 10000
+        limit: Results per page (optional) - Default: 25, Max: 1000
+        sort: Sort order (optional) - "safeName asc" or "safeName desc", Default: "safeName asc"
+        include_accounts: Include account counts (optional) - Default: false
+        extended_details: Return full details (optional) - Default: true
     
     Returns:
-        List of safe objects (excludes Internal Safes)
+        List of safe objects (excludes Internal Safes) with name, description, location, member count
+        
+    Example:
+        list_safes(search="Production", limit=50, include_accounts=true)
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -339,19 +354,21 @@ async def get_safe_details(
     use_cache: Optional[bool] = None
 ) -> Dict[str, Any]:
     """
-    Get detailed information about a specific safe.
+    Get detailed information about a specific safe including configuration and permissions.
     
     Args:
-        safe_name: Name of the safe (special characters will be URL encoded automatically)
-        include_accounts: Whether to include accounts for the Safe (default: False)
-        use_cache: Whether to retrieve from session cache (default: False)
+        safe_name: Safe name (required) - Examples: "Production-Servers", "Database.Accounts"
+        include_accounts: Include account list (optional) - Default: false
+        use_cache: Use session cache (optional) - Default: false for real-time data
     
     Returns:
-        Safe object with detailed information
+        Safe object with detailed configuration, permissions, location, and optionally account list
+        
+    Example:
+        get_safe_details("Production-Servers", include_accounts=true)
         
     Note:
-        For safe names with special characters like dots (.), the API may require
-        special handling. Contact your CyberArk administrator if you encounter issues.
+        Safe names with special characters (dots, spaces) are automatically URL encoded
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -370,10 +387,19 @@ async def get_safe_details(
 @mcp.tool()
 async def health_check() -> Dict[str, Any]:
     """
-    Perform a health check of the CyberArk connection.
+    Perform a comprehensive health check of the CyberArk Privilege Cloud connection and services.
     
     Returns:
-        Health status information
+        Health status information including connectivity, authentication, and service availability
+        
+    Example:
+        health_check()
+        
+    Response includes:
+        - status: "healthy" or "unhealthy"
+        - timestamp: Check execution time
+        - safe_count: Number of accessible safes (indicates proper permissions)
+        - response_time: API response time in milliseconds
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -392,15 +418,20 @@ async def list_platforms(
     system_type: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    List available platforms in CyberArk Privilege Cloud.
+    List all available platforms in CyberArk Privilege Cloud with filtering options.
     
     Args:
-        search: Search term for platform names
-        active: Filter by active status (true/false)
-        system_type: Filter by system type (e.g., Windows, Unix)
+        search: Search term for platform names (optional) - Partial match across platform names
+        active: Filter by active status (optional) - true for active platforms only
+        system_type: Filter by system type (optional) - Examples: "Windows", "Unix", "Database"
     
     Returns:
-        List of platform objects
+        List of platform objects with platformId, platformName, systemType, and capabilities
+        
+    Example:
+        list_platforms(system_type="Windows", active=true)
+        
+    Common platform types: WinServerLocal, UnixSSH, Oracle, SQLServer, MySQL, PostgreSQL
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -421,13 +452,18 @@ async def get_platform_details(
     platform_id: str
 ) -> Dict[str, Any]:
     """
-    Get detailed information about a specific platform.
+    Get detailed configuration information about a specific platform.
     
     Args:
-        platform_id: Unique identifier for the platform (e.g., WinServerLocal, UnixSSH)
+        platform_id: Platform identifier (required) - Examples: "WinServerLocal", "UnixSSH", "Oracle"
     
     Returns:
-        Platform object with detailed configuration information
+        Platform object with detailed configuration including connection components, properties, and policies
+        
+    Example:
+        get_platform_details("WinServerLocal")
+        
+    Response includes platform settings, connection components, password policies, and capabilities
     """
     try:
         server = CyberArkMCPServer.from_environment()
@@ -443,19 +479,24 @@ async def import_platform_package(
     platform_package_file: str
 ) -> Dict[str, Any]:
     """
-    Import a platform package to CyberArk Privilege Cloud.
+    Import a platform package ZIP file to CyberArk Privilege Cloud to add new platform types.
     
     Args:
-        platform_package_file: Path to the platform package ZIP file to import.
-                              Must be a valid ZIP file and not exceed 20MB.
+        platform_package_file: Full path to platform package ZIP file (required) - Must be valid ZIP ≤ 20MB
     
     Returns:
-        Dict containing the imported platform ID
-    
-    Note:
-        - The platform package file must be a ZIP file containing platform definition and dependencies
-        - Maximum file size is 20MB
-        - Supports all four platform types: Target, Dependent, Group, and Rotational group
+        Import result containing PlatformID of the imported platform and status information
+        
+    Example:
+        import_platform_package("/path/to/CustomPlatform.zip")
+        
+    Requirements:
+        - File must be a valid ZIP archive
+        - Maximum file size: 20MB
+        - Must contain valid platform definition files
+        - Supports: Target, Dependent, Group, and Rotational group platform types
+        
+    Note: Requires Privilege Cloud Administrator role for platform management operations
     """
     try:
         server = CyberArkMCPServer.from_environment()
