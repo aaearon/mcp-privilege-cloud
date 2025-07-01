@@ -19,11 +19,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from mcp_privilege_cloud.mcp_server import create_account, set_next_password
 
 # Platform management MCP tools  
-from mcp_privilege_cloud.mcp_server import list_platforms, import_platform_package
+from mcp_privilege_cloud.mcp_server import import_platform_package
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
-# Safe management MCP tools
-from mcp_privilege_cloud.mcp_server import list_safes as mcp_list_safes
+# Safe management MCP tools - replaced with resources
 
 
 class TestMCPAccountTools:
@@ -401,70 +400,6 @@ class TestMCPPlatformTools:
         }
 
     @pytest.mark.asyncio
-    async def test_mcp_list_platforms_tool(self, platform_mock_env_vars):
-        """Test the MCP list_platforms tool"""
-        mock_platforms = [
-            {"id": "WinServerLocal", "name": "Windows Server Local"},
-            {"id": "UnixSSH", "name": "Unix via SSH"}
-        ]
-        
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_platforms', new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = mock_platforms
-                
-                result = await list_platforms()
-                
-                assert result == mock_platforms
-                mock_list.assert_called_once_with(
-                    search=None,
-                    active=None,
-                    system_type=None
-                )
-
-    @pytest.mark.asyncio
-    async def test_mcp_list_platforms_with_filters(self, platform_mock_env_vars):
-        """Test the MCP list_platforms tool with filters"""
-        mock_platforms = [{"id": "WinServerLocal", "name": "Windows Server Local"}]
-        
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_platforms', new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = mock_platforms
-                
-                result = await list_platforms(
-                    search="Windows",
-                    active=True,
-                    system_type="Windows"
-                )
-                
-                assert result == mock_platforms
-                mock_list.assert_called_once_with(
-                    search="Windows",
-                    active=True,
-                    system_type="Windows"
-                )
-
-
-    @pytest.mark.asyncio
-    async def test_mcp_platform_tools_error_handling(self, platform_mock_env_vars):
-        """Test MCP platform tools handle errors properly"""
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_platforms', new_callable=AsyncMock) as mock_list:
-                mock_list.side_effect = Exception("API Error")
-                
-                with pytest.raises(Exception, match="API Error"):
-                    await list_platforms()
-            
-
-    @pytest.mark.asyncio
-    async def test_mcp_platform_tools_environment_handling(self):
-        """Test MCP platform tools handle missing environment variables"""
-        # Clear environment variables
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError):
-                await list_platforms()
-            
-
-    @pytest.mark.asyncio
     async def test_mcp_import_platform_package_tool(self, platform_mock_env_vars):
         """Test the MCP import_platform_package tool"""
         platform_file = "/tmp/test_platform.zip"
@@ -490,94 +425,5 @@ class TestMCPPlatformTools:
                     await import_platform_package("/tmp/nonexistent.zip")
 
 
-class TestMCPSafeTools:
-    """Test MCP safe management tools integration"""
 
-    @pytest.mark.asyncio
-    async def test_mcp_list_safes_basic(self):
-        """Test MCP list_safes tool with basic usage"""
-        mock_safes = [
-            {"safeName": "HRSafe", "description": "HR Safe"},
-            {"safeName": "ITSafe", "description": "IT Safe"}
-        ]
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.list_safes.return_value = mock_safes
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_list_safes()
-            
-            mock_server.list_safes.assert_called_once_with(
-                search=None,
-                offset=None,
-                limit=None,
-                sort=None,
-                include_accounts=None,
-                extended_details=None
-            )
-            assert result == mock_safes
-
-    @pytest.mark.asyncio
-    async def test_mcp_list_safes_with_parameters(self):
-        """Test MCP list_safes tool with all parameters"""
-        mock_safes = [{"safeName": "HRSafe"}]
-        
-        safe_params = {
-            "search": "HR",
-            "offset": 10,
-            "limit": 5,
-            "sort": "safeName desc",
-            "include_accounts": True,
-            "extended_details": False
-        }
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.list_safes.return_value = mock_safes
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_list_safes(**safe_params)
-            
-            mock_server.list_safes.assert_called_once_with(**safe_params)
-            assert result == mock_safes
-
-    @pytest.mark.asyncio
-    async def test_mcp_list_safes_error_handling(self):
-        """Test MCP list_safes tool error handling"""
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.list_safes.side_effect = Exception("API Error")
-            mock_from_env.return_value = mock_server
-            
-            with pytest.raises(Exception, match="API Error"):
-                await mcp_list_safes()
-
-
-    @pytest.mark.asyncio
-    async def test_mcp_list_safes_pagination_scenario(self):
-        """Test MCP list_safes with pagination parameters"""
-        # Simulate a paginated request
-        mock_safes = [{"safeName": f"Safe{i}"} for i in range(10)]
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.list_safes.return_value = mock_safes
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_list_safes(
-                offset=20,
-                limit=10,
-                sort="safeName asc"
-            )
-            
-            mock_server.list_safes.assert_called_once_with(
-                search=None,
-                offset=20,
-                limit=10,
-                sort="safeName asc",
-                include_accounts=None,
-                extended_details=None
-            )
-            assert len(result) == 10
 

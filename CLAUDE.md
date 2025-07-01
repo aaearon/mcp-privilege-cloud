@@ -26,7 +26,7 @@ This document provides essential context for AI assistants developing the CyberA
 
 3. **MCP Integration** (`src/mcp_privilege_cloud/mcp_server.py`)
    - FastMCP server implementation
-   - 11 exposed tools for CyberArk operations
+   - 7 exposed action tools for CyberArk operations
    - Proper tool parameter validation
    - Windows-compatible encoding handling
 
@@ -39,20 +39,29 @@ This document provides essential context for AI assistants developing the CyberA
 - **Response Parsing**: `value` field for arrays (except Platforms API uses `Platforms`)
 - **Platform APIs**: Require Privilege Cloud Administrator role membership
 
-## Available MCP Tools
+## Available MCP Tools (Actions Only)
 
 | Tool | Purpose | Parameters | Returns |
 |------|---------|------------|---------|
-| `list_safes` | List accessible safes with pagination | `search`, `offset`, `limit`, `sort`, `include_accounts`, `extended_details` (all optional) | Array of safe objects (excludes Internal Safes) |
-| `list_accounts` | List accounts | `safe_name`, `username`, `address` (all optional) | Array of account objects |
-| `search_accounts` | Advanced account search | `keywords`, `safe_name`, `username`, `address`, `platform_id` (all optional) | Array of matching accounts |
+
 | `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
 | `change_account_password` | Change password for an account | `account_id` (required); `new_password` (optional) | Operation result |
 | `set_next_password` | Set the next password for an account | `account_id`, `password` (required) | Operation result |
 | `verify_account_password` | Verify the current password for an account | `account_id` (required) | Verification result |
 | `reconcile_account_password` | Reconcile account password with target system | `account_id` (required) | Reconciliation result |
-| `list_platforms` | List available platforms | `search`, `active`, `system_type` (all optional) | Array of platform objects |
+
 | `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
+
+## Available MCP Resources (Read Operations)
+
+| Resource | Purpose | URI Pattern | Description |
+|----------|---------|-------------|-------------|
+| **Accounts** | List and search accounts | `cyberark://accounts/` | All accessible accounts across safes |
+| **Account Search** | Advanced account search | `cyberark://accounts/search?query=...` | Search with filters and keywords |
+| **Safes** | List accessible safes | `cyberark://safes/` | All safes with pagination support |
+| **Platforms** | List available platforms | `cyberark://platforms/` | Platform definitions for account creation |
+
+*Resources provide read-only access via URIs and are cached for better performance*
 
 ## Configuration
 

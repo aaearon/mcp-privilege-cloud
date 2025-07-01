@@ -50,104 +50,11 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("CyberArk Privilege Cloud MCP Server")
 
 
-@mcp.tool()
-async def list_accounts(
-    safe_name: Optional[str] = None,
-    search: Optional[str] = None,
-    search_type: Optional[str] = None,
-    sort: Optional[str] = None,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None,
-    filter: Optional[str] = None,
-    saved_filter: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """
-    List privileged accounts from CyberArk Privilege Cloud with optional filtering.
-    
-    Args:
-        safe_name: Filter by safe name (optional) - Examples: "Production-Servers", "Database-Accounts"
-        search: Keywords to search for (optional) - Examples: "admin", "database"
-        search_type: Search type - "contains" or "startswith" (optional)
-        sort: Sort order (optional) - Examples: "name", "address", "platformId"
-        offset: Pagination offset (optional) - Example: 0, 20, 40
-        limit: Maximum results to return (optional) - Example: 50, 100
-        filter: Custom filter expression (optional) - Example: "platformId eq WindowsAccount"
-        saved_filter: Predefined filter name (optional)
-    
-    Returns:
-        List of account objects containing id, name, address, userName, safeName, platformId
-        
-    Example:
-        list_accounts(safe_name="Production-Servers", search="admin", limit=50)
-    """
-    try:
-        # Get the server instance from the current context
-        server = CyberArkMCPServer.from_environment()
-        
-        # Build kwargs for the server method
-        kwargs = {}
-        if search is not None:
-            kwargs["search"] = search
-        if search_type is not None:
-            kwargs["searchType"] = search_type
-        if sort is not None:
-            kwargs["sort"] = sort
-        if offset is not None:
-            kwargs["offset"] = offset
-        if limit is not None:
-            kwargs["limit"] = limit
-        if filter is not None:
-            kwargs["filter"] = filter
-        if saved_filter is not None:
-            kwargs["savedfilter"] = saved_filter
-            
-        accounts = await server.list_accounts(safe_name=safe_name, **kwargs)
-        logger.info(f"Retrieved {len(accounts)} accounts")
-        return accounts
-    except Exception as e:
-        logger.error(f"Error listing accounts: {e}")
-        raise
 
 
 
-@mcp.tool()
-async def search_accounts(
-    keywords: Optional[str] = None,
-    safe_name: Optional[str] = None,
-    username: Optional[str] = None,
-    address: Optional[str] = None,
-    platform_id: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """
-    Search for privileged accounts using advanced criteria and keywords.
-    
-    Args:
-        keywords: Search keywords (optional) - Free text search across account properties
-        safe_name: Filter by safe name (optional) - Examples: "Production-Servers", "Database-Accounts"
-        username: Filter by username (optional) - Examples: "admin", "service_account"
-        address: Filter by address/hostname (optional) - Examples: "server01.corp.com", "192.168.1.100"
-        platform_id: Filter by platform ID (optional) - Examples: "WinServerLocal", "UnixSSH"
-    
-    Returns:
-        List of matching account objects with relevance scoring
-        
-    Example:
-        search_accounts(keywords="production database", platform_id="UnixSSH")
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        accounts = await server.search_accounts(
-            keywords=keywords,
-            safe_name=safe_name,
-            username=username,
-            address=address,
-            platform_id=platform_id
-        )
-        logger.info(f"Search returned {len(accounts)} accounts")
-        return accounts
-    except Exception as e:
-        logger.error(f"Error searching accounts: {e}")
-        raise
+
+
 
 
 @mcp.tool()
@@ -342,86 +249,13 @@ async def reconcile_account_password(
         raise
 
 
-@mcp.tool()
-async def list_safes(
-    search: Optional[str] = None,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None,
-    sort: Optional[str] = None,
-    include_accounts: Optional[bool] = None,
-    extended_details: Optional[bool] = None
-) -> List[Dict[str, Any]]:
-    """
-    List all accessible safes in CyberArk Privilege Cloud with pagination and filtering.
-    
-    Args:
-        search: Search term for safe names (optional) - Partial match, automatically URL encoded
-        offset: Pagination offset (optional) - Default: 0, Max: 10000
-        limit: Results per page (optional) - Default: 25, Max: 1000
-        sort: Sort order (optional) - "safeName asc" or "safeName desc", Default: "safeName asc"
-        include_accounts: Include account counts (optional) - Default: false
-        extended_details: Return full details (optional) - Default: true
-    
-    Returns:
-        List of safe objects (excludes Internal Safes) with name, description, location, member count
-        
-    Example:
-        list_safes(search="Production", limit=50, include_accounts=true)
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        safes = await server.list_safes(
-            search=search,
-            offset=offset,
-            limit=limit,
-            sort=sort,
-            include_accounts=include_accounts,
-            extended_details=extended_details
-        )
-        logger.info(f"Retrieved {len(safes)} safes")
-        return safes
-    except Exception as e:
-        logger.error(f"Error listing safes: {e}")
-        raise
 
 
 
 
 
-@mcp.tool()
-async def list_platforms(
-    search: Optional[str] = None,
-    active: Optional[bool] = None,
-    system_type: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """
-    List all available platforms in CyberArk Privilege Cloud with filtering options.
-    
-    Args:
-        search: Search term for platform names (optional) - Partial match across platform names
-        active: Filter by active status (optional) - true for active platforms only
-        system_type: Filter by system type (optional) - Examples: "Windows", "Unix", "Database"
-    
-    Returns:
-        List of platform objects with platformId, platformName, systemType, and capabilities
-        
-    Example:
-        list_platforms(system_type="Windows", active=true)
-        
-    Common platform types: WinServerLocal, UnixSSH, Oracle, SQLServer, MySQL, PostgreSQL
-    """
-    try:
-        server = CyberArkMCPServer.from_environment()
-        platforms = await server.list_platforms(
-            search=search,
-            active=active,
-            system_type=system_type
-        )
-        logger.info(f"Retrieved {len(platforms)} platforms")
-        return platforms
-    except Exception as e:
-        logger.error(f"Error listing platforms: {e}")
-        raise
+
+
 
 
 

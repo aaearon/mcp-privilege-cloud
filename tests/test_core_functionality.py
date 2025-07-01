@@ -395,21 +395,20 @@ class TestServerCore:
         # This will test the actual tool registration once implemented
         tools = server_instance.get_available_tools()
         expected_tools = [
-            "list_accounts",
-            "get_account_details", 
-            "search_accounts",
-            "list_safes",
-            "get_safe_details",
-            "list_platforms",
-            "get_platform_details"
+            "create_account",
+            "change_account_password", 
+            "set_next_password",
+            "verify_account_password",
+            "reconcile_account_password",
+            "import_platform_package"
         ]
         
         for tool_name in expected_tools:
             assert tool_name in tools
 
     @pytest.mark.asyncio
-    async def test_list_accounts_tool(self, server_instance):
-        """Test list_accounts tool functionality"""
+    async def test_list_accounts_server_method(self, server_instance):
+        """Test list_accounts server method functionality"""
         mock_accounts = [
             {"id": "123", "name": "account1", "safeName": "safe1"},
             {"id": "456", "name": "account2", "safeName": "safe2"}
@@ -444,8 +443,8 @@ class TestServerCore:
             assert result == mock_account
 
     @pytest.mark.asyncio
-    async def test_search_accounts_tool(self, server_instance):
-        """Test search_accounts tool functionality with proper API filter syntax"""
+    async def test_search_accounts_server_method(self, server_instance):
+        """Test search_accounts server method functionality with proper API filter syntax"""
         search_params = {"keywords": "admin", "safe_name": "test-safe"}
         mock_results = [{"id": "123", "name": "admin-account"}]
         
@@ -739,8 +738,8 @@ class TestPlatformManagement:
         )
 
     @pytest.mark.asyncio
-    async def test_list_platforms_tool(self, platform_server):
-        """Test list_platforms tool functionality"""
+    async def test_list_platforms_server_method(self, platform_server):
+        """Test list_platforms server method functionality"""
         mock_platforms = [
             {
                 "id": "WinServerLocal",
@@ -1029,17 +1028,18 @@ class TestPlatformManagement:
             with pytest.raises(Exception):
                 await platform_server.list_platforms()
 
-    def test_platform_tools_in_available_tools(self, platform_server):
-        """Test that platform tools are included in available tools list"""
+    def test_remaining_tools_in_available_tools(self, platform_server):
+        """Test that remaining action tools are included in available tools list"""
         tools = platform_server.get_available_tools()
-        assert "list_platforms" in tools
+        assert "import_platform_package" in tools
         assert "get_platform_details" in tools
         
-        # Verify ordering and completeness
+        # Verify action tools are present
         expected_tools = [
-            "list_accounts", "get_account_details", "search_accounts",
-            "list_safes", "get_safe_details",
-            "list_platforms", "get_platform_details", "import_platform_package"
+            "create_account", "change_account_password", "set_next_password",
+            "verify_account_password", "reconcile_account_password",
+            "get_account_details", "get_safe_details", 
+            "get_platform_details", "import_platform_package"
         ]
         for tool in expected_tools:
             assert tool in tools
