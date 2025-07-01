@@ -19,12 +19,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from mcp_privilege_cloud.mcp_server import create_account, set_next_password
 
 # Platform management MCP tools  
-from mcp_privilege_cloud.mcp_server import list_platforms, get_platform_details, import_platform_package
+from mcp_privilege_cloud.mcp_server import list_platforms, import_platform_package
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
 # Safe management MCP tools
 from mcp_privilege_cloud.mcp_server import list_safes as mcp_list_safes
-from mcp_privilege_cloud.mcp_server import get_safe_details as mcp_get_safe_details
 
 
 class TestMCPAccountTools:
@@ -444,24 +443,6 @@ class TestMCPPlatformTools:
                     system_type="Windows"
                 )
 
-    @pytest.mark.asyncio
-    async def test_mcp_get_platform_details_tool(self, platform_mock_env_vars):
-        """Test the MCP get_platform_details tool"""
-        platform_id = "WinServerLocal"
-        mock_platform = {
-            "id": platform_id,
-            "name": "Windows Server Local",
-            "details": {"credentialsManagementPolicy": {"change": "on"}}
-        }
-        
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'get_platform_details', new_callable=AsyncMock) as mock_get:
-                mock_get.return_value = mock_platform
-                
-                result = await get_platform_details(platform_id)
-                
-                assert result == mock_platform
-                mock_get.assert_called_once_with(platform_id)
 
     @pytest.mark.asyncio
     async def test_mcp_platform_tools_error_handling(self, platform_mock_env_vars):
@@ -473,11 +454,6 @@ class TestMCPPlatformTools:
                 with pytest.raises(Exception, match="API Error"):
                     await list_platforms()
             
-            with patch.object(CyberArkMCPServer, 'get_platform_details', new_callable=AsyncMock) as mock_get:
-                mock_get.side_effect = Exception("Platform not found")
-                
-                with pytest.raises(Exception, match="Platform not found"):
-                    await get_platform_details("NonExistentPlatform")
 
     @pytest.mark.asyncio
     async def test_mcp_platform_tools_environment_handling(self):
@@ -487,8 +463,6 @@ class TestMCPPlatformTools:
             with pytest.raises(ValueError):
                 await list_platforms()
             
-            with pytest.raises(ValueError):
-                await get_platform_details("TestPlatform")
 
     @pytest.mark.asyncio
     async def test_mcp_import_platform_package_tool(self, platform_mock_env_vars):
@@ -579,69 +553,6 @@ class TestMCPSafeTools:
             with pytest.raises(Exception, match="API Error"):
                 await mcp_list_safes()
 
-    @pytest.mark.asyncio
-    async def test_mcp_get_safe_details_basic(self):
-        """Test MCP get_safe_details tool with basic usage"""
-        safe_name = "HRSafe"
-        mock_safe = {
-            "safeName": safe_name,
-            "description": "HR Safe",
-            "accounts": []
-        }
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.get_safe_details.return_value = mock_safe
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_get_safe_details(safe_name)
-            
-            mock_server.get_safe_details.assert_called_once_with(
-                safe_name,
-                include_accounts=None,
-                use_cache=None
-            )
-            assert result == mock_safe
-
-    @pytest.mark.asyncio
-    async def test_mcp_get_safe_details_with_parameters(self):
-        """Test MCP get_safe_details tool with parameters"""
-        safe_name = "HRSafe"
-        mock_safe = {
-            "safeName": safe_name,
-            "accounts": [{"id": "123", "name": "hr-admin"}]
-        }
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.get_safe_details.return_value = mock_safe
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_get_safe_details(
-                safe_name,
-                include_accounts=True,
-                use_cache=False
-            )
-            
-            mock_server.get_safe_details.assert_called_once_with(
-                safe_name,
-                include_accounts=True,
-                use_cache=False
-            )
-            assert result == mock_safe
-
-    @pytest.mark.asyncio
-    async def test_mcp_get_safe_details_error_handling(self):
-        """Test MCP get_safe_details tool error handling"""
-        safe_name = "NonExistentSafe"
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.get_safe_details.side_effect = Exception("Safe not found")
-            mock_from_env.return_value = mock_server
-            
-            with pytest.raises(Exception, match="Safe not found"):
-                await mcp_get_safe_details(safe_name)
 
     @pytest.mark.asyncio
     async def test_mcp_list_safes_pagination_scenario(self):
@@ -670,23 +581,3 @@ class TestMCPSafeTools:
             )
             assert len(result) == 10
 
-    @pytest.mark.asyncio
-    async def test_mcp_get_safe_details_with_special_characters(self):
-        """Test MCP get_safe_details with safe names containing special characters"""
-        safe_name = "My Safe With Spaces & Special Characters"
-        mock_safe = {"safeName": safe_name}
-        
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_from_env:
-            mock_server = AsyncMock()
-            mock_server.get_safe_details.return_value = mock_safe
-            mock_from_env.return_value = mock_server
-            
-            result = await mcp_get_safe_details(safe_name)
-            
-            # Verify the safe name is passed through correctly
-            mock_server.get_safe_details.assert_called_once_with(
-                safe_name,
-                include_accounts=None,
-                use_cache=None
-            )
-            assert result == mock_safe

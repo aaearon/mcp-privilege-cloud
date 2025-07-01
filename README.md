@@ -8,6 +8,8 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 - **Account Management**: List, search, retrieve detailed information, and create new privileged accounts
 - **Safe Management**: List and view safe information
 - **Platform Management**: List available platforms and view detailed platform configurations
+- **Password Operations**: Change, verify, set next, and reconcile account passwords
+- **MCP Resources**: URI-based access to CyberArk entities for browsing and caching
 - **OAuth 2.0 Authentication**: Secure API token authentication with CyberArk Identity
 - **Health Monitoring**: Built-in health check functionality
 - **Comprehensive Logging**: Detailed logging for all operations
@@ -125,12 +127,21 @@ python -m src.mcp_privilege_cloud.mcp_server
 
 The server provides 10 MCP tools for CyberArk operations:
 
-- **Account Management**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`
-- **Safe Management**: `list_safes`, `get_safe_details` 
-- **Platform Management**: `list_platforms`, `get_platform_details`
-- **System**: `health_check`
+- **Account Management**: `list_accounts`, `search_accounts`, `create_account`
+- **Password Operations**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+- **Safe Management**: `list_safes`
+- **Platform Management**: `list_platforms`, `import_platform_package`
 
-For detailed tool specifications, parameters, and examples, see [API Reference](docs/API_REFERENCE.md).
+### Available Resources
+
+The server provides URI-based resource access for browsing and caching:
+
+- **Health**: `cyberark://health/` - System status and connectivity
+- **Safes**: `cyberark://safes/` - Browse safe hierarchy and accounts
+- **Accounts**: `cyberark://accounts/` - Access and search account collections
+- **Platforms**: `cyberark://platforms/` - Platform configurations and capabilities
+
+For detailed specifications, see [Server Capabilities](SERVER_CAPABILITIES.md) and [Resources Guide](docs/RESOURCES.md).
 
 ## Standardized MCP Server Approach
 
