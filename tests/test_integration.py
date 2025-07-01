@@ -42,20 +42,14 @@ class TestIntegration:
         # Mock the server context to test tool availability
         mock_server = Mock(spec=CyberArkMCPServer)
         mock_server.list_accounts = AsyncMock(return_value=[])
-        mock_server.get_account_details = AsyncMock(return_value={})
         mock_server.search_accounts = AsyncMock(return_value=[])
         mock_server.list_safes = AsyncMock(return_value=[])
-        mock_server.get_safe_details = AsyncMock(return_value={})
-        mock_server.health_check = AsyncMock(return_value={"status": "healthy"})
         
         # Verify that the mock has all expected methods
         expected_methods = [
             'list_accounts',
-            'get_account_details', 
             'search_accounts',
-            'list_safes',
-            'get_safe_details',
-            'health_check'
+            'list_safes'
         ]
         
         for method in expected_methods:
@@ -106,20 +100,6 @@ class TestIntegration:
         logger = logging.getLogger("src.mcp_privilege_cloud.mcp_server")
         assert logger is not None
 
-    def test_health_check_functionality(self):
-        """Test the health check functionality"""
-        mock_server = Mock(spec=CyberArkMCPServer)
-        mock_server.health_check = AsyncMock(return_value={
-            "status": "healthy",
-            "timestamp": "2025-01-06T12:00:00Z",
-            "safes_accessible": 5
-        })
-        
-        # Test health check response
-        result = asyncio.run(mock_server.health_check())
-        assert result["status"] == "healthy"
-        assert "timestamp" in result
-        assert "safes_accessible" in result
 
     def test_server_lifecycle_management(self):
         """Test that server lifecycle is managed properly"""
