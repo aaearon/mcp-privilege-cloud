@@ -421,13 +421,17 @@ class TestServerCore:
 
     @pytest.mark.asyncio
     async def test_list_accounts_with_filters(self, server_instance):
-        """Test list_accounts with filter parameters"""
-        filters = {"safeName": "test-safe", "userName": "admin"}
-        
+        """Test list_accounts with valid API filter parameters"""
         with patch.object(server_instance, '_make_api_request') as mock_request:
             mock_request.return_value = {"value": []}
-            await server_instance.list_accounts(**filters)
-            mock_request.assert_called_once_with("GET", "Accounts", params=filters)
+            
+            # Test safe_name parameter (gets converted to filter)
+            await server_instance.list_accounts(safe_name="test-safe")
+            mock_request.assert_called_with("GET", "Accounts", params={"filter": "safeName eq test-safe"})
+            
+            # Test additional kwargs passed through
+            await server_instance.list_accounts(search="admin", limit=50)
+            mock_request.assert_called_with("GET", "Accounts", params={"search": "admin", "limit": 50})
 
     @pytest.mark.asyncio
     async def test_get_account_details_tool(self, server_instance):
@@ -441,13 +445,20 @@ class TestServerCore:
 
     @pytest.mark.asyncio
     async def test_search_accounts_tool(self, server_instance):
-        """Test search_accounts tool functionality"""
-        search_params = {"keywords": "admin", "safeName": "test-safe"}
+        """Test search_accounts tool functionality with proper API filter syntax"""
+        search_params = {"keywords": "admin", "safe_name": "test-safe"}
         mock_results = [{"id": "123", "name": "admin-account"}]
         
-        with patch.object(server_instance, '_make_api_request', return_value={"value": mock_results}):
+        with patch.object(server_instance, '_make_api_request', return_value={"value": mock_results}) as mock_request:
             result = await server_instance.search_accounts(**search_params)
             assert result == mock_results
+            
+            # Verify the API call uses proper parameter mapping
+            expected_params = {
+                "search": "admin",
+                "filter": "safeName eq test-safe"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
 
     # Safe Management Tests
     

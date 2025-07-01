@@ -52,31 +52,55 @@ mcp = FastMCP("CyberArk Privilege Cloud MCP Server")
 @mcp.tool()
 async def list_accounts(
     safe_name: Optional[str] = None,
-    username: Optional[str] = None,
-    address: Optional[str] = None
+    search: Optional[str] = None,
+    search_type: Optional[str] = None,
+    sort: Optional[str] = None,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None,
+    filter: Optional[str] = None,
+    saved_filter: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     List privileged accounts from CyberArk Privilege Cloud with optional filtering.
     
     Args:
         safe_name: Filter by safe name (optional) - Examples: "Production-Servers", "Database-Accounts"
-        username: Filter by username (optional) - Examples: "admin", "service_account"
-        address: Filter by address/hostname (optional) - Examples: "server01.corp.com", "192.168.1.100"
+        search: Keywords to search for (optional) - Examples: "admin", "database"
+        search_type: Search type - "contains" or "startswith" (optional)
+        sort: Sort order (optional) - Examples: "name", "address", "platformId"
+        offset: Pagination offset (optional) - Example: 0, 20, 40
+        limit: Maximum results to return (optional) - Example: 50, 100
+        filter: Custom filter expression (optional) - Example: "platformId eq WindowsAccount"
+        saved_filter: Predefined filter name (optional)
     
     Returns:
         List of account objects containing id, name, address, userName, safeName, platformId
         
     Example:
-        list_accounts(safe_name="Production-Servers", username="admin")
+        list_accounts(safe_name="Production-Servers", search="admin", limit=50)
     """
     try:
         # Get the server instance from the current context
         server = CyberArkMCPServer.from_environment()
-        accounts = await server.list_accounts(
-            safe_name=safe_name,
-            username=username,
-            address=address
-        )
+        
+        # Build kwargs for the server method
+        kwargs = {}
+        if search is not None:
+            kwargs["search"] = search
+        if search_type is not None:
+            kwargs["searchType"] = search_type
+        if sort is not None:
+            kwargs["sort"] = sort
+        if offset is not None:
+            kwargs["offset"] = offset
+        if limit is not None:
+            kwargs["limit"] = limit
+        if filter is not None:
+            kwargs["filter"] = filter
+        if saved_filter is not None:
+            kwargs["savedfilter"] = saved_filter
+            
+        accounts = await server.list_accounts(safe_name=safe_name, **kwargs)
         logger.info(f"Retrieved {len(accounts)} accounts")
         return accounts
     except Exception as e:
@@ -238,6 +262,44 @@ async def change_account_password(
         return result
     except Exception as e:
         logger.error(f"Error changing password for account ID: {account_id} - {e}")
+        raise
+
+@mcp.tool()
+async def set_next_password(
+    account_id: str,
+    new_password: str,
+    change_immediately: bool = True
+) -> Dict[str, Any]:
+    """
+    Set the next password for an existing account in CyberArk Privilege Cloud.
+    
+    This operation manually sets the next password for an account, which is different 
+    from CPM-managed password changes. The password will be set immediately by default.
+    
+    Args:
+        account_id: The unique ID of the account to set password for (required)
+        new_password: The new password to set for the account (required)
+        change_immediately: Whether to change the password immediately (default: True)
+    
+    Returns:
+        Password set response containing status, timestamps, and account metadata
+        
+    Security Notes:
+        - This operation requires appropriate permissions for password management
+        - Password changes are audited and logged in CyberArk
+        - Use strong passwords that comply with your organization's policy
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        result = await server.set_next_password(
+            account_id=account_id,
+            new_password=new_password,
+            change_immediately=change_immediately
+        )
+        logger.info(f"Next password set for account ID: {account_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error setting next password for account ID: {account_id} - {e}")
         raise
 
 @mcp.tool()

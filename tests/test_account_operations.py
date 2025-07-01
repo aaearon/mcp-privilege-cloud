@@ -92,25 +92,73 @@ class TestAccountManagement:
             
             assert result == filtered_accounts
             mock_request.assert_called_once_with(
-                "GET", "Accounts", params={"safeName": "IT-Infrastructure"}
+                "GET", "Accounts", params={"filter": "safeName eq IT-Infrastructure"}
             )
 
-    async def test_list_accounts_with_multiple_filters(self, server, sample_accounts):
-        """Test listing accounts with multiple filters"""
+    async def test_list_accounts_with_additional_params(self, server, sample_accounts):
+        """Test listing accounts with additional API parameters"""
         mock_response = {"value": sample_accounts}
         
         with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
             result = await server.list_accounts(
                 safe_name="IT-Infrastructure",
-                username="admin",
-                address="server01.example.com"
+                search="admin",
+                limit=50,
+                offset=0
             )
             
             assert result == sample_accounts
             expected_params = {
-                "safeName": "IT-Infrastructure",
-                "userName": "admin", 
-                "address": "server01.example.com"
+                "filter": "safeName eq IT-Infrastructure",
+                "search": "admin",
+                "limit": 50,
+                "offset": 0
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+
+    async def test_list_accounts_with_valid_api_parameters(self, server, sample_accounts):
+        """Test listing accounts with all valid API parameters"""
+        mock_response = {"value": sample_accounts}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.list_accounts(
+                search="admin",
+                searchType="contains",
+                sort="name",
+                offset=10,
+                limit=25,
+                filter="platformId eq WindowsAccount",
+                savedfilter="MyFilter"
+            )
+            
+            assert result == sample_accounts
+            expected_params = {
+                "search": "admin",
+                "searchType": "contains", 
+                "sort": "name",
+                "offset": 10,
+                "limit": 25,
+                "filter": "platformId eq WindowsAccount",
+                "savedfilter": "MyFilter"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+
+    async def test_list_accounts_safe_name_with_additional_params(self, server, sample_accounts):
+        """Test listing accounts with safe_name filter combined with other parameters"""
+        mock_response = {"value": sample_accounts}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.list_accounts(
+                safe_name="IT-Infrastructure",
+                search="server",
+                limit=10
+            )
+            
+            assert result == sample_accounts
+            expected_params = {
+                "filter": "safeName eq IT-Infrastructure",
+                "search": "server",
+                "limit": 10
             }
             mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
 
@@ -160,7 +208,7 @@ class TestAccountManagement:
             )
 
     async def test_search_accounts_with_all_filters(self, server, sample_accounts):
-        """Test searching accounts with all possible filters"""
+        """Test searching accounts with all possible filters using proper API filter syntax"""
         mock_response = {"value": sample_accounts}
         
         with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
@@ -175,10 +223,7 @@ class TestAccountManagement:
             assert result == sample_accounts
             expected_params = {
                 "search": "admin",
-                "safeName": "IT-Infrastructure",
-                "userName": "admin",
-                "address": "server01.example.com", 
-                "platformId": "WindowsDomainAccount"
+                "filter": "safeName eq IT-Infrastructure AND userName eq admin AND address eq server01.example.com AND platformId eq WindowsDomainAccount"
             }
             mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
 
@@ -210,6 +255,169 @@ class TestAccountManagement:
             }
             mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
 
+    async def test_search_accounts_with_individual_filters(self, server, sample_accounts):
+        """Test searching accounts with individual filter parameters"""
+        mock_response = {"value": sample_accounts}
+        
+        # Test safe_name filter only
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(safe_name="IT-Infrastructure")
+            assert result == sample_accounts
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": "safeName eq IT-Infrastructure"}
+            )
+        
+        # Test username filter only
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(username="admin")
+            assert result == sample_accounts
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": "userName eq admin"}
+            )
+        
+        # Test address filter only
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(address="server01.example.com")
+            assert result == sample_accounts
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": "address eq server01.example.com"}
+            )
+        
+        # Test platform_id filter only
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(platform_id="WindowsDomainAccount")
+            assert result == sample_accounts
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": "platformId eq WindowsDomainAccount"}
+            )
+
+    async def test_search_accounts_filter_combination_logic(self, server, sample_accounts):
+        """Test proper AND logic for multiple filters"""
+        mock_response = {"value": sample_accounts}
+        
+        # Test two filters
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                safe_name="IT-Infrastructure",
+                username="admin"
+            )
+            assert result == sample_accounts
+            expected_filter = "safeName eq IT-Infrastructure AND userName eq admin"
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": expected_filter}
+            )
+        
+        # Test three filters
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                safe_name="IT-Infrastructure",
+                username="admin",
+                address="server01.example.com"
+            )
+            assert result == sample_accounts
+            expected_filter = "safeName eq IT-Infrastructure AND userName eq admin AND address eq server01.example.com"
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": expected_filter}
+            )
+
+    async def test_search_accounts_keywords_with_filters(self, server, sample_accounts):
+        """Test combining keywords search with filters"""
+        mock_response = {"value": sample_accounts}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                keywords="production database",
+                safe_name="Database-Safes",
+                platform_id="MySQLAccount"
+            )
+            assert result == sample_accounts
+            expected_params = {
+                "search": "production database",
+                "filter": "safeName eq Database-Safes AND platformId eq MySQLAccount"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+
+    async def test_search_accounts_keywords_with_additional_params(self, server, sample_accounts):
+        """Test keywords search with additional parameters and filters"""
+        mock_response = {"value": sample_accounts}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                keywords="admin",
+                safe_name="IT-Infrastructure",
+                limit=25,
+                offset=10,
+                sort="name"
+            )
+            assert result == sample_accounts
+            expected_params = {
+                "search": "admin",
+                "filter": "safeName eq IT-Infrastructure",
+                "limit": 25,
+                "offset": 10,
+                "sort": "name"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+
+    async def test_search_accounts_edge_cases(self, server, sample_accounts):
+        """Test search_accounts edge cases and parameter sanitization"""
+        mock_response = {"value": sample_accounts}
+        
+        # Test with only keywords (no filters)
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(keywords="test")
+            assert result == sample_accounts
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"search": "test"}
+            )
+        
+        # Test with empty string filters (should be ignored)
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                keywords="test",
+                safe_name="",  # Empty string should be ignored
+                username="admin",
+                address=""  # Empty string should be ignored
+            )
+            assert result == sample_accounts
+            # Only the non-empty filter should be included
+            expected_params = {
+                "search": "test",
+                "filter": "userName eq admin"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+        
+        # Test with None values (should be ignored)
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                keywords=None,  # Should be ignored
+                safe_name="test-safe",
+                username=None,  # Should be ignored
+                address="server.example.com"
+            )
+            assert result == sample_accounts
+            expected_params = {
+                "filter": "safeName eq test-safe AND address eq server.example.com"
+            }
+            mock_request.assert_called_once_with("GET", "Accounts", params=expected_params)
+
+    async def test_search_accounts_special_characters_in_filters(self, server, sample_accounts):
+        """Test search_accounts with special characters in filter values"""
+        mock_response = {"value": sample_accounts}
+        
+        # Test with spaces and special characters in values
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.search_accounts(
+                safe_name="IT Infrastructure",
+                username="admin@domain.com",
+                address="server-01.example.com"
+            )
+            assert result == sample_accounts
+            expected_filter = "safeName eq IT Infrastructure AND userName eq admin@domain.com AND address eq server-01.example.com"
+            mock_request.assert_called_once_with(
+                "GET", "Accounts", params={"filter": expected_filter}
+            )
+
     async def test_account_operations_logging(self, server, sample_accounts, caplog):
         """Test that account operations generate appropriate log messages"""
         import logging
@@ -222,6 +430,7 @@ class TestAccountManagement:
                 
                 # Check that appropriate log message was generated
                 assert "Listing accounts with filters" in caplog.text
+                assert "filter" in caplog.text
                 assert "test-safe" in caplog.text
 
     async def test_account_detail_logging(self, server, sample_account_detail, caplog):
@@ -249,7 +458,10 @@ class TestAccountManagement:
                 
                 # Check that appropriate log message was generated
                 assert "Searching accounts with criteria" in caplog.text
+                # Check that the criteria includes both search parameter and filter
+                assert "search" in caplog.text
                 assert "admin" in caplog.text
+                assert "filter" in caplog.text
                 assert "test-safe" in caplog.text
 
     async def test_concurrent_account_operations(self, server, sample_accounts, sample_account_detail):
@@ -662,7 +874,7 @@ class TestAccountManagement:
     # Password Change Tests
     
     async def test_change_account_password_cpm_managed(self, server):
-        """Test changing password for CPM-managed account (no new password specified)"""
+        """Test changing password for CPM-managed account using ChangeCredsForGroup"""
         account_id = "123_456_789"
         
         # Mock successful password change response
@@ -679,43 +891,38 @@ class TestAccountManagement:
             assert "lastModifiedTime" in result
             assert "status" in result
             
-            # Verify API call was made correctly
+            # Verify API call was made correctly with new payload structure
             server._make_api_request.assert_called_once_with(
                 "POST", 
                 f"Accounts/{account_id}/Change/",
-                json={"ChangeImmediately": True}
+                json={"ChangeCredsForGroup": True}
             )
 
-    async def test_change_account_password_manual_password(self, server):
-        """Test changing password with manually specified new password"""
+    async def test_change_account_password_changecredsforgroup_behavior(self, server):
+        """Test that change_account_password always uses ChangeCredsForGroup parameter"""
         account_id = "123_456_789"
-        new_password = "NewSecureP@ssw0rd123"
         
         # Mock successful password change response
         mock_response = {
             "id": account_id,
             "lastModifiedTime": "2025-06-30T10:30:00Z",
-            "status": "Password changed successfully"
+            "status": "Password change initiated for credential group"
         }
         
         with patch.object(server, '_make_api_request', return_value=mock_response):
-            result = await server.change_account_password(
-                account_id=account_id, 
-                new_password=new_password
-            )
+            result = await server.change_account_password(account_id=account_id)
             
             assert result["id"] == account_id
             assert "lastModifiedTime" in result
             
-            # Verify API call was made correctly with new password
+            # Verify that ChangeCredsForGroup is always True in the payload
             server._make_api_request.assert_called_once_with(
                 "POST", 
                 f"Accounts/{account_id}/Change/",
-                json={
-                    "ChangeImmediately": True,
-                    "NewCredentials": new_password
-                }
+                json={"ChangeCredsForGroup": True}
             )
+
+
 
     async def test_change_account_password_missing_account_id(self, server):
         """Test error when account_id is missing"""
@@ -778,11 +985,10 @@ class TestAccountManagement:
                 await server.change_account_password(account_id=account_id)
 
     async def test_change_account_password_logging_no_sensitive_data(self, server, caplog):
-        """Test that password change operations don't log sensitive data"""
+        """Test that CPM password change operations generate appropriate logs"""
         import logging
         
         account_id = "123_456_789"
-        new_password = "SuperSecretPassword123!"
         
         mock_response = {
             "id": account_id,
@@ -791,16 +997,12 @@ class TestAccountManagement:
         
         with patch.object(server, '_make_api_request', return_value=mock_response):
             with caplog.at_level(logging.INFO):
-                await server.change_account_password(account_id=account_id, new_password=new_password)
+                await server.change_account_password(account_id=account_id)
                 
-                # Check that logs don't contain the password
+                # Check that appropriate info was logged (account ID should be present)
                 log_messages = [record.message for record in caplog.records]
-                for message in log_messages:
-                    assert new_password not in message
-                    assert "SuperSecretPassword123!" not in message
-                
-                # Verify appropriate info was logged (account ID should be present)
                 assert any(account_id in message for message in log_messages)
+                assert any("CPM-managed password change" in message for message in log_messages)
 
     async def test_change_account_password_concurrent_operations(self, server):
         """Test concurrent password change operations"""
@@ -1328,3 +1530,394 @@ class TestAccountManagement:
             assert result["reconciled"] is False
             assert "error" in result
             assert result["status"] == "Reconciliation failed - target system unavailable"
+
+    # Set Next Password Tests
+    
+    @pytest.mark.asyncio
+    async def test_set_next_password_basic_functionality(self, server):
+        """Test basic functionality of set_next_password method"""
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        
+        # Mock successful response
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.set_next_password(
+                account_id=account_id,
+                new_password=new_password
+            )
+            
+            assert result["id"] == account_id
+            assert "lastModifiedTime" in result
+            assert "status" in result
+            
+            # Verify API call was made correctly
+            server._make_api_request.assert_called_once_with(
+                "POST",
+                f"Accounts/{account_id}/SetNextPassword/",
+                json={
+                    "ChangeImmediately": True,
+                    "NewCredentials": new_password
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_change_immediately_false(self, server):
+        """Test set_next_password with change_immediately=False"""
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.set_next_password(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=False
+            )
+            
+            assert result["id"] == account_id
+            
+            # Verify API call was made with correct payload
+            server._make_api_request.assert_called_once_with(
+                "POST",
+                f"Accounts/{account_id}/SetNextPassword/",
+                json={
+                    "ChangeImmediately": False,
+                    "NewCredentials": new_password
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_change_immediately_true(self, server):
+        """Test set_next_password with change_immediately=True (default)"""
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.set_next_password(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=True
+            )
+            
+            assert result["id"] == account_id
+            
+            # Verify API call was made with correct payload
+            server._make_api_request.assert_called_once_with(
+                "POST",
+                f"Accounts/{account_id}/SetNextPassword/",
+                json={
+                    "ChangeImmediately": True,
+                    "NewCredentials": new_password
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_missing_account_id(self, server):
+        """Test error when account_id is missing"""
+        with pytest.raises(ValueError, match="account_id is required"):
+            await server.set_next_password(account_id="", new_password="TestPassword123")
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_missing_new_password(self, server):
+        """Test error when new_password is missing"""
+        with pytest.raises(ValueError, match="new_password is required"):
+            await server.set_next_password(account_id="123_456_789", new_password="")
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_invalid_account_id(self, server):
+        """Test error when account_id is invalid"""
+        invalid_account_ids = [None, 123, [], {}]
+        
+        for invalid_id in invalid_account_ids:
+            with pytest.raises(ValueError, match="account_id"):
+                await server.set_next_password(account_id=invalid_id, new_password="TestPassword123")
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_invalid_new_password(self, server):
+        """Test error when new_password is invalid"""
+        invalid_passwords = [None, 123, [], {}]
+        
+        for invalid_password in invalid_passwords:
+            with pytest.raises(ValueError, match="new_password"):
+                await server.set_next_password(account_id="123_456_789", new_password=invalid_password)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_whitespace_validation(self, server):
+        """Test validation of whitespace-only parameters"""
+        # Test whitespace-only account_id
+        with pytest.raises(ValueError, match="account_id is required"):
+            await server.set_next_password(account_id="   ", new_password="TestPassword123")
+        
+        # Test whitespace-only new_password
+        with pytest.raises(ValueError, match="new_password is required"):
+            await server.set_next_password(account_id="123_456_789", new_password="   ")
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_parameter_validation(self, server):
+        """Test comprehensive parameter validation and sanitization"""
+        # Test various invalid account IDs
+        invalid_account_ids = ["", "   ", None, 123, [], {}]
+        
+        for invalid_id in invalid_account_ids:
+            with pytest.raises(ValueError, match="account_id"):
+                await server.set_next_password(account_id=invalid_id, new_password="TestPassword123")
+        
+        # Test various invalid passwords
+        invalid_passwords = ["", "   ", None, 123, [], {}]
+        
+        for invalid_password in invalid_passwords:
+            with pytest.raises(ValueError, match="new_password"):
+                await server.set_next_password(account_id="123_456_789", new_password=invalid_password)
+        
+        # Test valid combinations
+        valid_account_ids = [
+            "123_456_789",
+            "abc-def-123",
+            "AccountID123",
+            "12345"
+        ]
+        
+        mock_response = {"id": "test", "status": "Next password set successfully"}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            for valid_id in valid_account_ids:
+                result = await server.set_next_password(account_id=valid_id, new_password="TestPassword123")
+                assert result["id"] == "test"
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_api_endpoint_usage(self, server):
+        """Test that correct API endpoint is used"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        mock_response = {"id": account_id, "status": "Success"}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            await server.set_next_password(account_id=account_id, new_password=new_password)
+            
+            # Verify the correct endpoint was called
+            mock_request.assert_called_once_with(
+                "POST",
+                f"Accounts/{account_id}/SetNextPassword/",
+                json={
+                    "ChangeImmediately": True,
+                    "NewCredentials": new_password
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_payload_structure(self, server):
+        """Test that correct payload structure is sent"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        mock_response = {"id": account_id, "status": "Success"}
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            await server.set_next_password(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=False
+            )
+            
+            # Verify the payload structure
+            call_args = mock_request.call_args
+            assert call_args[1]['json'] == {
+                "ChangeImmediately": False,
+                "NewCredentials": new_password
+            }
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_account_not_found(self, server):
+        """Test error handling when account is not found"""
+        account_id = "nonexistent_account"
+        new_password = "TestPassword123"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Account not found", 404)):
+            with pytest.raises(CyberArkAPIError, match="Account not found"):
+                await server.set_next_password(account_id=account_id, new_password=new_password)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_permission_denied(self, server):
+        """Test error handling when permission is denied"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Permission denied", 403)):
+            with pytest.raises(CyberArkAPIError, match="Permission denied"):
+                await server.set_next_password(account_id=account_id, new_password=new_password)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_rate_limited(self, server):
+        """Test error handling when rate limited"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Rate limit exceeded", 429)):
+            with pytest.raises(CyberArkAPIError, match="Rate limit exceeded"):
+                await server.set_next_password(account_id=account_id, new_password=new_password)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_network_error(self, server):
+        """Test error handling for network errors"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        with patch.object(server, '_make_api_request', side_effect=Exception("Network error")):
+            with pytest.raises(Exception, match="Network error"):
+                await server.set_next_password(account_id=account_id, new_password=new_password)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_logging_no_sensitive_data(self, server, caplog):
+        """Test that set_next_password operations don't log sensitive data"""
+        import logging
+        
+        account_id = "123_456_789"
+        new_password = "SuperSecretPassword123!"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            with caplog.at_level(logging.INFO):
+                await server.set_next_password(account_id=account_id, new_password=new_password)
+                
+                # Check that logs don't contain the password
+                log_messages = [record.message for record in caplog.records]
+                for message in log_messages:
+                    assert new_password not in message
+                    assert "SuperSecretPassword123!" not in message
+                
+                # Verify appropriate info was logged (account ID should be present)
+                assert any(account_id in message for message in log_messages)
+                assert any("Setting next password" in message for message in log_messages)
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_successful_response_handling(self, server):
+        """Test successful response handling"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully",
+            "changeImmediately": True
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.set_next_password(account_id=account_id, new_password=new_password)
+            
+            # Verify all response fields are returned
+            assert result["id"] == account_id
+            assert result["lastModifiedTime"] == "2025-06-30T10:30:00Z"
+            assert result["status"] == "Next password set successfully"
+            assert result["changeImmediately"] is True
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_concurrent_operations(self, server):
+        """Test concurrent set_next_password operations"""
+        import asyncio
+        
+        account_ids = ["123_456_789", "987_654_321", "555_111_333"]
+        new_password = "TestPassword123"
+        
+        mock_responses = [
+            {"id": account_id, "status": "Success", "lastModifiedTime": "2025-06-30T10:30:00Z"}
+            for account_id in account_ids
+        ]
+        
+        with patch.object(server, '_make_api_request', side_effect=mock_responses):
+            tasks = [
+                server.set_next_password(account_id=account_id, new_password=new_password)
+                for account_id in account_ids
+            ]
+            
+            results = await asyncio.gather(*tasks)
+            
+            # Verify all operations completed successfully
+            assert len(results) == 3
+            for i, result in enumerate(results):
+                assert result["id"] == account_ids[i]
+                assert result["status"] == "Success"
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_with_kwargs(self, server):
+        """Test set_next_password with additional kwargs (should be ignored)"""
+        account_id = "123_456_789"
+        new_password = "TestPassword123"
+        
+        mock_response = {
+            "id": account_id,
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response):
+            result = await server.set_next_password(
+                account_id=account_id,
+                new_password=new_password,
+                additional_param="ignored",
+                another_param=42
+            )
+            
+            assert result["id"] == account_id
+            assert result["status"] == "Next password set successfully"
+            
+            # Verify API call was made correctly (kwargs should be ignored)
+            server._make_api_request.assert_called_once_with(
+                "POST",
+                f"Accounts/{account_id}/SetNextPassword/",
+                json={
+                    "ChangeImmediately": True,
+                    "NewCredentials": new_password
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_account_id_sanitization(self, server):
+        """Test that account_id is properly sanitized (whitespace stripped)"""
+        account_id_with_whitespace = "  123_456_789  "
+        new_password = "TestPassword123"
+        
+        mock_response = {
+            "id": "123_456_789",
+            "status": "Next password set successfully"
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.set_next_password(
+                account_id=account_id_with_whitespace,
+                new_password=new_password
+            )
+            
+            assert result["id"] == "123_456_789"
+            
+            # Verify API call was made with cleaned account_id
+            mock_request.assert_called_once_with(
+                "POST",
+                "Accounts/123_456_789/SetNextPassword/",
+                json={
+                    "ChangeImmediately": True,
+                    "NewCredentials": new_password
+                }
+            )

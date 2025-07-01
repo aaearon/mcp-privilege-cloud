@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Account management MCP tools
-from mcp_privilege_cloud.mcp_server import create_account
+from mcp_privilege_cloud.mcp_server import create_account, set_next_password
 
 # Platform management MCP tools  
 from mcp_privilege_cloud.mcp_server import list_platforms, get_platform_details, import_platform_package
@@ -144,40 +144,7 @@ class TestMCPAccountTools:
                 new_password=None
             )
 
-    @pytest.mark.asyncio
-    async def test_change_account_password_mcp_tool_manual_password(self):
-        """Test change_account_password MCP tool with manual password"""
-        from src.mcp_privilege_cloud.mcp_server import change_account_password
-        
-        account_id = "123_456_789"
-        new_password = "NewSecureP@ssw0rd123"
-        mock_response = {
-            "id": account_id,
-            "lastModifiedTime": "2025-06-30T10:30:00Z",
-            "status": "Password changed successfully"
-        }
-        
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.change_account_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
-            # Call the MCP tool
-            result = await change_account_password(
-                account_id=account_id,
-                new_password=new_password
-            )
-            
-            # Verify result
-            assert result == mock_response
-            assert result["id"] == account_id
-            
-            # Verify server method was called correctly
-            mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id,
-                new_password=new_password
-            )
+
 
     @pytest.mark.asyncio
     async def test_change_account_password_mcp_tool_error_handling(self):
@@ -203,6 +170,108 @@ class TestMCPAccountTools:
             mock_server.change_account_password.assert_called_once_with(
                 account_id=account_id,
                 new_password=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_mcp_tool_success(self):
+        """Test set_next_password MCP tool with successful operation"""
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password set successfully"
+        }
+        
+        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance and its method
+            mock_server = Mock()
+            mock_server.set_next_password = AsyncMock(return_value=mock_response)
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool
+            result = await set_next_password(
+                account_id=account_id,
+                new_password=new_password
+            )
+            
+            # Verify result
+            assert result == mock_response
+            assert result["id"] == account_id
+            assert "lastModifiedTime" in result
+            
+            # Verify server method was called correctly
+            mock_server.set_next_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=True
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_mcp_tool_with_change_immediately_false(self):
+        """Test set_next_password MCP tool with change_immediately=False"""
+        account_id = "123_456_789"
+        new_password = "NewSecureP@ssw0rd123"
+        
+        mock_response = {
+            "id": account_id,
+            "lastModifiedTime": "2025-06-30T10:30:00Z",
+            "status": "Next password scheduled successfully"
+        }
+        
+        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance and its method
+            mock_server = Mock()
+            mock_server.set_next_password = AsyncMock(return_value=mock_response)
+            mock_server_factory.return_value = mock_server
+            
+            # Call the MCP tool
+            result = await set_next_password(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=False
+            )
+            
+            # Verify result
+            assert result == mock_response
+            assert result["id"] == account_id
+            
+            # Verify server method was called correctly
+            mock_server.set_next_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_next_password_mcp_tool_error_handling(self):
+        """Test set_next_password MCP tool error handling"""
+        from mcp_privilege_cloud.server import CyberArkAPIError
+        
+        account_id = "invalid_account"
+        new_password = "TestPassword123"
+        
+        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
+            # Mock the server instance to raise an error
+            mock_server = Mock()
+            mock_server.set_next_password = AsyncMock(
+                side_effect=CyberArkAPIError("Account not found", 404)
+            )
+            mock_server_factory.return_value = mock_server
+            
+            # Verify that the error is propagated
+            with pytest.raises(CyberArkAPIError, match="Account not found"):
+                await set_next_password(
+                    account_id=account_id,
+                    new_password=new_password
+                )
+            
+            # Verify server method was called
+            mock_server.set_next_password.assert_called_once_with(
+                account_id=account_id,
+                new_password=new_password,
+                change_immediately=True
             )
 
     @pytest.mark.asyncio
