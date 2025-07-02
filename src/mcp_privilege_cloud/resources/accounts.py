@@ -22,10 +22,7 @@ class AccountCollectionResource(CollectionResource):
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get list of all accessible accounts."""
         # Use existing list_accounts method from the server
-        accounts_result = await self.server.list_accounts()
-        
-        # Extract accounts from the result
-        accounts = accounts_result.get("value", [])
+        accounts = await self.server.list_accounts()
         
         # Format accounts for resource consumption
         account_items = []
@@ -168,16 +165,13 @@ class AccountSearchResource(CollectionResource):
         platform_id = query_params.get("platform_id")
         
         # Use existing search_accounts method from the server
-        search_result = await self.server.search_accounts(
+        accounts = await self.server.search_accounts(
             keywords=keywords if keywords else None,
             safe_name=safe_name,
             username=username,
             address=address,
             platform_id=platform_id
         )
-        
-        # Extract accounts from the result
-        accounts = search_result.get("value", [])
         
         # Format accounts for resource consumption (same as AccountCollectionResource)
         account_items = []

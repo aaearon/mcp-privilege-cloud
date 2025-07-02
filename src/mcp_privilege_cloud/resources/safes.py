@@ -21,10 +21,7 @@ class SafeCollectionResource(CollectionResource):
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get list of all accessible safes."""
         # Use existing list_safes method from the server
-        safes_result = await self.server.list_safes()
-        
-        # Extract safes from the result
-        safes = safes_result.get("value", [])
+        safes = await self.server.list_safes()
         
         # Format safes for resource consumption
         safe_items = []
@@ -134,10 +131,7 @@ class SafeAccountsResource(CollectionResource):
             raise ValueError("Safe name is required for safe accounts resource")
         
         # Use existing list_accounts method with safe filter
-        accounts_result = await self.server.list_accounts(safe_name=safe_name)
-        
-        # Extract accounts from the result
-        accounts = accounts_result.get("value", [])
+        accounts = await self.server.list_accounts(safe_name=safe_name)
         
         # Format accounts for resource consumption
         account_items = []
