@@ -24,22 +24,52 @@ class PlatformCollectionResource(CollectionResource):
         # Use existing list_platforms method from the server
         platforms = await self.server.list_platforms()
         
+        # Ensure platforms is a list of dictionaries
+        if not isinstance(platforms, list):
+            raise ValueError(f"Expected list of platforms, got {type(platforms)}")
+        
         # Format platforms for resource consumption
         platform_items = []
         for platform in platforms:
+            if not isinstance(platform, dict):
+                raise ValueError(f"Expected platform to be a dictionary, got {type(platform)}")
+                
+            # Extract data from the nested structure
+            general = platform.get("general", {})
+            if not general:
+                # Skip platforms without general info
+                continue
+                
             platform_item = {
-                "id": platform.get("PlatformID"),
-                "name": platform.get("Name"),
-                "uri": f"cyberark://platforms/{platform.get('PlatformID')}",
-                "description": platform.get("Description", ""),
-                "system_type": platform.get("SystemType"),
-                "active": platform.get("Active", True),
-                "platform_base_id": platform.get("PlatformBaseID"),
-                "platform_type": platform.get("PlatformType"),
-                "search_for_usages": platform.get("SearchForUsages", False),
-                "privileged_session_management": platform.get("PrivilegedSessionManagement", False),
-                "credential_management": platform.get("CredentialsManagement", False),
+                "id": general.get("id"),
+                "name": general.get("name"),
+                "uri": f"cyberark://platforms/{general.get('id')}",
+                "description": general.get("description", ""),
+                "system_type": general.get("systemType"),
+                "active": general.get("active", True),
+                "platform_base_id": general.get("platformBaseID"),
+                "platform_type": general.get("platformType"),
             }
+            
+            # Add credential management info if available
+            creds_mgmt = platform.get("credentialsManagement", {})
+            if creds_mgmt:
+                platform_item.update({
+                    "credential_management": True,
+                    "allow_manual_change": creds_mgmt.get("allowManualChange", False),
+                    "perform_periodic_change": creds_mgmt.get("performPeriodicChange", False),
+                    "allow_manual_verification": creds_mgmt.get("allowManualVerification", False),
+                })
+            
+            # Add session management info if available
+            session_mgmt = platform.get("sessionManagement", {})
+            if session_mgmt:
+                platform_item.update({
+                    "privileged_session_management": session_mgmt.get("requirePrivilegedSessionMonitoringAndIsolation", False),
+                    "record_sessions": session_mgmt.get("recordAndSaveSessionActivity", False),
+                    "psm_server_id": session_mgmt.get("PSMServerID"),
+                })
+            
             # Remove None values and empty strings
             platform_item = {k: v for k, v in platform_item.items() if v is not None and v != ""}
             platform_items.append(platform_item)
