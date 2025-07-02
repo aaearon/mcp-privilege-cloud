@@ -15,7 +15,7 @@ class SafeCollectionResource(CollectionResource):
     
     Provides a collection of all safes that the authenticated user can access.
     
-    URI: cyberark://safes/
+    URI: cyberark://safes
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:
@@ -28,7 +28,7 @@ class SafeCollectionResource(CollectionResource):
         for safe in safes:
             safe_item = {
                 "name": safe.get("safeName"),
-                "uri": f"cyberark://safes/{safe.get('safeName')}/",
+                "uri": f"cyberark://safes/{safe.get('safeName')}",
                 "description": safe.get("description", ""),
                 "location": safe.get("location", ""),
                 "created_time": safe.get("creationTime"),
@@ -62,7 +62,7 @@ class SafeEntityResource(EntityResource):
     
     Provides detailed information about a specific safe.
     
-    URI: cyberark://safes/{safe_name}/
+    URI: cyberark://safes/{safe_name}
     """
     
     async def get_entity_data(self) -> Dict[str, Any]:
@@ -95,8 +95,8 @@ class SafeEntityResource(EntityResource):
         
         # Add related resources
         safe_data["related_resources"] = {
-            "accounts": f"cyberark://safes/{safe_name}/accounts/",
-            "members": f"cyberark://safes/{safe_name}/members/",  # Future implementation
+            "accounts": f"cyberark://safes/{safe_name}/accounts",
+            "members": f"cyberark://safes/{safe_name}/members",  # Future implementation
         }
         
         # Remove None values
@@ -121,7 +121,7 @@ class SafeAccountsResource(CollectionResource):
     
     Provides a collection of all accounts stored in a specific safe.
     
-    URI: cyberark://safes/{safe_name}/accounts/
+    URI: cyberark://safes/{safe_name}/accounts
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:
@@ -139,7 +139,7 @@ class SafeAccountsResource(CollectionResource):
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}/",
+                "uri": f"cyberark://accounts/{account.get('id')}",
                 "address": account.get("address"),
                 "user_name": account.get("userName"),
                 "platform_id": account.get("platformId"),

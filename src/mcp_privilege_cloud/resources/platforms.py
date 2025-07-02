@@ -16,7 +16,7 @@ class PlatformCollectionResource(CollectionResource):
     Provides a collection of all platforms that can be used for account creation
     and management.
     
-    URI: cyberark://platforms/
+    URI: cyberark://platforms
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:
@@ -33,7 +33,7 @@ class PlatformCollectionResource(CollectionResource):
             platform_item = {
                 "id": platform.get("PlatformID"),
                 "name": platform.get("Name"),
-                "uri": f"cyberark://platforms/{platform.get('PlatformID')}/",
+                "uri": f"cyberark://platforms/{platform.get('PlatformID')}",
                 "description": platform.get("Description", ""),
                 "system_type": platform.get("SystemType"),
                 "active": platform.get("Active", True),
@@ -67,7 +67,7 @@ class PlatformEntityResource(EntityResource):
     
     Provides detailed configuration information about a specific platform.
     
-    URI: cyberark://platforms/{platform_id}/
+    URI: cyberark://platforms/{platform_id}
     """
     
     async def get_entity_data(self) -> Dict[str, Any]:
@@ -136,7 +136,7 @@ class PlatformEntityResource(EntityResource):
         
         # Add related resources
         platform_data["related_resources"] = {
-            "accounts_using_platform": f"cyberark://accounts/?platform_id={platform_id}",
+            "accounts_using_platform": f"cyberark://accounts?platform_id={platform_id}",
         }
         
         # Remove None values and empty lists/dicts
@@ -170,7 +170,7 @@ class PlatformPackagesResource(CollectionResource):
     
     Provides access to platform packages that can be imported.
     
-    URI: cyberark://platforms/packages/
+    URI: cyberark://platforms/packages
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:

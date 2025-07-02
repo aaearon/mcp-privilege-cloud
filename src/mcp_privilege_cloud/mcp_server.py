@@ -330,28 +330,28 @@ def setup_resources():
     # Resources are registered via @mcp.resource decorators below
 
 
-@mcp.resource("cyberark://health/", name="CyberArk Health", description="System health status")
+@mcp.resource("cyberark://health", name="CyberArk Health", description="System health status")
 async def get_health_resource() -> str:
     """Get health resource content."""
-    return await _read_resource_content("cyberark://health/")
+    return await _read_resource_content("cyberark://health")
 
 
-@mcp.resource("cyberark://safes/", name="CyberArk Safes", description="All accessible safes")
+@mcp.resource("cyberark://safes", name="CyberArk Safes", description="All accessible safes")
 async def get_safes_resource() -> str:
     """Get safes collection resource content."""
-    return await _read_resource_content("cyberark://safes/")
+    return await _read_resource_content("cyberark://safes")
 
 
-@mcp.resource("cyberark://accounts/", name="CyberArk Accounts", description="All accessible accounts")
+@mcp.resource("cyberark://accounts", name="CyberArk Accounts", description="All accessible accounts")
 async def get_accounts_resource() -> str:
     """Get accounts collection resource content."""
-    return await _read_resource_content("cyberark://accounts/")
+    return await _read_resource_content("cyberark://accounts")
 
 
-@mcp.resource("cyberark://platforms/", name="CyberArk Platforms", description="All available platforms")
+@mcp.resource("cyberark://platforms", name="CyberArk Platforms", description="All available platforms")
 async def get_platforms_resource() -> str:
     """Get platforms collection resource content."""
-    return await _read_resource_content("cyberark://platforms/")
+    return await _read_resource_content("cyberark://platforms")
 
 
 async def _read_resource_content(uri: str) -> str:

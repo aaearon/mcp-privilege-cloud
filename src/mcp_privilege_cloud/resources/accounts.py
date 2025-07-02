@@ -16,7 +16,7 @@ class AccountCollectionResource(CollectionResource):
     Provides a collection of all accounts that the authenticated user can access
     across all safes.
     
-    URI: cyberark://accounts/
+    URI: cyberark://accounts
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:
@@ -30,7 +30,7 @@ class AccountCollectionResource(CollectionResource):
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}/",
+                "uri": f"cyberark://accounts/{account.get('id')}",
                 "address": account.get("address"),
                 "user_name": account.get("userName"),
                 "platform_id": account.get("platformId"),
@@ -67,7 +67,7 @@ class AccountEntityResource(EntityResource):
     
     Provides detailed information about a specific account.
     
-    URI: cyberark://accounts/{account_id}/
+    URI: cyberark://accounts/{account_id}
     """
     
     async def get_entity_data(self) -> Dict[str, Any]:
@@ -117,8 +117,8 @@ class AccountEntityResource(EntityResource):
         
         # Add related resources
         account_data["related_resources"] = {
-            "safe": f"cyberark://safes/{account_details.get('safeName')}/",
-            "platform": f"cyberark://platforms/{account_details.get('platformId')}/",
+            "safe": f"cyberark://safes/{account_details.get('safeName')}",
+            "platform": f"cyberark://platforms/{account_details.get('platformId')}",
         }
         
         # Remove None values and empty dicts
@@ -179,7 +179,7 @@ class AccountSearchResource(CollectionResource):
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}/",
+                "uri": f"cyberark://accounts/{account.get('id')}",
                 "address": account.get("address"),
                 "user_name": account.get("userName"),
                 "platform_id": account.get("platformId"),

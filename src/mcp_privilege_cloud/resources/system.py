@@ -16,7 +16,7 @@ class HealthResource(EntityResource):
     Provides health check information including connectivity status,
     response times, and system metrics.
     
-    URI: cyberark://health/
+    URI: cyberark://health
     """
     
     async def get_entity_data(self) -> Dict[str, Any]:
