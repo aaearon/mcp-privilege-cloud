@@ -168,15 +168,16 @@ class TestSafeResources:
         
     async def test_safe_collection_resource(self):
         """Test SafeCollectionResource."""
-        self.mock_server.list_safes.return_value = {
-            "value": [
+        # Mock the async list_safes method to return a list directly
+        async def mock_list_safes():
+            return [
                 {
                     "safeName": "TestSafe",
                     "description": "Test safe",
                     "creationTime": "2024-01-01T00:00:00Z"
                 }
             ]
-        }
+        self.mock_server.list_safes = mock_list_safes
         
         uri = ResourceURI("cyberark://safes/")
         resource = SafeCollectionResource(uri, self.mock_server)
@@ -209,8 +210,9 @@ class TestSafeResources:
         
     async def test_safe_accounts_resource(self):
         """Test SafeAccountsResource."""
-        self.mock_server.list_accounts.return_value = {
-            "value": [
+        # Mock the list_accounts method with pagination parameters
+        async def mock_list_accounts(safe_name=None, offset=0, limit=100):
+            return [
                 {
                     "id": "12345",
                     "name": "test-account",
@@ -218,7 +220,7 @@ class TestSafeResources:
                     "userName": "admin"
                 }
             ]
-        }
+        self.mock_server.list_accounts = mock_list_accounts
         
         uri = ResourceURI("cyberark://safes/TestSafe/accounts/")
         resource = SafeAccountsResource(uri, self.mock_server)
@@ -228,7 +230,7 @@ class TestSafeResources:
         
         assert data["type"] == "collection"
         assert data["items"][0]["name"] == "test-account"
-        assert data["items"][0]["uri"] == "cyberark://accounts/12345/"
+        assert data["items"][0]["uri"] == "cyberark://accounts/12345"
 
 
 class TestAccountResources:

@@ -131,25 +131,12 @@ class SafeAccountsResource(CollectionResource):
         if not safe_name:
             raise ValueError("Safe name is required for safe accounts resource")
         
-        # Fetch all accounts in the safe using pagination to get complete dataset
-        all_accounts = []
-        offset = 0
-        limit = 100   # Use reasonable batch size that works with CyberArk API
+        # Create a server method call with the safe filter bound
+        async def safe_accounts_call(offset: int, limit: int):
+            return await self.server.list_accounts(safe_name=safe_name, offset=offset, limit=limit)
         
-        while True:
-            # Use existing list_accounts method with safe filter and pagination
-            batch_accounts = await self.server.list_accounts(safe_name=safe_name, offset=offset, limit=limit)
-            
-            if not batch_accounts:
-                break
-                
-            all_accounts.extend(batch_accounts)
-            
-            # If we got fewer accounts than the limit, we've reached the end
-            if len(batch_accounts) < limit:
-                break
-                
-            offset += limit
+        # Fetch all accounts in the safe using pagination to get complete dataset
+        all_accounts = await self._paginate_server_call(safe_accounts_call)
         
         # Format accounts for resource consumption using shared utility
         account_items = [
