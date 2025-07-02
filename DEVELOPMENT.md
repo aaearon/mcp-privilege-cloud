@@ -99,7 +99,8 @@ src/mcp_privilege_cloud/
 
 #### 3. MCP Integration (`mcp_server.py`)
 - **FastMCP Server**: MCP protocol implementation
-- **Tool Definitions**: 10 exposed tools for CyberArk operations
+- **Action Tools**: 6 action tools for account and platform operations
+- **Resource Endpoints**: Structured resource endpoints for data access
 - **Parameter Validation**: Input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
 
@@ -178,9 +179,9 @@ Follow the feature branch Git workflow:
    # Automated CI/CD runs all tests
    ```
 
-### Adding New Tools
+### Adding New Action Tools
 
-Follow this systematic approach:
+Follow this systematic approach for adding new action tools:
 
 1. **Define Tool Specification**:
    - Document in `docs/development/SERVER_CAPABILITIES.md`
@@ -190,20 +191,20 @@ Follow this systematic approach:
    ```python
    # tests/test_new_tool.py
    @pytest.mark.asyncio
-   async def test_new_tool_success(mock_server):
-       result = await mock_server.new_tool(param1="value")
+   async def test_new_action_tool_success(mock_server):
+       result = await mock_server.new_action_tool(param1="value")
        assert result["status"] == "success"
    
    @pytest.mark.asyncio  
-   async def test_new_tool_error_handling(mock_server):
+   async def test_new_action_tool_error_handling(mock_server):
        with pytest.raises(CyberArkAPIError):
-           await mock_server.new_tool(invalid_param="bad")
+           await mock_server.new_action_tool(invalid_param="bad")
    ```
 
 3. **Implement Server Method**:
    ```python
    # src/mcp_privilege_cloud/server.py
-   async def new_tool(self, param1: str) -> Dict[str, Any]:
+   async def new_action_tool(self, param1: str) -> Dict[str, Any]:
        """Tool description with type hints and docstring."""
        # Implementation
    ```
@@ -212,17 +213,39 @@ Follow this systematic approach:
    ```python
    # src/mcp_privilege_cloud/mcp_server.py
    @mcp.tool()
-   async def new_tool(param1: str) -> Dict[str, Any]:
+   async def new_action_tool(param1: str) -> Dict[str, Any]:
        """MCP tool wrapper with parameter validation."""
        server = CyberArkMCPServer.from_environment()
-       return await server.new_tool(param1)
+       return await server.new_action_tool(param1)
    ```
 
-5. **Test Integration**:
+### Adding New Resources
+
+For read-only data access, use the resource system:
+
+1. **Create Resource Class**:
+   ```python
+   # src/mcp_privilege_cloud/resources/
+   class NewDataResource(ResourceBase):
+       """Resource for accessing new data type."""
+       
+       async def read(self) -> str:
+           # Return JSON data
+           pass
+   ```
+
+2. **Register Resource**:
+   ```python
+   # src/mcp_privilege_cloud/mcp_server.py in setup_resources()
+   resource_registry.register_resource("new-data", NewDataResource)
+   resource_registry.register_resource("new-data/{item_id}", NewDataItemResource)
+   ```
+
+3. **Test Integration**:
    ```bash
    # Test with MCP Inspector
    python run_server.py
-   # Connect Inspector and validate tool functionality
+   # Connect Inspector and validate resource access
    ```
 
 ## Code Quality Standards
@@ -236,27 +259,32 @@ Follow this systematic approach:
 - **Naming Conventions**: Meaningful, descriptive names
 
 ```python
-# Example of proper style
-async def list_accounts(
-    self, 
-    safe_name: Optional[str] = None,
-    username: Optional[str] = None,
-    address: Optional[str] = None
-) -> List[Dict[str, Any]]:
+# Example of proper style for action tools
+async def create_account(
+    self,
+    platform_id: str,
+    safe_name: str,
+    name: Optional[str] = None,
+    address: Optional[str] = None,
+    user_name: Optional[str] = None
+) -> Dict[str, Any]:
     """
-    List accounts from CyberArk Privilege Cloud with optional filters.
+    Create a new privileged account in CyberArk Privilege Cloud.
     
     Args:
-        safe_name: Optional safe name filter
-        username: Optional username filter  
-        address: Optional address filter
+        platform_id: Platform ID for the account
+        safe_name: Safe where account will be stored
+        name: Optional account name
+        address: Optional target system address
+        user_name: Optional username for the account
         
     Returns:
-        List of account dictionaries
+        Dictionary containing created account details with ID
         
     Raises:
         CyberArkAPIError: On API communication errors
         AuthenticationError: On authentication failures
+        ValidationError: On invalid input parameters
     """
     # Implementation with proper error handling
 ```
@@ -287,26 +315,28 @@ The test suite is organized into focused categories:
 tests/
 ├── test_core_functionality.py    # Auth, server core, platforms (64+ tests)
 ├── test_account_operations.py    # Account lifecycle (35+ tests)  
-├── test_mcp_integration.py       # MCP tool wrappers (15+ tests)
-└── test_integration.py           # End-to-end tests (10+ tests)
+├── test_mcp_integration.py       # MCP action tools (15+ tests)
+├── test_integration.py           # End-to-end tests (10+ tests)
+└── test_resources.py             # MCP resource tests (24+ tests)
 ```
 
 ### Running Tests
 
 ```bash
-# All tests (124+ total)
+# All tests (148+ total)
 pytest
 
 # Specific test categories
 pytest tests/test_core_functionality.py    # Core functionality
 pytest tests/test_account_operations.py    # Account operations
-pytest tests/test_mcp_integration.py       # MCP integration
+pytest tests/test_mcp_integration.py       # MCP action tools
+pytest tests/test_resources.py             # MCP resources
 
 # By markers
 pytest -m auth          # Authentication tests
 pytest -m integration   # Integration tests only
 pytest -k platform      # Platform management tests
-pytest -k safe          # Safe management tests
+pytest -k resource      # Resource access tests
 
 # With coverage
 pytest --cov=src/mcp_privilege_cloud
@@ -345,7 +375,7 @@ async def test_api_error_handling(mock_server, mocker):
                  side_effect=aiohttp.ClientError("Network error"))
     
     with pytest.raises(CyberArkAPIError):
-        await mock_server.list_accounts()
+        await mock_server.create_account(platform_id="test", safe_name="test")
 ```
 
 ### Test Coverage Requirements
@@ -499,9 +529,12 @@ python src/mcp_privilege_cloud/mcp_server.py  # Direct execution
 # Verify tool definitions
 python -c "
 from src.mcp_privilege_cloud.mcp_server import mcp
-print('Available tools:')
+print('Available action tools:')
 for tool in mcp.list_tools():
     print(f'- {tool.name}')
+print('Available resources:')
+for resource in mcp.list_resources():
+    print(f'- {resource.uri}')
 "
 ```
 
@@ -546,7 +579,8 @@ except Exception as e:
 python -c "
 from src.mcp_privilege_cloud.mcp_server import mcp
 print(f'MCP server: {mcp.name}')
-print(f'Tools available: {len(list(mcp.list_tools()))}')
+print(f'Action tools available: {len(list(mcp.list_tools()))}')
+print(f'Resource endpoints available: {len(list(mcp.list_resources()))}')
 "
 
 # Platform management debug

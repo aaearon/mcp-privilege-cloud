@@ -11,6 +11,7 @@ Comprehensive troubleshooting guide for the CyberArk Privilege Cloud MCP Server.
 - [MCP Inspector Problems](#mcp-inspector-problems)
 - [Import and Startup Errors](#import-and-startup-errors)
 - [Platform Management Issues](#platform-management-issues)
+- [Resource Access Issues](#resource-access-issues)
 - [Debug Mode](#debug-mode)
 - [Health Check Procedures](#health-check-procedures)
 - [Advanced Debugging](#advanced-debugging)
@@ -225,16 +226,21 @@ Error: Insufficient permissions
    # Service account must be member of Privilege Cloud Administrator role
    ```
 
-3. **Test with specific safe:**
+3. **Test safes resource access:**
    ```bash
    python -c "
-   from src.mcp_privilege_cloud.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
    import asyncio
-   server = CyberArkMCPServer.from_environment()
-   safes = asyncio.run(server.list_safes())
-   print(f'Accessible safes: {len(safes)}')
-   for safe in safes[:3]:
-       print(f'- {safe.get(\"safeName\", \"Unknown\")}')
+   import json
+   content = asyncio.run(_read_resource_content('cyberark://safes/'))
+   data = json.loads(content)
+   if 'error' in data:
+       print(f'Error accessing safes: {data[\"error\"]}')
+   else:
+       safes = data.get('safes', [])
+       print(f'Accessible safes: {len(safes)}')
+       for safe in safes[:3]:
+           print(f'- {safe.get(\"safeName\", \"Unknown\")}')
    "
    ```
 
@@ -344,7 +350,7 @@ Rate limit exceeded
 
 ### 2. Tools Not Visible in Inspector
 
-**Symptoms:** Inspector connects but shows no tools or fewer than 10 tools
+**Symptoms:** Inspector connects but shows no tools or fewer than expected tools
 
 **Solutions:**
 1. **Verify server startup:**
@@ -360,12 +366,13 @@ Rate limit exceeded
    python run_server.py
    ```
 
-3. **Test tool loading:**
+3. **Test tool and resource loading:**
    ```bash
    python -c "
-   from src.mcp_privilege_cloud.mcp_server import mcp
+   from src.mcp_privilege_cloud.mcp_server import mcp, resource_registry
    print('MCP server loaded:', mcp.name)
    print('Available tools:', len(mcp._handlers.get('tools', {})))
+   print('Available resource patterns:', len(resource_registry.get_registered_patterns()))
    "
    ```
 
@@ -399,11 +406,49 @@ Rate limit exceeded
    }
    ```
 
-3. **Test with minimal parameters:**
+3. **Test resource access:**
    ```json
    {
-     "tool": "list_safes",
-     "arguments": {}
+     "uri": "cyberark://safes/",
+     "description": "Test safes resource access"
+   }
+   ```
+
+### 4. Resource Access Errors in Inspector
+
+**Symptoms:** Resources appear but fail when accessed or return empty data
+
+**Solutions:**
+1. **Test resource access directly:**
+   ```json
+   {
+     "resource": "cyberark://health/",
+     "description": "Test health resource access"
+   }
+   ```
+
+2. **Verify resource URI format:**
+   ```json
+   // Correct resource URIs
+   {
+     "resource": "cyberark://safes/",
+     "description": "List all safes"
+   }
+   {
+     "resource": "cyberark://accounts/search",
+     "description": "Search accounts"
+   }
+   {
+     "resource": "cyberark://platforms/WinServerLocal",
+     "description": "Get specific platform"
+   }
+   ```
+
+3. **Check resource with parameters:**
+   ```json
+   {
+     "resource": "cyberark://safes/MySafe/accounts",
+     "description": "Get accounts in specific safe"
    }
    ```
 
@@ -473,16 +518,21 @@ Empty platform list returned
    - Service account must be member of "Privilege Cloud Administrator" role
    - Check role assignment in CyberArk Identity admin portal
 
-2. **Test platform API specifically:**
+2. **Test platforms resource access:**
    ```bash
    python -c "
-   from src.mcp_privilege_cloud.server import CyberArkMCPServer
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
    import asyncio
-   server = CyberArkMCPServer.from_environment()
-   platforms = asyncio.run(server.list_platforms())
-   print(f'Found {len(platforms)} platforms')
-   if platforms:
-       print('First platform:', platforms[0].get('Name', 'Unknown'))
+   import json
+   content = asyncio.run(_read_resource_content('cyberark://platforms/'))
+   data = json.loads(content)
+   if 'error' in data:
+       print(f'Error accessing platforms: {data[\"error\"]}')
+   else:
+       platforms = data.get('platforms', [])
+       print(f'Found {len(platforms)} platforms')
+       if platforms:
+           print('First platform:', platforms[0].get('Name', 'Unknown'))
    "
    ```
 
@@ -510,22 +560,214 @@ Empty platform list returned
    UnixSSHKey
    ```
 
-2. **List available platforms first:**
+2. **Access platforms resource first:**
    ```json
    {
-     "tool": "list_platforms",
-     "arguments": {}
+     "uri": "cyberark://platforms/",
+     "description": "Get available platforms"
    }
    ```
 
-3. **Use exact platform ID from list:**
+3. **Access specific platform resource:**
    ```json
    {
-     "tool": "get_platform_details",
-     "arguments": {
-       "platform_id": "WinServerLocal"
-     }
+     "uri": "cyberark://platforms/WinServerLocal",
+     "description": "Get specific platform details"
    }
+   ```
+
+## Resource Access Issues
+
+### 1. Resource URI Parsing Errors
+
+**Symptoms:**
+```
+Error: Invalid URI format
+Resource not found for URI: cyberark://invalid-resource/
+```
+
+**Solutions:**
+1. **Verify URI format:**
+   ```bash
+   # Correct URI patterns
+   cyberark://health/
+   cyberark://safes/
+   cyberark://safes/MySafe/accounts
+   cyberark://accounts/
+   cyberark://accounts/search
+   cyberark://accounts/123_456
+   cyberark://platforms/
+   cyberark://platforms/WinServerLocal
+   cyberark://platforms/packages
+   ```
+
+2. **Test URI pattern matching:**
+   ```bash
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import resource_registry
+   patterns = resource_registry.get_registered_patterns()
+   print('Available URI patterns:')
+   for pattern in patterns:
+       print(f'- {pattern}')
+   "
+   ```
+
+3. **Validate specific URI:**
+   ```bash
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import resource_registry
+   uri = 'cyberark://safes/MySafe'
+   resource = resource_registry.get_resource_class_for_uri(uri)
+   print(f'URI {uri} -> Resource: {resource.__name__ if resource else \"Not Found\"}')
+   "
+   ```
+
+### 2. Resource Access Permission Errors
+
+**Symptoms:**
+```
+Error: 403 Forbidden when accessing resource
+Resource returns empty data despite valid authentication
+```
+
+**Solutions:**
+1. **Check resource-specific permissions:**
+   ```bash
+   # Test each resource type individually
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   import asyncio
+   import json
+   
+   resources = [
+       'cyberark://health/',
+       'cyberark://safes/',
+       'cyberark://accounts/',
+       'cyberark://platforms/'
+   ]
+   
+   for uri in resources:
+       try:
+           content = asyncio.run(_read_resource_content(uri))
+           data = json.loads(content)
+           if 'error' in data:
+               print(f'❌ {uri}: {data[\"error\"]}')
+           else:
+               print(f'✅ {uri}: Access successful')
+       except Exception as e:
+           print(f'❌ {uri}: {str(e)}')
+   "
+   ```
+
+2. **Verify safe-specific access:**
+   ```bash
+   # Test specific safe access
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   import asyncio
+   import json
+   
+   safe_name = 'YourSafeName'  # Replace with actual safe name
+   uri = f'cyberark://safes/{safe_name}'
+   content = asyncio.run(_read_resource_content(uri))
+   data = json.loads(content)
+   print(json.dumps(data, indent=2))
+   "
+   ```
+
+### 3. Resource Data Format Issues
+
+**Symptoms:**
+```
+Resource returns data but in unexpected format
+Missing expected fields in resource response
+```
+
+**Solutions:**
+1. **Inspect raw resource content:**
+   ```bash
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   import asyncio
+   import json
+   
+   uri = 'cyberark://safes/'
+   content = asyncio.run(_read_resource_content(uri))
+   print('Raw content:')
+   print(content)
+   print('\\nParsed JSON:')
+   print(json.dumps(json.loads(content), indent=2))
+   "
+   ```
+
+2. **Validate resource schema:**
+   ```bash
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   import asyncio
+   import json
+   
+   uri = 'cyberark://accounts/'
+   content = asyncio.run(_read_resource_content(uri))
+   data = json.loads(content)
+   
+   # Check expected fields
+   expected_fields = ['accounts', 'total_count', 'metadata']
+   missing_fields = [f for f in expected_fields if f not in data]
+   
+   if missing_fields:
+       print(f'Missing fields: {missing_fields}')
+   else:
+       print('All expected fields present')
+   
+   print(f'Available fields: {list(data.keys())}')
+   "
+   ```
+
+### 4. Resource Performance Issues
+
+**Symptoms:**
+```
+Resource requests timeout
+Slow resource response times
+```
+
+**Solutions:**
+1. **Test resource response times:**
+   ```bash
+   python -c "
+   import time
+   import asyncio
+   import json
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   
+   uri = 'cyberark://safes/'
+   start_time = time.time()
+   content = asyncio.run(_read_resource_content(uri))
+   end_time = time.time()
+   
+   data = json.loads(content)
+   if 'error' not in data:
+       print(f'Resource {uri} responded in {end_time - start_time:.2f} seconds')
+       print(f'Data size: {len(content)} characters')
+   else:
+       print(f'Error: {data[\"error\"]}')
+   "
+   ```
+
+2. **Use resource pagination:**
+   ```bash
+   python -c "
+   from src.mcp_privilege_cloud.mcp_server import _read_resource_content
+   import asyncio
+   import json
+   
+   # Use search resource with filters for better performance
+   uri = 'cyberark://accounts/search?keywords=admin&limit=10'
+   content = asyncio.run(_read_resource_content(uri))
+   data = json.loads(content)
+   print(f'Limited search results: {len(data.get(\"accounts\", []))} accounts')
+   "
    ```
 
 ## Debug Mode
@@ -609,12 +851,17 @@ except Exception as e:
 #### Server Connection Test
 ```bash
 python -c "
-from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.mcp_server import _read_resource_content
 import asyncio
+import json
 try:
-    server = CyberArkMCPServer.from_environment()
-    safes = asyncio.run(server.list_safes())
-    print(f'✅ Server connection successful - {len(safes)} safes accessible')
+    content = asyncio.run(_read_resource_content('cyberark://safes/'))
+    data = json.loads(content)
+    if 'error' in data:
+        print(f'❌ Server connection failed: {data[\"error\"]}')
+    else:
+        safes = data.get('safes', [])
+        print(f'✅ Server connection successful - {len(safes)} safes accessible')
 except Exception as e:
     print('❌ Server connection failed:', str(e))
 "
@@ -685,6 +932,9 @@ python run_server.py
 - **"Network error"**: DNS, connectivity, or firewall issue
 - **"Platform management returns 0"**: Administrator role missing
 - **"ImportError"**: Python path or dependency issue
+- **"Resource not found for URI"**: Invalid resource URI format
+- **"No resource handler found"**: URI pattern not registered
+- **"Resource returns empty data"**: Permission or filtering issue
 
 ## Getting Support
 
@@ -735,6 +985,8 @@ Before seeking support, verify:
 - [ ] Using correct TLD (.cloud, not .com)
 - [ ] Heath check passes
 - [ ] MCP Inspector can connect to server
+- [ ] Resource URIs follow correct format (cyberark://resource/)
+- [ ] Resource access returns expected data structures
 
 ---
 

@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 ### Basic Test Commands
 ```bash
-# Run all tests (124+ total)
+# Run all tests (148+ total)
 pytest
 
 # Run with verbose output
@@ -60,50 +60,60 @@ The test suite is organized into specialized test files with comprehensive cover
 - Authentication error handling
 - Concurrent token request handling
 
-**TestServerCore** - Basic server operations and safe management (28+ tests)
+**TestServerCore** - Basic server operations and API integration (28+ tests)
 - Health check functionality
-- Safe listing with pagination
-- Safe details retrieval
+- Core server initialization and configuration
 - Network error handling
 - Response parsing validation
+- API endpoint testing
 
 **TestPlatformManagement** - Platform operations and API integration (16+ tests)
-- Platform listing with filters
+- Platform package import functionality
 - Platform details retrieval
 - Administrator role permission testing
 - Gen2 API endpoint compliance
 
 #### `tests/test_account_operations.py` (35+ tests)
-- Account listing with various filters
-- Account details retrieval
-- Advanced account search functionality
 - Account creation with full parameter validation
+- Password management operations (change, set, verify, reconcile)
+- Account lifecycle management testing
 - Error handling for account operations
 - Special character handling in account data
+- Account security operation validation
 
 #### `tests/test_mcp_integration.py` (15+ tests)
-**TestMCPAccountTools** - Account creation MCP tools (2+ tests)
-- MCP tool wrapper validation
+**TestMCPAccountTools** - Account management MCP tools (8+ tests)
+- Account creation MCP tool wrapper
+- Password management MCP tool wrappers (change, set, verify, reconcile)
 - Parameter passing and validation
+- Error handling and response formatting
 
-**TestMCPPlatformTools** - Platform MCP tools integration (5+ tests)
-- Platform listing MCP wrapper
-- Platform details MCP wrapper
+**TestMCPPlatformTools** - Platform MCP tools integration (3+ tests)
+- Platform package import MCP wrapper
+- Platform management parameter validation
 
-**TestMCPSafeTools** - Safe management MCP tools integration (8+ tests)
-- Safe listing MCP wrapper with pagination
-- Safe details MCP wrapper with options
+**TestMCPResourceIntegration** - Resource testing framework (4+ tests)
+- Resource discovery and validation
+- Resource content retrieval testing
+- Resource error handling
 
 #### `tests/test_integration.py` (10+ tests)
 - End-to-end integration scenarios
 - Complete workflow testing
 - Cross-component integration validation
 
+#### `tests/test_resources.py` (24+ tests)
+- Resource implementation testing
+- Resource registry functionality
+- Resource content generation and validation
+- Resource error handling and edge cases
+- Resource URI pattern matching
+
 ### Test Coverage Metrics
-- **Total Tests**: 124+ comprehensive test cases
+- **Total Tests**: 148+ comprehensive test cases
 - **Target Coverage**: Minimum 80% code coverage
 - **Mock Strategy**: All external CyberArk API dependencies are mocked
-- **Test Types**: Unit, integration, and MCP protocol tests
+- **Test Types**: Unit, integration, MCP tools, and MCP resources tests
 
 ## Running Tests
 
@@ -134,6 +144,9 @@ pytest tests/test_mcp_integration.py
 
 # Integration tests only
 pytest tests/test_integration.py
+
+# Resource tests only
+pytest tests/test_resources.py
 ```
 
 #### Run by Test Categories
@@ -150,11 +163,14 @@ pytest -m integration
 # Platform management tests
 pytest -k platform
 
-# Safe management tests
-pytest -k safe
+# Resource tests
+pytest -k resource
 
-# Account management tests
+# Account management tests (tools and operations)
 pytest -k account
+
+# Password management tests
+pytest -k password
 ```
 
 ### Coverage Testing
@@ -199,11 +215,14 @@ npx @modelcontextprotocol/inspector
 
 #### Start MCP Server for Testing
 ```bash
-# Recommended: Use multiplatform launcher
-python run_server.py
+# Recommended: Use uv for development
+uv run mcp-privilege-cloud
 
-# Alternative: Direct execution
-python src/mcp_privilege_cloud/mcp_server.py
+# Alternative: Use uvx for production-like testing
+uvx mcp-privilege-cloud
+
+# Legacy: Direct execution
+python -m mcp_privilege_cloud
 ```
 
 ### Testing Without Credentials
@@ -218,23 +237,33 @@ ERROR - Missing required environment variables: ['CYBERARK_IDENTITY_TENANT_ID', 
 
 #### Connect MCP Inspector
 1. **Connection Method**: Choose "Local" or "Command"
-2. **Command**: Enter the full path:
+2. **Command**: Enter one of:
    ```bash
-   python /mnt/c/Users/Tim/Projects/mcp-privilege-cloud/run_server.py
+   # Recommended for development
+   uv run mcp-privilege-cloud
+   
+   # Or for production-like testing
+   uvx mcp-privilege-cloud
+   
+   # Or legacy method
+   python -m mcp_privilege_cloud
    ```
 3. **Click Connect**
 
-#### Verify Available Tools
-You should see these 10 tools in the Inspector:
-- `health_check`
-- `list_accounts`
-- `get_account_details`
-- `search_accounts`
+#### Verify Available Tools and Resources
+You should see these **6 tools** in the Inspector:
 - `create_account`
-- `list_safes`
-- `get_safe_details`
-- `list_platforms`
-- `get_platform_details`
+- `change_account_password`
+- `set_next_password`
+- `verify_account_password`
+- `reconcile_account_password`
+- `import_platform_package`
+
+And these **4 resources**:
+- `cyberark://health/` - System health status
+- `cyberark://safes/` - All accessible safes
+- `cyberark://accounts/` - All accessible accounts
+- `cyberark://platforms/` - All available platforms
 
 ### Parameter Validation Testing
 
@@ -244,13 +273,13 @@ Test tool parameter validation without real API calls:
 ```json
 // Should fail - missing required parameter
 {
-  "tool": "get_account_details",
+  "tool": "create_account",
   "arguments": {}
 }
 
 // Should fail - missing required parameter
 {
-  "tool": "get_safe_details",
+  "tool": "change_account_password",
   "arguments": {}
 }
 ```
@@ -259,22 +288,50 @@ Test tool parameter validation without real API calls:
 ```json
 // Should validate successfully
 {
-  "tool": "list_accounts",
+  "tool": "create_account",
   "arguments": {
+    "platform_id": "WinServerLocal",
     "safe_name": "TestSafe",
-    "username": "testuser"
+    "address": "test.server.com",
+    "user_name": "testuser"
   }
 }
 
 // Should validate successfully  
 {
-  "tool": "list_safes",
+  "tool": "change_account_password",
   "arguments": {
-    "search": "Database",
-    "limit": 10
+    "account_id": "123_456"
   }
 }
 ```
+
+### Resource Testing
+
+Resources provide read-only access to CyberArk data through URI-based endpoints. Test resource accessibility without real API calls:
+
+#### Test Resource Discovery
+Resources should be discoverable in the MCP Inspector under the "Resources" section.
+
+#### Test Resource URIs
+```bash
+# Health status resource
+cyberark://health/
+
+# Safes collection resource  
+cyberark://safes/
+
+# Accounts collection resource
+cyberark://accounts/
+
+# Platforms collection resource
+cyberark://platforms/
+```
+
+#### Expected Resource Behavior
+- **Without credentials**: Resources should return error information explaining missing configuration
+- **With credentials**: Resources should return formatted JSON data from CyberArk APIs
+- **Invalid URIs**: Should return clear error messages for unsupported resource patterns
 
 ### Testing With Real Credentials
 
@@ -314,7 +371,7 @@ else:
 ```bash
 # Stop current server (Ctrl+C)
 # Restart with proper environment
-python run_server.py
+uv run mcp-privilege-cloud
 ```
 
 **Expected Output:**
@@ -325,68 +382,55 @@ INFO - CyberArk server connection established successfully
 
 ### Real API Testing Sequence
 
-#### Test 1: Health Check
-```json
-{
-  "tool": "health_check",
-  "arguments": {}
-}
+#### Test 1: Read Health Resource
+```
+Resource URI: cyberark://health/
 ```
 **Expected Response:**
 ```json
 {
   "status": "healthy",
-  "timestamp": "2025-06-28T...",
+  "timestamp": "2025-07-01T...",
   "safes_accessible": 5
 }
 ```
 
-#### Test 2: List Safes
-```json
-{
-  "tool": "list_safes",
-  "arguments": {}
-}
+#### Test 2: Read Safes Resource
+```
+Resource URI: cyberark://safes/
 ```
 
-#### Test 3: List Accounts with Filter
+#### Test 3: Read Accounts Resource
+```
+Resource URI: cyberark://accounts/
+```
+
+#### Test 4: Create Account Tool
 ```json
 {
-  "tool": "list_accounts",
+  "tool": "create_account",
   "arguments": {
-    "safe_name": "YourSafeName"
+    "platform_id": "WinServerLocal",
+    "safe_name": "YourSafeName",
+    "address": "test.server.com",
+    "user_name": "testuser"
   }
 }
 ```
 
-#### Test 4: Search Accounts
+#### Test 5: Change Account Password Tool
 ```json
 {
-  "tool": "search_accounts",
-  "arguments": {
-    "keywords": "admin"
-  }
-}
-```
-
-#### Test 5: Get Account Details
-```json
-{
-  "tool": "get_account_details",
+  "tool": "change_account_password",
   "arguments": {
     "account_id": "123_456"
   }
 }
 ```
 
-#### Test 6: List Platforms
-```json
-{
-  "tool": "list_platforms",
-  "arguments": {
-    "active": true
-  }
-}
+#### Test 6: Read Platforms Resource
+```
+Resource URI: cyberark://platforms/
 ```
 
 ## Test Categories
@@ -394,12 +438,14 @@ INFO - CyberArk server connection established successfully
 ### Unit Tests
 - **Authentication Module**: Token management, OAuth flow, credential validation
 - **Server Core**: HTTP client, API response parsing, error handling
-- **MCP Integration**: Tool wrappers, parameter validation, response formatting
+- **MCP Tools**: Action tool wrappers, parameter validation, response formatting
+- **MCP Resources**: Resource content generation, URI pattern matching, registry functionality
 
 ### Integration Tests
-- **End-to-end Workflows**: Complete operations from authentication to data retrieval
+- **End-to-end Workflows**: Complete operations from authentication to action execution
 - **Cross-component Integration**: Authentication + server + MCP layer testing
 - **API Compliance**: Real CyberArk API behavior validation
+- **Resource Integration**: Resource content retrieval and formatting testing
 
 ### Performance Tests
 - **Response Time Testing**: API call performance measurement
@@ -519,8 +565,10 @@ pytest --cov=src/mcp_privilege_cloud --cov-report=xml
 - ✅ Fast test execution (< 2 minutes for full suite)
 
 ### MCP Inspector Integration
-- ✅ All 10 tools visible in Inspector interface
+- ✅ All 6 action tools visible in Inspector interface
+- ✅ All 4 resources accessible in Inspector interface
 - ✅ Tool parameters correctly displayed and validated
+- ✅ Resource content properly loaded and displayed
 - ✅ Successful tool execution with real credentials
 - ✅ Clear error messages for invalid operations
 
@@ -533,10 +581,10 @@ pytest --cov=src/mcp_privilege_cloud --cov-report=xml
 ## Next Steps
 
 After successful testing:
-1. **Integration**: Connect to preferred MCP client
-2. **Automation**: Integrate tools into automated workflows
+1. **Integration**: Connect to preferred MCP client (Claude Desktop, etc.)
+2. **Automation**: Integrate action tools and resources into automated workflows
 3. **Monitoring**: Set up production logging and monitoring
-4. **Enhancement**: Add additional features based on test feedback
+4. **Enhancement**: Add additional password management features and resources
 
 ---
 

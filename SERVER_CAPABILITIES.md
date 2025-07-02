@@ -6,8 +6,8 @@ This document provides a comprehensive overview of all capabilities provided by 
 
 The CyberArk Privilege Cloud MCP Server provides two main types of capabilities:
 
-1. **Tools**: Function-based operations for managing CyberArk entities
-2. **Resources**: URI-based access to CyberArk data objects
+1. **Tools**: Action-based operations for creating and modifying CyberArk entities
+2. **Resources**: URI-based read-only access to CyberArk data for browsing and discovery
 
 ## Server Information
 
@@ -19,24 +19,9 @@ The CyberArk Privilege Cloud MCP Server provides two main types of capabilities:
 
 ## Tools
 
-The server provides 10 tools for comprehensive CyberArk management:
+The server provides 9 action tools for CyberArk management operations:
 
 ### Account Management Tools
-
-#### `list_accounts`
-- **Purpose**: List accounts with optional filtering
-- **Parameters**: 
-  - `safe_name` (optional): Filter by safe name
-  - `username` (optional): Filter by username
-  - `address` (optional): Filter by address
-- **Returns**: Array of account objects
-- **Example**:
-  ```json
-  {
-    "safe_name": "ProductionServers",
-    "username": "admin"
-  }
-  ```
 
 #### `get_account_details`
 - **Purpose**: Get detailed information for a specific account
@@ -47,24 +32,6 @@ The server provides 10 tools for comprehensive CyberArk management:
   ```json
   {
     "account_id": "12345"
-  }
-  ```
-
-#### `search_accounts`
-- **Purpose**: Advanced account search with multiple criteria
-- **Parameters**:
-  - `keywords` (optional): Free text search
-  - `safe_name` (optional): Filter by safe
-  - `username` (optional): Filter by username
-  - `address` (optional): Filter by address
-  - `platform_id` (optional): Filter by platform
-- **Returns**: Array of matching accounts
-- **Example**:
-  ```json
-  {
-    "keywords": "webserver",
-    "safe_name": "ProductionServers",
-    "platform_id": "WinServerLocal"
   }
   ```
 
@@ -149,25 +116,6 @@ The server provides 10 tools for comprehensive CyberArk management:
 
 ### Safe Management Tools
 
-#### `list_safes`
-- **Purpose**: List accessible safes with optional filtering
-- **Parameters**:
-  - `search` (optional): Search term
-  - `offset` (optional): Pagination offset
-  - `limit` (optional): Results limit
-  - `sort` (optional): Sort order
-  - `include_accounts` (optional): Include account counts
-  - `extended_details` (optional): Include extended metadata
-- **Returns**: Array of safe objects
-- **Example**:
-  ```json
-  {
-    "search": "Production",
-    "limit": 20,
-    "include_accounts": true
-  }
-  ```
-
 #### `get_safe_details`
 - **Purpose**: Get detailed information for a specific safe
 - **Parameters**:
@@ -184,21 +132,6 @@ The server provides 10 tools for comprehensive CyberArk management:
   ```
 
 ### Platform Management Tools
-
-#### `list_platforms`
-- **Purpose**: List available platforms
-- **Parameters**:
-  - `search` (optional): Search term
-  - `active` (optional): Filter by active status
-  - `system_type` (optional): Filter by system type
-- **Returns**: Array of platform objects
-- **Example**:
-  ```json
-  {
-    "active": true,
-    "system_type": "Windows"
-  }
-  ```
 
 #### `get_platform_details`
 - **Purpose**: Get detailed platform configuration
@@ -226,34 +159,45 @@ The server provides 10 tools for comprehensive CyberArk management:
 
 ## Resources
 
-The server provides URI-based resource access for browsing and caching CyberArk data:
+The server provides URI-based resource access for browsing and discovery of CyberArk data. Resources are read-only and designed for efficient caching and navigation.
 
 ### Resource Types
 
-1. **Collection Resources**: Lists of entities
+1. **Collection Resources**: Lists of entities with pagination support
 2. **Entity Resources**: Individual objects with full details
 3. **Search Resources**: Query-based filtered views
 4. **System Resources**: Health and status information
 
 ### Available Resources
 
-#### Health Resources
-- `cyberark://health/` - System health and connectivity status
+#### Account Resources
+- **`cyberark://accounts/`** - Collection of all accessible accounts
+  - Returns paginated list of accounts across all accessible safes
+  - Supports filtering by safe, username, address
+  - Excludes sensitive data (passwords/secrets)
+
+- **`cyberark://accounts/search?query=...`** - Advanced account search
+  - Parameters: `keywords`, `safe_name`, `username`, `address`, `platform_id`
+  - Returns filtered account collections based on search criteria
+  - Example: `cyberark://accounts/search?safe_name=Production&platform_id=WinServerLocal`
 
 #### Safe Resources
-- `cyberark://safes/` - Collection of all accessible safes
-- `cyberark://safes/{safe_name}/` - Individual safe details
-- `cyberark://safes/{safe_name}/accounts/` - Accounts within a safe
-
-#### Account Resources
-- `cyberark://accounts/` - Collection of all accessible accounts
-- `cyberark://accounts/{account_id}/` - Individual account details
-- `cyberark://accounts/search?query={terms}` - Search accounts with filters
+- **`cyberark://safes/`** - Collection of all accessible safes
+  - Returns list of safes with metadata (creation date, description, etc.)
+  - Excludes Internal Safes by default
+  - Includes account counts when available
 
 #### Platform Resources
-- `cyberark://platforms/` - Collection of all available platforms
-- `cyberark://platforms/{platform_id}/` - Individual platform details
-- `cyberark://platforms/packages/` - Platform package information
+- **`cyberark://platforms/`** - Collection of all available platforms
+  - Returns platform definitions with system types and capabilities
+  - Includes both active and inactive platforms
+  - Contains platform configuration metadata
+
+#### System Resources
+- **`cyberark://health/`** - System health and connectivity status
+  - Authentication status and token validity
+  - API endpoint connectivity
+  - Permission verification results
 
 ### Resource Features
 
@@ -310,11 +254,11 @@ Resources return JSON error objects:
 ## Performance Characteristics
 
 ### Response Times (Typical)
-- Health check: < 100ms
-- List operations: < 500ms
-- Individual entity access: < 300ms
-- Search operations: < 1000ms
-- Create operations: < 2000ms
+- Health check resource: < 100ms
+- Collection resources: < 500ms
+- Individual entity resources: < 300ms
+- Search resources: < 1000ms
+- Tool operations: < 2000ms
 
 ### Scalability
 - Supports concurrent operations
@@ -335,15 +279,16 @@ Resources return JSON error objects:
 - **Custom Clients**: Standard MCP protocol compatibility
 
 ### Integration Patterns
-1. **Tool-based Workflow**: Use tools for operations and modifications
-2. **Resource-based Browsing**: Use resources for discovery and navigation
-3. **Hybrid Approach**: Combine tools and resources for optimal experience
+1. **Resource-first Discovery**: Use resources to browse and discover accounts, safes, and platforms
+2. **Tool-based Actions**: Use tools for creating accounts, managing passwords, and platform operations
+3. **Hybrid Workflow**: Combine resource browsing with targeted tool actions for optimal experience
 
 ### Best Practices
-- Start with health check to verify connectivity
-- Use resources for discovery and browsing
-- Use tools for specific operations and modifications
-- Implement appropriate caching strategies
+- Start with health check resource to verify connectivity
+- Use collection resources (accounts/, safes/, platforms/) for discovery and browsing
+- Use search resources for filtered views and specific queries
+- Use tools only for create/modify operations (account creation, password management)
+- Implement client-side caching for frequently accessed resources
 - Handle errors gracefully with user feedback
 
 ## Monitoring & Observability

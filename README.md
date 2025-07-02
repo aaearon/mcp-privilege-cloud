@@ -5,9 +5,9 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 ## Features
 
 ### Current (MVP+)
-- **Account Management**: List, search, retrieve detailed information, and create new privileged accounts
-- **Safe Management**: List and view safe information
-- **Platform Management**: List available platforms and view detailed platform configurations
+- **Account Management**: Browse and search accounts via resources, create new privileged accounts
+- **Safe Management**: Browse safe hierarchy and view safe information via resources
+- **Platform Management**: Browse available platforms and configurations via resources
 - **Password Operations**: Change, verify, set next, and reconcile account passwords
 - **MCP Resources**: URI-based access to CyberArk entities for browsing and caching
 - **OAuth 2.0 Authentication**: Secure API token authentication with CyberArk Identity
@@ -16,7 +16,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 - **Error Handling**: Robust error handling with automatic token refresh
 
 ### Planned (Future Releases)
-- Password management operations (retrieve, change, verify)
+- Password management operations (retrieve passwords)
 - Account lifecycle management (update, delete)
 - Session monitoring and management
 - Advanced reporting and analytics
@@ -125,23 +125,22 @@ python -m src.mcp_privilege_cloud.mcp_server
 
 ### Available Tools
 
-The server provides 10 MCP tools for CyberArk operations:
+The server provides 6 MCP tools for CyberArk action operations:
 
-- **Account Management**: `list_accounts`, `search_accounts`, `create_account`
+- **Account Management**: `create_account`
 - **Password Operations**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
-- **Safe Management**: `list_safes`
-- **Platform Management**: `list_platforms`, `import_platform_package`
+- **Platform Management**: `import_platform_package`
 
 ### Available Resources
 
-The server provides URI-based resource access for browsing and caching:
+The server provides URI-based resource access for browsing and data retrieval:
 
-- **Health**: `cyberark://health/` - System status and connectivity
-- **Safes**: `cyberark://safes/` - Browse safe hierarchy and accounts
-- **Accounts**: `cyberark://accounts/` - Access and search account collections
-- **Platforms**: `cyberark://platforms/` - Platform configurations and capabilities
+- **Health**: `cyberark://health/` - System status and connectivity information
+- **Safes**: `cyberark://safes/` - Browse safe hierarchy, list safes, and view safe contents
+- **Accounts**: `cyberark://accounts/` - Access account collections, search accounts, and view account details
+- **Platforms**: `cyberark://platforms/` - Browse platform configurations and view platform capabilities
 
-For detailed specifications, see [Server Capabilities](SERVER_CAPABILITIES.md) and [Resources Guide](docs/RESOURCES.md).
+For detailed specifications, see [Resources Guide](docs/RESOURCES.md) and [API Reference](docs/API_REFERENCE.md).
 
 ## Standardized MCP Server Approach
 
@@ -171,27 +170,28 @@ If you're currently using legacy execution methods (`python run_server.py`), we 
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest
+# Modern approach (recommended)
+uv run pytest                               # Run all tests
+uv run pytest -m auth                      # Authentication tests
+uv run pytest -m unit                      # Unit tests  
+uv run pytest -m integration               # Integration tests
+uv run pytest --cov=src/mcp_privilege_cloud # Run with coverage
+uv run pytest -v                           # Verbose output
 
-# Run specific test categories
-pytest -m auth      # Authentication tests
-pytest -m unit      # Unit tests
-pytest -m integration  # Integration tests
-
-# Run with coverage
-pytest --cov=src/mcp_privilege_cloud
-
-# Verbose output
-pytest -v
+# Traditional approach
+pytest                                      # Run all tests
+pytest --cov=src/mcp_privilege_cloud       # Run with coverage
 ```
 
 ### Test Structure
 
-- `tests/test_core_functionality.py`: Authentication, server core, and platform management tests (64+ tests)
-- `tests/test_account_operations.py`: Account lifecycle management tests (35+ tests)
-- `tests/test_mcp_integration.py`: MCP tool wrappers and integration tests (15+ tests)
-- `tests/test_integration.py`: End-to-end integration tests (10+ tests)
+- `tests/test_core_functionality.py`: Authentication, server core, and platform management tests
+- `tests/test_account_operations.py`: Account lifecycle management tests
+- `tests/test_mcp_integration.py`: MCP tool wrappers and integration tests
+- `tests/test_integration.py`: End-to-end integration tests
+- `tests/test_resources.py`: MCP resource implementation tests
+
+Total: 215+ tests across 5 test files
 
 ## MCP Inspector Testing
 

@@ -17,12 +17,12 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server provides **10 specialized tools** for privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns for authentication, parameter validation, and error handling.
+The CyberArk Privilege Cloud MCP Server provides **6 specialized tools** for privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns for authentication, parameter validation, and error handling.
 
 ### Core Capabilities
-- **Account Management**: Create, list, search, and retrieve detailed account information
-- **Safe Management**: List and view safe information with advanced options
-- **Platform Management**: List available platforms and view detailed configurations
+- **Account Management**: Create and retrieve detailed account information
+- **Resource Discovery**: Access accounts, safes, and platforms through MCP resources
+- **Password Operations**: Advanced password management capabilities
 - **Health Monitoring**: Verify connectivity and system status
 
 ### API Integration Details
@@ -58,65 +58,64 @@ CYBERARK_LOG_LEVEL=INFO        # Logging level
 ## Tool Categories
 
 ### Primary Tools (MVP)
-1. **Account Discovery**: `list_accounts`, `search_accounts`
-2. **Account Information**: `get_account_details`
-3. **Account Management**: `create_account`
-4. **Safe Information**: `list_safes`, `get_safe_details`
-5. **Platform Information**: `list_platforms`, `get_platform_details`
-6. **Health Monitoring**: `health_check`
+1. **Account Management**: `create_account`, `get_account_details`
+2. **Password Operations**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+3. **Platform Management**: `import_platform_package`
+4. **Health Monitoring**: `health_check`
+
+### MCP Resources (Discovery)
+1. **Accounts**: `cyberark://accounts` - List and search accounts
+2. **Safes**: `cyberark://safes` - List and filter safes
+3. **Platforms**: `cyberark://platforms` - List available platforms
 
 ### Future Enhancement Categories
-1. **Password Operations**: Password retrieval and management
-2. **Account Lifecycle**: Update and delete operations
-3. **Session Management**: Active session monitoring
-4. **Reporting**: Access reports and analytics
+1. **Account Lifecycle**: Update and delete operations
+2. **Session Management**: Active session monitoring
+3. **Reporting**: Access reports and analytics
+4. **Advanced Safe Management**: Create and update operations
 
 ## Account Management Tools
 
-### `list_accounts`
+### Account Discovery via MCP Resources
 
-**Description**: Retrieve a list of accounts from CyberArk Privilege Cloud with optional filters.
+**Description**: List and search accounts through MCP resource URIs instead of dedicated tools.
 
-**API Endpoint**: `GET /PasswordVault/API/Accounts`
+**Base URI**: `cyberark://accounts`
 
-**Parameters**:
-- `safe_name` (optional, string): Filter accounts by safe name
-- `username` (optional, string): Filter accounts by username
-- `address` (optional, string): Filter accounts by address/hostname
+**Supported Query Parameters**:
+- `safe_name`: Filter accounts by safe name
+- `username`: Filter accounts by username  
+- `address`: Filter accounts by address/hostname
+- `keywords`: Search keywords
+- `platform_id`: Filter by platform ID
 
-**Returns**: Array of account objects with basic information
-
-**Example Usage**:
-```python
+**Example Resource URIs**:
+```
 # List all accessible accounts
-await client.call_tool("list_accounts", {})
+cyberark://accounts
 
 # Filter by safe name
-await client.call_tool("list_accounts", {
-    "safe_name": "IT-Infrastructure"
-})
+cyberark://accounts?safe_name=IT-Infrastructure
 
 # Multiple filters
-await client.call_tool("list_accounts", {
-    "safe_name": "Database-Safes",
-    "username": "admin"
-})
+cyberark://accounts?safe_name=Database-Safes&username=admin
+
+# Search with keywords
+cyberark://accounts?keywords=database&platform_id=MySQLDB
+
+# Search by address pattern
+cyberark://accounts?address=*.company.com
 ```
 
-**Response Example**:
+**Resource Response Example**:
 ```json
-[
-  {
-    "id": "123_456",
-    "name": "DatabaseAdmin",
-    "address": "db.company.com",
-    "userName": "dbadmin",
-    "platformId": "MySQLDB",
-    "safeName": "Database-Safes",
-    "secretType": "password",
-    "createdTime": 1640995200
-  }
-]
+{
+  "uri": "cyberark://accounts?safe_name=Database-Safes",
+  "name": "Accounts in Database-Safes",
+  "description": "Filtered list of accounts",
+  "mimeType": "application/json",
+  "text": "[{\"id\": \"123_456\", \"name\": \"DatabaseAdmin\", \"address\": \"db.company.com\", \"userName\": \"dbadmin\", \"platformId\": \"MySQLDB\", \"safeName\": \"Database-Safes\", \"secretType\": \"password\", \"createdTime\": 1640995200}]"
+}
 ```
 
 ---
@@ -163,44 +162,6 @@ await client.call_tool("get_account_details", {
 }
 ```
 
----
-
-### `search_accounts`
-
-**Description**: Advanced search for accounts with multiple filter criteria.
-
-**API Endpoint**: `GET /PasswordVault/API/Accounts` with query parameters
-
-**Parameters**:
-- `keywords` (optional, string): Search keywords
-- `safe_name` (optional, string): Filter by safe name
-- `username` (optional, string): Filter by username
-- `address` (optional, string): Filter by address/hostname
-- `platform_id` (optional, string): Filter by platform ID
-
-**Returns**: Array of matching accounts
-
-**Example Usage**:
-```python
-# Search by keywords
-await client.call_tool("search_accounts", {
-    "keywords": "admin"
-})
-
-# Advanced search with multiple criteria
-await client.call_tool("search_accounts", {
-    "keywords": "database",
-    "safe_name": "Database-Safes",
-    "platform_id": "MySQLDB"
-})
-
-# Search by address pattern
-await client.call_tool("search_accounts", {
-    "address": "*.company.com"
-})
-```
-
----
 
 ### `create_account`
 
@@ -281,63 +242,44 @@ await client.call_tool("create_account", {
 
 ## Safe Management Tools
 
-### `list_safes`
+### Safe Discovery via MCP Resources
 
-**Description**: List all accessible safes with advanced pagination and filtering options.
+**Description**: List and filter safes through MCP resource URIs instead of dedicated tools.
 
-**API Endpoint**: `GET /PasswordVault/API/Safes`
+**Base URI**: `cyberark://safes`
 
-**Parameters**:
-- `search` (optional, string): Search term for safe names
-- `offset` (optional, integer): Pagination offset (default: 0)
-- `limit` (optional, integer): Number of safes to return (default: 25, max: 1000)
-- `sort` (optional, string): Sort order - "safeName asc" or "safeName desc"
-- `include_accounts` (optional, boolean): Include account lists with each safe
-- `extended_details` (optional, boolean): Include extended safe information
+**Supported Query Parameters**:
+- `search`: Search term for safe names
+- `offset`: Pagination offset (default: 0)
+- `limit`: Number of safes to return (default: 25, max: 1000)
+- `sort`: Sort order - "safeName asc" or "safeName desc"
+- `include_accounts`: Include account lists with each safe
+- `extended_details`: Include extended safe information
 
-**Returns**: Array of safe objects (excludes Internal Safes)
-
-**Example Usage**:
-```python
+**Example Resource URIs**:
+```
 # List all accessible safes
-await client.call_tool("list_safes", {})
+cyberark://safes
 
 # Search safes by name
-await client.call_tool("list_safes", {
-    "search": "Database"
-})
+cyberark://safes?search=Database
 
 # Paginated results with sorting
-await client.call_tool("list_safes", {
-    "offset": 0,
-    "limit": 10,
-    "sort": "safeName asc"
-})
+cyberark://safes?offset=0&limit=10&sort=safeName+asc
 
 # Include accounts in each safe
-await client.call_tool("list_safes", {
-    "include_accounts": True,
-    "extended_details": True
-})
+cyberark://safes?include_accounts=true&extended_details=true
 ```
 
-**Response Example**:
+**Resource Response Example**:
 ```json
-[
-  {
-    "safeName": "Database-Safes",
-    "description": "Database server accounts",
-    "location": "\\",
-    "creator": "Admin",
-    "olacEnabled": false,
-    "managingCPM": "PasswordManager",
-    "numberOfVersionsRetention": 5,
-    "numberOfDaysRetention": 7,
-    "autoPurgeEnabled": false,
-    "creationTime": 1640995200,
-    "modificationTime": 1640995300
-  }
-]
+{
+  "uri": "cyberark://safes?search=Database",
+  "name": "Safes matching 'Database'",
+  "description": "Filtered list of safes",
+  "mimeType": "application/json",
+  "text": "[{\"safeName\": \"Database-Safes\", \"description\": \"Database server accounts\", \"location\": \"\\\\\", \"creator\": \"Admin\", \"olacEnabled\": false, \"managingCPM\": \"PasswordManager\", \"numberOfVersionsRetention\": 5, \"numberOfDaysRetention\": 7, \"autoPurgeEnabled\": false, \"creationTime\": 1640995200, \"modificationTime\": 1640995300}]"
+}
 ```
 
 ---
@@ -403,121 +345,225 @@ await client.call_tool("get_safe_details", {
 
 ## Platform Management Tools
 
-### `list_platforms`
+### Platform Discovery via MCP Resources
 
-**Description**: List all available platforms in CyberArk Privilege Cloud.
+**Description**: List and filter platforms through MCP resource URIs instead of dedicated tools.
 
-**API Endpoint**: `GET /PasswordVault/API/Platforms`
+**Base URI**: `cyberark://platforms`
 
 **Required Permissions**: Service account must be a member of the Privilege Cloud Administrator role
 
-**Parameters**:
-- `search` (optional, string): Search term for platform names
-- `active` (optional, boolean): Filter by active status (true/false)
-- `system_type` (optional, string): Filter by system type (e.g., Windows, Unix)
+**Supported Query Parameters**:
+- `search`: Search term for platform names
+- `active`: Filter by active status (true/false)
+- `system_type`: Filter by system type (e.g., Windows, Unix)
 
-**Returns**: Array of platform objects with basic information
-
-**Example Usage**:
-```python
+**Example Resource URIs**:
+```
 # List all platforms
-await client.call_tool("list_platforms", {})
+cyberark://platforms
 
 # Filter by active platforms
-await client.call_tool("list_platforms", {
-    "active": True
-})
+cyberark://platforms?active=true
 
 # Search and filter
-await client.call_tool("list_platforms", {
-    "search": "Windows",
-    "active": True,
-    "system_type": "Windows"
-})
+cyberark://platforms?search=Windows&active=true&system_type=Windows
 ```
 
-**Response Example**:
+**Resource Response Example**:
 ```json
-[
-  {
-    "ID": "WinServerLocal",
-    "Name": "Windows Server Local",
-    "SystemType": "Windows",
-    "Active": true,
-    "Description": "Windows Server Local Account",
-    "PlatformBaseID": "WinServer",
-    "PlatformType": "Regular"
-  },
-  {
-    "ID": "UnixSSH",
-    "Name": "Unix SSH",
-    "SystemType": "Unix",
-    "Active": true,
-    "Description": "Unix account via SSH",
-    "PlatformBaseID": "Unix",
-    "PlatformType": "Regular"
-  }
-]
+{
+  "uri": "cyberark://platforms?active=true",
+  "name": "Active Platforms",
+  "description": "List of active platforms",
+  "mimeType": "application/json",
+  "text": "[{\"ID\": \"WinServerLocal\", \"Name\": \"Windows Server Local\", \"SystemType\": \"Windows\", \"Active\": true, \"Description\": \"Windows Server Local Account\", \"PlatformBaseID\": \"WinServer\", \"PlatformType\": \"Regular\"}, {\"ID\": \"UnixSSH\", \"Name\": \"Unix SSH\", \"SystemType\": \"Unix\", \"Active\": true, \"Description\": \"Unix account via SSH\", \"PlatformBaseID\": \"Unix\", \"PlatformType\": \"Regular\"}]"
+}
 ```
 
----
+### `import_platform_package`
 
-### `get_platform_details`
+**Description**: Import a platform package into CyberArk Privilege Cloud.
 
-**Description**: Get detailed information about a specific platform configuration.
-
-**API Endpoint**: `GET /PasswordVault/API/Platforms/{platformId}`
+**API Endpoint**: `POST /PasswordVault/API/Platforms/Import`
 
 **Required Permissions**: Service account must be a member of the Privilege Cloud Administrator role
 
 **Parameters**:
-- `platform_id` (required, string): Unique identifier for the platform (e.g., WinServerLocal, UnixSSH)
+- `platform_package_file` (required, string): Base64-encoded platform package file content
 
-**Returns**: Complete platform object with configuration details
+**Returns**: Import result with platform ID and status
 
 **Example Usage**:
 ```python
-# Get Windows Server platform details
-await client.call_tool("get_platform_details", {
-    "platform_id": "WinServerLocal"
-})
-
-# Get Unix SSH platform details
-await client.call_tool("get_platform_details", {
-    "platform_id": "UnixSSH"
+# Import platform package
+await client.call_tool("import_platform_package", {
+    "platform_package_file": "UEsDBBQAAAAIAOt..." # Base64 encoded zip file
 })
 ```
 
 **Response Example**:
 ```json
 {
-  "ID": "WinServerLocal",
-  "Name": "Windows Server Local",
-  "SystemType": "Windows",
-  "Active": true,
-  "Description": "Windows Server Local Account",
-  "PlatformBaseID": "WinServer",
-  "PlatformType": "Regular",
-  "Properties": {
-    "required": [
-      "Address",
-      "UserName"
-    ],
-    "optional": [
-      "Port",
-      "LogonDomain"
-    ]
-  },
-  "CredentialsManagementPolicy": {
-    "Verification": {
-      "RequirePasswordVerificationEveryXDays": 1,
-      "AutomaticPasswordVerificationEnabled": true
-    },
-    "Change": {
-      "RequirePasswordChangeEveryXDays": 90,
-      "AutomaticPasswordChangeEnabled": true
-    }
-  }
+  "PlatformID": "CustomPlatform-001",
+  "Status": "Success",
+  "Message": "Platform imported successfully"
+}
+```
+
+---
+
+### Platform Details via MCP Resources
+
+**Description**: Get detailed information about specific platforms through resource URIs.
+
+**Base URI**: `cyberark://platforms/{platformId}`
+
+**Required Permissions**: Service account must be a member of the Privilege Cloud Administrator role
+
+**Example Resource URIs**:
+```
+# Get Windows Server platform details
+cyberark://platforms/WinServerLocal
+
+# Get Unix SSH platform details
+cyberark://platforms/UnixSSH
+```
+
+**Resource Response Example**:
+```json
+{
+  "uri": "cyberark://platforms/WinServerLocal",
+  "name": "Windows Server Local Platform",
+  "description": "Detailed platform configuration",
+  "mimeType": "application/json",
+  "text": "{\"ID\": \"WinServerLocal\", \"Name\": \"Windows Server Local\", \"SystemType\": \"Windows\", \"Active\": true, \"Description\": \"Windows Server Local Account\", \"PlatformBaseID\": \"WinServer\", \"PlatformType\": \"Regular\", \"Properties\": {\"required\": [\"Address\", \"UserName\"], \"optional\": [\"Port\", \"LogonDomain\"]}, \"CredentialsManagementPolicy\": {\"Verification\": {\"RequirePasswordVerificationEveryXDays\": 1, \"AutomaticPasswordVerificationEnabled\": true}, \"Change\": {\"RequirePasswordChangeEveryXDays\": 90, \"AutomaticPasswordChangeEnabled\": true}}}"
+}
+```
+
+## Password Management Tools
+
+### `change_account_password`
+
+**Description**: Change the password for a specific account.
+
+**API Endpoint**: `POST /PasswordVault/API/Accounts/{accountId}/Change`
+
+**Parameters**:
+- `account_id` (required, string): Unique identifier for the account
+- `new_password` (optional, string): New password (if not provided, system will generate one)
+
+**Returns**: Password change operation result
+
+**Example Usage**:
+```python
+# Change password with specified value
+await client.call_tool("change_account_password", {
+    "account_id": "123_456",
+    "new_password": "NewSecurePassword123!"
+})
+
+# Change password with system-generated value
+await client.call_tool("change_account_password", {
+    "account_id": "123_456"
+})
+```
+
+**Response Example**:
+```json
+{
+  "status": "success",
+  "message": "Password changed successfully"
+}
+```
+
+---
+
+### `set_next_password`
+
+**Description**: Set the next password for an account (password will be applied on next change).
+
+**API Endpoint**: `POST /PasswordVault/API/Accounts/{accountId}/SetNextPassword`
+
+**Parameters**:
+- `account_id` (required, string): Unique identifier for the account
+- `password` (required, string): The next password to set
+
+**Returns**: Set next password operation result
+
+**Example Usage**:
+```python
+# Set next password
+await client.call_tool("set_next_password", {
+    "account_id": "123_456",
+    "password": "FuturePassword123!"
+})
+```
+
+**Response Example**:
+```json
+{
+  "status": "success",
+  "message": "Next password set successfully"
+}
+```
+
+---
+
+### `verify_account_password`
+
+**Description**: Verify that the current password for an account is correct.
+
+**API Endpoint**: `POST /PasswordVault/API/Accounts/{accountId}/Verify`
+
+**Parameters**:
+- `account_id` (required, string): Unique identifier for the account
+
+**Returns**: Password verification result
+
+**Example Usage**:
+```python
+# Verify account password
+await client.call_tool("verify_account_password", {
+    "account_id": "123_456"
+})
+```
+
+**Response Example**:
+```json
+{
+  "status": "success",
+  "verified": true,
+  "message": "Password verification completed"
+}
+```
+
+---
+
+### `reconcile_account_password`
+
+**Description**: Reconcile the account password with the target system.
+
+**API Endpoint**: `POST /PasswordVault/API/Accounts/{accountId}/Reconcile`
+
+**Parameters**:
+- `account_id` (required, string): Unique identifier for the account
+
+**Returns**: Password reconciliation operation result
+
+**Example Usage**:
+```python
+# Reconcile account password
+await client.call_tool("reconcile_account_password", {
+    "account_id": "123_456"
+})
+```
+
+**Response Example**:
+```json
+{
+  "status": "success",
+  "message": "Password reconciliation completed"
 }
 ```
 
@@ -626,11 +672,9 @@ All tools follow consistent error handling patterns:
 ### Account Lifecycle Management
 
 ```python
-# 1. Search for existing accounts
-existing_accounts = await client.call_tool("search_accounts", {
-    "keywords": "webserver",
-    "safe_name": "Web-Servers"
-})
+# 1. Search for existing accounts via MCP resources
+existing_accounts_resource = await client.read_resource("cyberark://accounts?keywords=webserver&safe_name=Web-Servers")
+existing_accounts = json.loads(existing_accounts_resource.text)
 
 # 2. Create new account if not found
 if not existing_accounts:
@@ -653,15 +697,20 @@ else:
 account_details = await client.call_tool("get_account_details", {
     "account_id": account_id
 })
+
+# 4. Manage account password
+await client.call_tool("change_account_password", {
+    "account_id": account_id,
+    "new_password": "NewSecurePassword123!"
+})
 ```
 
 ### Safe Discovery and Analysis
 
 ```python
-# 1. List all accessible safes
-all_safes = await client.call_tool("list_safes", {
-    "sort": "safeName asc"
-})
+# 1. List all accessible safes via MCP resources
+all_safes_resource = await client.read_resource("cyberark://safes?sort=safeName+asc")
+all_safes = json.loads(all_safes_resource.text)
 
 # 2. Filter for database-related safes
 db_safes = [safe for safe in all_safes 
@@ -681,17 +730,15 @@ for safe in db_safes:
 ### Platform Configuration Review
 
 ```python
-# 1. List all active platforms
-platforms = await client.call_tool("list_platforms", {
-    "active": True
-})
+# 1. List all active platforms via MCP resources
+platforms_resource = await client.read_resource("cyberark://platforms?active=true")
+platforms = json.loads(platforms_resource.text)
 
 # 2. Get detailed configuration for each platform
 platform_configs = {}
 for platform in platforms:
-    details = await client.call_tool("get_platform_details", {
-        "platform_id": platform["ID"]
-    })
+    details_resource = await client.read_resource(f"cyberark://platforms/{platform['ID']}")
+    details = json.loads(details_resource.text)
     platform_configs[platform["ID"]] = details
 
 # 3. Analyze password policies
@@ -710,8 +757,8 @@ for platform_id, config in platform_configs.items():
 {
   "mcpServers": {
     "cyberark-privilege-cloud": {
-      "command": "python",
-      "args": ["/path/to/run_server.py"],
+      "command": "uvx",
+      "args": ["mcp-privilege-cloud"],
       "env": {
         "CYBERARK_IDENTITY_TENANT_ID": "your-tenant-id",
         "CYBERARK_CLIENT_ID": "your-client-id",
@@ -725,12 +772,13 @@ for platform_id, config in platform_configs.items():
 
 #### MCP Inspector Testing
 ```bash
-# Start server
-python run_server.py
-
-# Connect MCP Inspector
+# Connect MCP Inspector with uvx
 npx @modelcontextprotocol/inspector
-# Command: python /path/to/run_server.py
+# Command: uvx mcp-privilege-cloud
+
+# Alternative with uv run for development
+npx @modelcontextprotocol/inspector  
+# Command: uv run mcp-privilege-cloud
 ```
 
 ### Batch Operations
@@ -753,6 +801,22 @@ async def process_accounts_in_safe(safe_name):
         results.append(account_details)
     
     return results
+
+# Alternative approach using MCP resources for account discovery
+async def discover_and_process_accounts(safe_name):
+    # Discover accounts via MCP resources
+    accounts_resource = await client.read_resource(f"cyberark://accounts?safe_name={safe_name}")
+    accounts = json.loads(accounts_resource.text)
+    
+    # Process each account
+    results = []
+    for account in accounts:
+        account_details = await client.call_tool("get_account_details", {
+            "account_id": account["id"]
+        })
+        results.append(account_details)
+    
+    return results
 ```
 
 ### Error Handling Patterns
@@ -766,11 +830,10 @@ async def robust_account_creation(account_data):
         
     except Exception as e:
         if "already exists" in str(e):
-            # Search for existing account
-            existing = await client.call_tool("search_accounts", {
-                "username": account_data["user_name"],
-                "address": account_data["address"]
-            })
+            # Search for existing account via MCP resources
+            search_uri = f"cyberark://accounts?username={account_data['user_name']}&address={account_data['address']}"
+            existing_resource = await client.read_resource(search_uri)
+            existing = json.loads(existing_resource.text)
             return {"success": False, "reason": "exists", "existing": existing}
         else:
             return {"success": False, "reason": "error", "error": str(e)}

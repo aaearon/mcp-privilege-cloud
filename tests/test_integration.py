@@ -39,17 +39,17 @@ class TestIntegration:
 
     def test_server_tools_available(self):
         """Test that all expected tools are available in the MCP server"""
-        # Mock the server context to test tool availability
+        # Mock the server context to test remaining action tools
         mock_server = Mock(spec=CyberArkMCPServer)
-        mock_server.list_accounts = AsyncMock(return_value=[])
-        mock_server.search_accounts = AsyncMock(return_value=[])
-        mock_server.list_safes = AsyncMock(return_value=[])
+        mock_server.create_account = AsyncMock(return_value={})
+        mock_server.change_account_password = AsyncMock(return_value={})
+        mock_server.import_platform_package = AsyncMock(return_value={})
         
         # Verify that the mock has all expected methods
         expected_methods = [
-            'list_accounts',
-            'search_accounts',
-            'list_safes'
+            'create_account',
+            'change_account_password', 
+            'import_platform_package'
         ]
         
         for method in expected_methods:
@@ -61,14 +61,15 @@ class TestIntegration:
         
         # Mock the server and its methods
         mock_server = Mock(spec=CyberArkMCPServer)
-        mock_server.list_accounts = AsyncMock(return_value=[
-            {"id": "123", "name": "test-account", "safeName": "test-safe"}
-        ])
+        mock_server.create_account = AsyncMock(return_value={
+            "id": "123", "name": "test-account", "safeName": "test-safe"
+        })
         
         # Test that we can call the method
-        result = await mock_server.list_accounts()
-        assert len(result) == 1
-        assert result[0]["name"] == "test-account"
+        result = await mock_server.create_account(
+            platform_id="WinServerLocal", safe_name="test-safe"
+        )
+        assert result["name"] == "test-account"
 
     def test_error_handling_in_tools(self):
         """Test that tools handle errors appropriately"""
@@ -76,11 +77,13 @@ class TestIntegration:
         
         # Mock server that raises errors
         mock_server = Mock(spec=CyberArkMCPServer)
-        mock_server.list_accounts = AsyncMock(side_effect=CyberArkAPIError("Test error"))
+        mock_server.create_account = AsyncMock(side_effect=CyberArkAPIError("Test error"))
         
         # Verify that the error is propagated correctly
         with pytest.raises(CyberArkAPIError, match="Test error"):
-            asyncio.run(mock_server.list_accounts())
+            asyncio.run(mock_server.create_account(
+                platform_id="WinServerLocal", safe_name="test-safe"
+            ))
 
     @patch.dict(os.environ, {
         "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
@@ -109,8 +112,8 @@ class TestIntegration:
         assert mcp.name == "CyberArk Privilege Cloud MCP Server"
         
         # Verify that essential functions exist
-        from src.mcp_privilege_cloud.mcp_server import list_accounts
-        assert list_accounts is not None
+        from src.mcp_privilege_cloud.mcp_server import create_account
+        assert create_account is not None
 
     def test_resource_endpoints(self):
         """Test that resource endpoints are defined"""
