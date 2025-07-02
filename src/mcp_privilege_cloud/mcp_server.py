@@ -358,7 +358,7 @@ async def _read_resource_content(uri: str) -> str:
     """Read specific CyberArk resource by URI."""
     try:
         # Ensure server is initialized and set in registry
-        server = CyberArkMCPServer()
+        server = CyberArkMCPServer.from_environment()
         resource_registry.set_server(server)
         
         # Create resource instance for the URI
