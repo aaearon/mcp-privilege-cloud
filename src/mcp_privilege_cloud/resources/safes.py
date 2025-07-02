@@ -7,7 +7,8 @@ through URI-based addressing.
 
 from typing import Any, Dict, List
 
-from .base import CollectionResource, EntityResource
+from .base import BaseResource, CollectionResource, EntityResource
+from .accounts import _format_account_item
 
 
 class SafeCollectionResource(CollectionResource):
@@ -40,7 +41,7 @@ class SafeCollectionResource(CollectionResource):
                 "ole_db_enabled": safe.get("oleDbEnabled", False),
             }
             # Remove None values
-            safe_item = {k: v for k, v in safe_item.items() if v is not None}
+            safe_item = BaseResource._clean_data(safe_item)
             safe_items.append(safe_item)
         
         return safe_items
@@ -100,7 +101,7 @@ class SafeEntityResource(EntityResource):
         }
         
         # Remove None values
-        safe_data = {k: v for k, v in safe_data.items() if v is not None}
+        safe_data = BaseResource._clean_data(safe_data)
         
         return safe_data
     
@@ -133,7 +134,7 @@ class SafeAccountsResource(CollectionResource):
         # Fetch all accounts in the safe using pagination to get complete dataset
         all_accounts = []
         offset = 0
-        limit = 1000  # Use larger page size for efficiency
+        limit = 100   # Use reasonable batch size that works with CyberArk API
         
         while True:
             # Use existing list_accounts method with safe filter and pagination
@@ -150,26 +151,11 @@ class SafeAccountsResource(CollectionResource):
                 
             offset += limit
         
-        # Format accounts for resource consumption
-        account_items = []
-        for account in all_accounts:
-            account_item = {
-                "id": account.get("id"),
-                "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}",
-                "address": account.get("address"),
-                "user_name": account.get("userName"),
-                "platform_id": account.get("platformId"),
-                "safe_name": account.get("safeName"),
-                "secret_type": account.get("secretType"),
-                "status": account.get("secretManagement", {}).get("status"),
-                "last_modified": account.get("secretManagement", {}).get("lastModifiedTime"),
-                "last_verified": account.get("secretManagement", {}).get("lastVerifiedTime"),
-                "created_time": account.get("createdTime"),
-            }
-            # Remove None values
-            account_item = {k: v for k, v in account_item.items() if v is not None}
-            account_items.append(account_item)
+        # Format accounts for resource consumption using shared utility
+        account_items = [
+            _format_account_item(account, include_platform_properties=False, include_search_score=False)
+            for account in all_accounts
+        ]
         
         return account_items
     

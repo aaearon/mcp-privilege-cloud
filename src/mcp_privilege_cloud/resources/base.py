@@ -110,6 +110,36 @@ class BaseResource(ABC):
     def _format_json(self, data: Any) -> str:
         """Format data as JSON string with proper indentation."""
         return json.dumps(data, indent=2, ensure_ascii=False)
+
+    
+    @staticmethod
+    def _clean_data(data: Dict[str, Any], remove_empty_strings: bool = False, remove_empty_collections: bool = False) -> Dict[str, Any]:
+        """Clean data by removing None values and optionally empty values.
+        
+        Args:
+            data: Dictionary to clean
+            remove_empty_strings: Whether to remove empty string values
+            remove_empty_collections: Whether to remove empty lists and dicts
+            
+        Returns:
+            Cleaned dictionary with specified empty values removed
+        """
+        def should_remove(value: Any) -> bool:
+            # Always remove None values
+            if value is None:
+                return True
+                
+            # Optionally remove empty strings
+            if remove_empty_strings and value == "":
+                return True
+                
+            # Optionally remove empty collections
+            if remove_empty_collections and (value == [] or value == {}):
+                return True
+                
+            return False
+        
+        return {k: v for k, v in data.items() if not should_remove(v)}
     
     async def _handle_server_error(self, error: Exception) -> str:
         """Handle server errors and return appropriate error response."""
@@ -129,6 +159,37 @@ class CollectionResource(BaseResource):
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get the list of items in this collection."""
         pass
+
+    async def _paginate_server_call(self, server_method_call) -> List[Any]:
+        """Utility method to handle pagination for server API calls.
+        
+        Args:
+            server_method_call: A callable that takes offset and limit parameters
+                              and returns a list of results
+        
+        Returns:
+            List of all results across all pages
+        """
+        all_results = []
+        offset = 0
+        limit = 100   # Use reasonable batch size that works with CyberArk API
+        
+        while True:
+            # Call the server method with pagination parameters
+            batch_results = await server_method_call(offset=offset, limit=limit)
+            
+            if not batch_results:
+                break
+                
+            all_results.extend(batch_results)
+            
+            # If we got fewer results than the limit, we've reached the end
+            if len(batch_results) < limit:
+                break
+                
+            offset += limit
+        
+        return all_results
     
     async def get_content(self) -> str:
         """Get collection content as JSON."""

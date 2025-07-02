@@ -241,19 +241,16 @@ class TestAccountResources:
         self.mock_server.logger = MagicMock()
         
     async def test_account_collection_resource(self):
-        """Test AccountCollectionResource with nextLink pagination."""
-        # Mock the new nextLink pagination methods
-        self.mock_server.list_accounts_with_pagination.return_value = (
-            [
-                {
-                    "id": "12345",
-                    "name": "test-account",
-                    "userName": "admin",
-                    "safeName": "TestSafe"
-                }
-            ], 
-            None  # No nextLink, indicating end of results
-        )
+        """Test AccountCollectionResource with pagination."""
+        # Mock the list_accounts method to return test data when called with pagination
+        self.mock_server.list_accounts.return_value = [
+            {
+                "id": "12345",
+                "name": "test-account",
+                "userName": "admin",
+                "safeName": "TestSafe"
+            }
+        ]
         
         uri = ResourceURI("cyberark://accounts/")
         resource = AccountCollectionResource(uri, self.mock_server)
@@ -289,18 +286,15 @@ class TestAccountResources:
         assert data["data"]["secret_management"]["status"] == "success"
         
     async def test_account_search_resource(self):
-        """Test AccountSearchResource with nextLink pagination."""
-        # Mock the new nextLink search pagination method
-        self.mock_server.search_accounts_with_pagination.return_value = (
-            [
-                {
-                    "id": "12345",
-                    "name": "test-account",
-                    "_score": 0.95
-                }
-            ],
-            None  # No nextLink, indicating end of results
-        )
+        """Test AccountSearchResource with pagination."""
+        # Mock the search_accounts method to return test data when called with pagination
+        self.mock_server.search_accounts.return_value = [
+            {
+                "id": "12345",
+                "name": "test-account",
+                "_score": 0.95
+            }
+        ]
         
         uri = ResourceURI("cyberark://accounts/search?query=test")
         resource = AccountSearchResource(uri, self.mock_server)

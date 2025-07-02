@@ -7,8 +7,44 @@ URI-based addressing, including collections, individual accounts, and search.
 
 from typing import Any, Dict, List
 
-from .base import CollectionResource, EntityResource
+from .base import BaseResource, CollectionResource, EntityResource
 
+
+def _format_account_item(account: Dict[str, Any], include_platform_properties: bool = True, include_search_score: bool = False) -> Dict[str, Any]:
+    """Format account data into standardized resource format.
+    
+    Args:
+        account: Raw account data from CyberArk API
+        include_platform_properties: Whether to include platform account properties
+        include_search_score: Whether to include search relevance score
+        
+    Returns:
+        Formatted account item with consistent structure
+    """
+    account_item = {
+        "id": account.get("id"),
+        "name": account.get("name"),
+        "uri": f"cyberark://accounts/{account.get('id')}",
+        "address": account.get("address"),
+        "user_name": account.get("userName"),
+        "platform_id": account.get("platformId"),
+        "safe_name": account.get("safeName"),
+        "secret_type": account.get("secretType"),
+        "status": account.get("secretManagement", {}).get("status"),
+        "last_modified": account.get("secretManagement", {}).get("lastModifiedTime"),
+        "last_verified": account.get("secretManagement", {}).get("lastVerifiedTime"),
+        "created_time": account.get("createdTime"),
+    }
+    
+    # Add optional fields based on context
+    if include_platform_properties:
+        account_item["platform_account_properties"] = account.get("platformAccountProperties", {})
+    
+    if include_search_score:
+        account_item["search_score"] = account.get("_score")
+    
+    # Remove None values and empty dicts
+    return BaseResource._clean_data(account_item, remove_empty_collections=True)
 
 class AccountCollectionResource(CollectionResource):
     """Resource for listing all accessible accounts.
@@ -22,46 +58,13 @@ class AccountCollectionResource(CollectionResource):
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get list of all accessible accounts."""
         # Fetch all accounts using pagination to get complete dataset
-        all_accounts = []
-        offset = 0
-        limit = 1000  # Use larger page size for efficiency
+        all_accounts = await self._paginate_server_call(self.server.list_accounts)
         
-        while True:
-            # Use existing list_accounts method from the server with pagination
-            batch_accounts = await self.server.list_accounts(offset=offset, limit=limit)
-            
-            if not batch_accounts:
-                break
-                
-            all_accounts.extend(batch_accounts)
-            
-            # If we got fewer accounts than the limit, we've reached the end
-            if len(batch_accounts) < limit:
-                break
-                
-            offset += limit
-        
-        # Format accounts for resource consumption
-        account_items = []
-        for account in all_accounts:
-            account_item = {
-                "id": account.get("id"),
-                "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}",
-                "address": account.get("address"),
-                "user_name": account.get("userName"),
-                "platform_id": account.get("platformId"),
-                "safe_name": account.get("safeName"),
-                "secret_type": account.get("secretType"),
-                "status": account.get("secretManagement", {}).get("status"),
-                "last_modified": account.get("secretManagement", {}).get("lastModifiedTime"),
-                "last_verified": account.get("secretManagement", {}).get("lastVerifiedTime"),
-                "created_time": account.get("createdTime"),
-                "platform_account_properties": account.get("platformAccountProperties", {}),
-            }
-            # Remove None values and empty dicts
-            account_item = {k: v for k, v in account_item.items() if v is not None and v != {}}
-            account_items.append(account_item)
+        # Format accounts for resource consumption using shared utility
+        account_items = [
+            _format_account_item(account, include_platform_properties=True, include_search_score=False)
+            for account in all_accounts
+        ]
         
         return account_items
     
@@ -139,7 +142,7 @@ class AccountEntityResource(EntityResource):
         }
         
         # Remove None values and empty dicts
-        account_data = {k: v for k, v in account_data.items() if v is not None and v != {}}
+        account_data = BaseResource._clean_data(account_data, remove_empty_collections=True)
         
         return account_data
     
@@ -181,14 +184,9 @@ class AccountSearchResource(CollectionResource):
         address = query_params.get("address")
         platform_id = query_params.get("platform_id")
         
-        # Fetch all search results using pagination to get complete dataset
-        all_accounts = []
-        offset = 0
-        limit = 1000  # Use larger page size for efficiency
-        
-        while True:
-            # Use existing search_accounts method from the server with pagination
-            batch_accounts = await self.server.search_accounts(
+        # Create a server method call with the search parameters bound
+        async def search_call(offset: int, limit: int):
+            return await self.server.search_accounts(
                 keywords=keywords if keywords else None,
                 safe_name=safe_name,
                 username=username,
@@ -197,40 +195,15 @@ class AccountSearchResource(CollectionResource):
                 offset=offset,
                 limit=limit
             )
-            
-            if not batch_accounts:
-                break
-                
-            all_accounts.extend(batch_accounts)
-            
-            # If we got fewer accounts than the limit, we've reached the end
-            if len(batch_accounts) < limit:
-                break
-                
-            offset += limit
         
-        # Format accounts for resource consumption (same as AccountCollectionResource)
-        account_items = []
-        for account in all_accounts:
-            account_item = {
-                "id": account.get("id"),
-                "name": account.get("name"),
-                "uri": f"cyberark://accounts/{account.get('id')}",
-                "address": account.get("address"),
-                "user_name": account.get("userName"),
-                "platform_id": account.get("platformId"),
-                "safe_name": account.get("safeName"),
-                "secret_type": account.get("secretType"),
-                "status": account.get("secretManagement", {}).get("status"),
-                "last_modified": account.get("secretManagement", {}).get("lastModifiedTime"),
-                "last_verified": account.get("secretManagement", {}).get("lastVerifiedTime"),
-                "created_time": account.get("createdTime"),
-                # Add search relevance score if available
-                "search_score": account.get("_score"),
-            }
-            # Remove None values and empty dicts
-            account_item = {k: v for k, v in account_item.items() if v is not None and v != {}}
-            account_items.append(account_item)
+        # Fetch all search results using pagination to get complete dataset
+        all_accounts = await self._paginate_server_call(search_call)
+        
+        # Format accounts for resource consumption using shared utility
+        account_items = [
+            _format_account_item(account, include_platform_properties=False, include_search_score=True)
+            for account in all_accounts
+        ]
         
         return account_items
     

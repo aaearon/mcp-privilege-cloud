@@ -7,7 +7,7 @@ configurations through URI-based addressing.
 
 from typing import Any, Dict, List
 
-from .base import CollectionResource, EntityResource
+from .base import BaseResource, CollectionResource, EntityResource
 
 
 class PlatformCollectionResource(CollectionResource):
@@ -71,7 +71,7 @@ class PlatformCollectionResource(CollectionResource):
                 })
             
             # Remove None values and empty strings
-            platform_item = {k: v for k, v in platform_item.items() if v is not None and v != ""}
+            platform_item = BaseResource._clean_data(platform_item, remove_empty_strings=True)
             platform_items.append(platform_item)
         
         return platform_items
@@ -131,7 +131,7 @@ class PlatformEntityResource(EntityResource):
                     "enabled": component.get("Enabled", False),
                 }
                 # Remove None values
-                comp_data = {k: v for k, v in comp_data.items() if v is not None}
+                comp_data = BaseResource._clean_data(comp_data)
                 platform_data["connection_components"].append(comp_data)
         
         # Add properties if available
@@ -148,7 +148,7 @@ class PlatformEntityResource(EntityResource):
                     "length": prop.get("Length"),
                 }
                 # Remove None values
-                prop_data = {k: v for k, v in prop_data.items() if v is not None}
+                prop_data = BaseResource._clean_data(prop_data)
                 platform_data["properties"].append(prop_data)
         
         # Add capabilities information
@@ -167,10 +167,7 @@ class PlatformEntityResource(EntityResource):
         }
         
         # Remove None values and empty lists/dicts
-        platform_data = {
-            k: v for k, v in platform_data.items() 
-            if v is not None and v != [] and v != {}
-        }
+        platform_data = BaseResource._clean_data(platform_data, remove_empty_collections=True)
         
         return platform_data
     
