@@ -21,12 +21,29 @@ class AccountCollectionResource(CollectionResource):
     
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get list of all accessible accounts."""
-        # Use existing list_accounts method from the server
-        accounts = await self.server.list_accounts()
+        # Fetch all accounts using pagination to get complete dataset
+        all_accounts = []
+        offset = 0
+        limit = 1000  # Use larger page size for efficiency
+        
+        while True:
+            # Use existing list_accounts method from the server with pagination
+            batch_accounts = await self.server.list_accounts(offset=offset, limit=limit)
+            
+            if not batch_accounts:
+                break
+                
+            all_accounts.extend(batch_accounts)
+            
+            # If we got fewer accounts than the limit, we've reached the end
+            if len(batch_accounts) < limit:
+                break
+                
+            offset += limit
         
         # Format accounts for resource consumption
         account_items = []
-        for account in accounts:
+        for account in all_accounts:
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),
@@ -164,18 +181,37 @@ class AccountSearchResource(CollectionResource):
         address = query_params.get("address")
         platform_id = query_params.get("platform_id")
         
-        # Use existing search_accounts method from the server
-        accounts = await self.server.search_accounts(
-            keywords=keywords if keywords else None,
-            safe_name=safe_name,
-            username=username,
-            address=address,
-            platform_id=platform_id
-        )
+        # Fetch all search results using pagination to get complete dataset
+        all_accounts = []
+        offset = 0
+        limit = 1000  # Use larger page size for efficiency
+        
+        while True:
+            # Use existing search_accounts method from the server with pagination
+            batch_accounts = await self.server.search_accounts(
+                keywords=keywords if keywords else None,
+                safe_name=safe_name,
+                username=username,
+                address=address,
+                platform_id=platform_id,
+                offset=offset,
+                limit=limit
+            )
+            
+            if not batch_accounts:
+                break
+                
+            all_accounts.extend(batch_accounts)
+            
+            # If we got fewer accounts than the limit, we've reached the end
+            if len(batch_accounts) < limit:
+                break
+                
+            offset += limit
         
         # Format accounts for resource consumption (same as AccountCollectionResource)
         account_items = []
-        for account in accounts:
+        for account in all_accounts:
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),

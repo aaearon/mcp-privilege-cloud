@@ -130,12 +130,29 @@ class SafeAccountsResource(CollectionResource):
         if not safe_name:
             raise ValueError("Safe name is required for safe accounts resource")
         
-        # Use existing list_accounts method with safe filter
-        accounts = await self.server.list_accounts(safe_name=safe_name)
+        # Fetch all accounts in the safe using pagination to get complete dataset
+        all_accounts = []
+        offset = 0
+        limit = 1000  # Use larger page size for efficiency
+        
+        while True:
+            # Use existing list_accounts method with safe filter and pagination
+            batch_accounts = await self.server.list_accounts(safe_name=safe_name, offset=offset, limit=limit)
+            
+            if not batch_accounts:
+                break
+                
+            all_accounts.extend(batch_accounts)
+            
+            # If we got fewer accounts than the limit, we've reached the end
+            if len(batch_accounts) < limit:
+                break
+                
+            offset += limit
         
         # Format accounts for resource consumption
         account_items = []
-        for account in accounts:
+        for account in all_accounts:
             account_item = {
                 "id": account.get("id"),
                 "name": account.get("name"),
