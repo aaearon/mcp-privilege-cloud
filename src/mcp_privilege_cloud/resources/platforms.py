@@ -22,10 +22,7 @@ class PlatformCollectionResource(CollectionResource):
     async def get_items(self) -> List[Dict[str, Any]]:
         """Get list of all available platforms."""
         # Use existing list_platforms method from the server
-        platforms_result = await self.server.list_platforms()
-        
-        # Extract platforms from the result - note this uses "Platforms" not "value"
-        platforms = platforms_result.get("Platforms", [])
+        platforms = await self.server.list_platforms()
         
         # Format platforms for resource consumption
         platform_items = []
