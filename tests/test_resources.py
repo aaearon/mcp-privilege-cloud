@@ -168,15 +168,16 @@ class TestSafeResources:
         
     async def test_safe_collection_resource(self):
         """Test SafeCollectionResource."""
-        self.mock_server.list_safes.return_value = {
-            "value": [
+        # Mock the async list_safes method to return a list directly
+        async def mock_list_safes():
+            return [
                 {
                     "safeName": "TestSafe",
                     "description": "Test safe",
                     "creationTime": "2024-01-01T00:00:00Z"
                 }
             ]
-        }
+        self.mock_server.list_safes = mock_list_safes
         
         uri = ResourceURI("cyberark://safes/")
         resource = SafeCollectionResource(uri, self.mock_server)
@@ -209,8 +210,9 @@ class TestSafeResources:
         
     async def test_safe_accounts_resource(self):
         """Test SafeAccountsResource."""
-        self.mock_server.list_accounts.return_value = {
-            "value": [
+        # Mock the list_accounts method with pagination parameters
+        async def mock_list_accounts(safe_name=None, offset=0, limit=100):
+            return [
                 {
                     "id": "12345",
                     "name": "test-account",
@@ -218,7 +220,7 @@ class TestSafeResources:
                     "userName": "admin"
                 }
             ]
-        }
+        self.mock_server.list_accounts = mock_list_accounts
         
         uri = ResourceURI("cyberark://safes/TestSafe/accounts/")
         resource = SafeAccountsResource(uri, self.mock_server)
@@ -228,7 +230,7 @@ class TestSafeResources:
         
         assert data["type"] == "collection"
         assert data["items"][0]["name"] == "test-account"
-        assert data["items"][0]["uri"] == "cyberark://accounts/12345/"
+        assert data["items"][0]["uri"] == "cyberark://accounts/12345"
 
 
 class TestAccountResources:
@@ -237,19 +239,20 @@ class TestAccountResources:
     def setup_method(self):
         """Set up test account resources."""
         self.mock_server = AsyncMock()
+        # Mock the logger to avoid warnings
+        self.mock_server.logger = MagicMock()
         
     async def test_account_collection_resource(self):
-        """Test AccountCollectionResource."""
-        self.mock_server.list_accounts.return_value = {
-            "value": [
-                {
-                    "id": "12345",
-                    "name": "test-account",
-                    "userName": "admin",
-                    "safeName": "TestSafe"
-                }
-            ]
-        }
+        """Test AccountCollectionResource with pagination."""
+        # Mock the list_accounts method to return test data when called with pagination
+        self.mock_server.list_accounts.return_value = [
+            {
+                "id": "12345",
+                "name": "test-account",
+                "userName": "admin",
+                "safeName": "TestSafe"
+            }
+        ]
         
         uri = ResourceURI("cyberark://accounts/")
         resource = AccountCollectionResource(uri, self.mock_server)
@@ -285,16 +288,15 @@ class TestAccountResources:
         assert data["data"]["secret_management"]["status"] == "success"
         
     async def test_account_search_resource(self):
-        """Test AccountSearchResource."""
-        self.mock_server.search_accounts.return_value = {
-            "value": [
-                {
-                    "id": "12345",
-                    "name": "test-account",
-                    "_score": 0.95
-                }
-            ]
-        }
+        """Test AccountSearchResource with pagination."""
+        # Mock the search_accounts method to return test data when called with pagination
+        self.mock_server.search_accounts.return_value = [
+            {
+                "id": "12345",
+                "name": "test-account",
+                "_score": 0.95
+            }
+        ]
         
         uri = ResourceURI("cyberark://accounts/search?query=test")
         resource = AccountSearchResource(uri, self.mock_server)
@@ -315,16 +317,29 @@ class TestPlatformResources:
         
     async def test_platform_collection_resource(self):
         """Test PlatformCollectionResource."""
-        self.mock_server.list_platforms.return_value = {
-            "Platforms": [
-                {
-                    "PlatformID": "WinServerLocal",
-                    "Name": "Windows Server Local",
-                    "SystemType": "Windows",
-                    "Active": True
+        self.mock_server.list_platforms.return_value = [
+            {
+                "general": {
+                    "id": "WinServerLocal",
+                    "name": "Windows Server Local",
+                    "systemType": "Windows",
+                    "active": True,
+                    "description": "Windows Server for local accounts",
+                    "platformBaseID": "WinServerLocal",
+                    "platformType": "Regular"
+                },
+                "credentialsManagement": {
+                    "allowManualChange": True,
+                    "performPeriodicChange": False,
+                    "allowManualVerification": True
+                },
+                "sessionManagement": {
+                    "requirePrivilegedSessionMonitoringAndIsolation": True,
+                    "recordAndSaveSessionActivity": True,
+                    "PSMServerID": "PSMServer_1"
                 }
-            ]
-        }
+            }
+        ]
         
         uri = ResourceURI("cyberark://platforms/")
         resource = PlatformCollectionResource(uri, self.mock_server)
