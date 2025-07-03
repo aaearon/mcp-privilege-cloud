@@ -1,13 +1,13 @@
 import pytest
 import httpx
-from unittest.mock import Mock, AsyncMock, patch, mock_open
+from unittest.mock import Mock, AsyncMock, MagicMock, patch, mock_open
 from datetime import datetime, timedelta
 import os
 import asyncio
 import base64
 
 from src.mcp_privilege_cloud.auth import CyberArkAuthenticator, AuthenticationError
-from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
 
 
 class TestAuthentication:
@@ -1210,3 +1210,630 @@ class TestPlatformManagement:
                 platform_server._make_api_request.assert_called_with(
                     "POST", "Platforms/Import", json={"ImportFile": expected_b64}
                 )
+
+
+class TestPlatformDetailsAPI:
+    """Test class for enhanced platform details API functionality"""
+    
+    @pytest.fixture
+    def mock_config(self):
+        """Mock configuration for testing"""
+        return {
+            'subdomain': 'test',
+            'client_id': 'test-client',
+            'client_secret': 'test-secret',
+            'tenant_id': 'test-tenant'
+        }
+    
+    @pytest.fixture  
+    def mock_authenticator(self):
+        """Mock authenticator for testing"""
+        mock_auth = Mock()
+        mock_auth.get_auth_header.return_value = {"Authorization": "Bearer test-token"}
+        return mock_auth
+    
+    @pytest.fixture
+    def server(self, mock_config, mock_authenticator):
+        """Create server instance for testing"""
+        server = CyberArkMCPServer(
+            authenticator=mock_authenticator,
+            subdomain=mock_config['subdomain']
+        )
+        return server
+
+    @pytest.mark.asyncio
+    async def test_get_platform_details_success(self, server):
+        """Test successful retrieval of platform details with comprehensive configuration"""
+        platform_id = "WinServerLocal"
+        
+        # Mock comprehensive platform response with Policy INI fields
+        mock_response = {
+            "id": "WinServerLocal",
+            "name": "Windows Server Local",
+            "platformType": "Regular", 
+            "active": True,
+            "systemType": "Windows",
+            "description": "Windows Server Local Accounts",
+            "details": {
+                # Policy INI Properties - comprehensive set
+                "credentialsManagementPolicy": {
+                    "change": "on",
+                    "changeFrequency": 90,
+                    "reconcile": "on", 
+                    "verify": "on",
+                    "verifyFrequency": 7,
+                    "cpmDisabled": "off",
+                    "allowSelectNewPassword": "on",
+                    "enforcePasswordPolicy": "on",
+                    "passwordLength": 12,
+                    "minimumPasswordAge": 1,
+                    "passwordComplexity": "on",
+                    "twoFactorAuthentication": "off"
+                },
+                "sessionManagementPolicy": {
+                    "requirePrivilegedSessionMonitoring": True,
+                    "recordPrivilegedSession": True,
+                    "psmServerID": "PSM_SERVER",
+                    "allowSelectPSMServer": False,
+                    "recordingDuration": 60,
+                    "suspendAccountIfRecordingFails": True
+                },
+                "privilegedAccessWorkflows": {
+                    "requireUsersToSpecifyReasonForAccess": False,
+                    "requireDualControlPasswordAccessApproval": False, 
+                    "enforceCheckinCheckoutExclusiveAccess": True,
+                    "requireAccessRequestApproval": False,
+                    "autoApproveAccessRequestInEmergency": True
+                },
+                "connectionComponents": [
+                    {
+                        "id": "PSM-RDP",
+                        "name": "PSM-RDP", 
+                        "enabled": True,
+                        "connectionMethod": "RDP"
+                    }
+                ],
+                # Additional Policy INI fields
+                "policySettings": {
+                    "searchForUsers": 300,
+                    "searchForGroups": 300,
+                    "timeout": 30,
+                    "retries": 3,
+                    "minValidityPeriod": 60,
+                    "resetOveridesMinValidity": "yes",
+                    "resetOveridesTimeFrame": "yes"
+                },
+                "uiSettings": {
+                    "showChangeButton": True,
+                    "showVerifyButton": True,
+                    "showReconcileButton": True,
+                    "showCopyButton": True
+                }
+            }
+        }
+        
+        with patch.object(server, '_make_api_request', return_value=mock_response) as mock_request:
+            result = await server.get_platform_details(platform_id)
+            
+            # Verify API call
+            mock_request.assert_called_once_with("GET", f"Platforms/{platform_id}")
+            
+            # Verify comprehensive response structure
+            assert result["id"] == platform_id
+            assert result["name"] == "Windows Server Local" 
+            assert result["platformType"] == "Regular"
+            assert result["active"] is True
+            assert result["systemType"] == "Windows"
+            
+            # Verify Policy INI fields are present
+            details = result["details"]
+            assert "credentialsManagementPolicy" in details
+            assert "sessionManagementPolicy" in details
+            assert "privilegedAccessWorkflows" in details
+            assert "connectionComponents" in details
+            assert "policySettings" in details
+            assert "uiSettings" in details
+            
+            # Verify specific policy values
+            cmp = details["credentialsManagementPolicy"]
+            assert cmp["change"] == "on"
+            assert cmp["changeFrequency"] == 90
+            assert cmp["passwordLength"] == 12
+            
+            smp = details["sessionManagementPolicy"]
+            assert smp["requirePrivilegedSessionMonitoring"] is True
+            assert smp["psmServerID"] == "PSM_SERVER"
+            
+            # Verify connection components
+            assert len(details["connectionComponents"]) == 1
+            assert details["connectionComponents"][0]["id"] == "PSM-RDP"
+
+    @pytest.mark.asyncio 
+    async def test_get_platform_details_not_found(self, server):
+        """Test get_platform_details with non-existent platform ID returns proper 404 handling"""
+        platform_id = "NonExistentPlatform"
+        
+        # Mock 404 response
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = "Platform not found"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.side_effect = CyberArkAPIError("Platform not found", 404)
+            
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            assert exc_info.value.status_code == 404
+            assert "does not exist or is not accessible" in str(exc_info.value)
+            mock_request.assert_called_once_with("GET", f"Platforms/{platform_id}")
+
+    @pytest.mark.asyncio
+    async def test_get_platform_details_unauthorized(self, server):
+        """Test get_platform_details with insufficient permissions returns proper 403 handling"""
+        platform_id = "RestrictedPlatform"
+        
+        # Mock 403 response  
+        mock_response = Mock()
+        mock_response.status_code = 403
+        mock_response.text = "Insufficient privileges to access platform details"
+        
+        with patch.object(server, '_make_api_request') as mock_request:
+            mock_request.side_effect = CyberArkAPIError("Insufficient privileges", 403)
+            
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            assert exc_info.value.status_code == 403
+            assert "Access denied" in str(exc_info.value)
+            mock_request.assert_called_once_with("GET", f"Platforms/{platform_id}")
+
+
+class TestConcurrentPlatformFetching:
+    """Test concurrent platform fetching functionality for performance optimization."""
+    
+    @pytest.fixture
+    def mock_config(self):
+        """Mock configuration for testing"""
+        return {
+            'subdomain': 'test',
+            'client_id': 'test-client',
+            'client_secret': 'test-secret',
+            'tenant_id': 'test-tenant'
+        }
+    
+    @pytest.fixture  
+    def mock_authenticator(self):
+        """Mock authenticator for testing"""
+        mock_auth = Mock()
+        mock_auth.get_auth_header.return_value = {"Authorization": "Bearer test-token"}
+        return mock_auth
+    
+    @pytest.fixture
+    def server(self, mock_config, mock_authenticator):
+        """Create server instance for testing"""
+        server = CyberArkMCPServer(
+            authenticator=mock_authenticator,
+            subdomain=mock_config['subdomain']
+        )
+        return server
+        
+    @pytest.mark.asyncio
+    async def test_concurrent_platform_details_basic_functionality(self, server):
+        """Test that concurrent platform details fetching works correctly."""
+        # Arrange - Mock successful platform list and details responses
+        mock_platforms = [
+            {"id": "WinServerLocal", "name": "Windows Server Local"},
+            {"id": "UnixSSH", "name": "Unix via SSH"},
+            {"id": "WinDomainAccount", "name": "Windows Domain Account"}
+        ]
+        
+        # Mock platform details for each platform
+        mock_details = {
+            "WinServerLocal": {"id": "WinServerLocal", "name": "Windows Server Local", "details": {"policy": "win_policy"}},
+            "UnixSSH": {"id": "UnixSSH", "name": "Unix via SSH", "details": {"policy": "unix_policy"}},
+            "WinDomainAccount": {"id": "WinDomainAccount", "name": "Windows Domain Account", "details": {"policy": "domain_policy"}}
+        }
+        
+        # Configure mocks
+        with patch.object(server, 'list_platforms', return_value=mock_platforms) as mock_list:
+            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id, platform_basic=None: mock_details[platform_id]) as mock_get_complete:
+                # Act - Call concurrent platform fetching
+                result = await server.list_platforms_with_details()
+                
+                # Assert - Verify all platforms returned with details
+                assert len(result) == 3
+                assert all(platform["id"] in ["WinServerLocal", "UnixSSH", "WinDomainAccount"] for platform in result)
+                assert all("details" in platform for platform in result)
+                
+                # Verify concurrent execution occurred (all platforms should be fetched)
+                assert mock_list.call_count == 1
+                assert mock_get_complete.call_count == 3
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_platform_details_with_filtering(self, server):
+        """Test concurrent fetching with search/filter parameters."""
+        # Arrange
+        mock_platforms = [
+            {"id": "WinServerLocal", "name": "Windows Server Local"},
+            {"id": "UnixSSH", "name": "Unix via SSH"}
+        ]
+        
+        mock_details = {
+            "WinServerLocal": {"id": "WinServerLocal", "name": "Windows Server Local", "details": {"policy": "win_policy"}},
+            "UnixSSH": {"id": "UnixSSH", "name": "Unix via SSH", "details": {"policy": "unix_policy"}}
+        }
+        
+        # Configure mocks
+        with patch.object(server, 'list_platforms', return_value=mock_platforms) as mock_list:
+            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id, platform_basic=None: mock_details[platform_id]) as mock_get_complete:
+                # Act - Call with search parameter
+                result = await server.list_platforms_with_details(search="Windows")
+                
+                # Assert - Should pass search parameter to list_platforms
+                assert len(result) == 2  # Should return filtered results with details
+                mock_list.assert_called_once_with(search="Windows")
+                assert mock_get_complete.call_count == 2
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_platform_details_partial_failure_handling(self, server):
+        """Test graceful handling of partial failures in concurrent requests."""
+        # Arrange - Some platforms fail to get details
+        mock_platforms = [
+            {"id": "WinServerLocal", "name": "Windows Server Local"},
+            {"id": "UnixSSH", "name": "Unix via SSH"},
+            {"id": "FailingPlatform", "name": "Failing Platform"}
+        ]
+        
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
+            if platform_id == "FailingPlatform":
+                raise CyberArkAPIError("Platform details unavailable", 403)
+            return {
+                "id": platform_id,
+                "name": f"Details for {platform_id}",
+                "details": {"policy": f"{platform_id}_policy"}
+            }
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms):
+            with patch.object(server, 'get_complete_platform_info', side_effect=mock_get_complete_platform_info):
+                # Act
+                result = await server.list_platforms_with_details()
+                
+                # Assert - Should return successful platforms, skip failed ones
+                assert len(result) == 2  # Only successful platforms
+                successful_ids = [p["id"] for p in result]
+                assert "WinServerLocal" in successful_ids
+                assert "UnixSSH" in successful_ids
+                assert "FailingPlatform" not in successful_ids
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_platform_details_concurrency_limit(self, server):
+        """Test that concurrent requests are properly limited to avoid rate limiting."""
+        # Arrange - Create many platforms to test batch processing
+        mock_platforms = [{"id": f"Platform{i}", "name": f"Platform {i}"} for i in range(15)]
+        
+        call_times = []
+        
+        async def mock_get_complete_platform_info(platform_id, platform_basic=None):
+            call_times.append(asyncio.get_event_loop().time())
+            # Simulate API delay
+            await asyncio.sleep(0.1)
+            return {"id": platform_id, "name": f"Details for {platform_id}"}
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms):
+            with patch.object(server, 'get_complete_platform_info', side_effect=mock_get_complete_platform_info):
+                # Act
+                start_time = asyncio.get_event_loop().time()
+                result = await server.list_platforms_with_details()
+                end_time = asyncio.get_event_loop().time()
+                
+                # Assert - Should complete in reasonable time due to concurrency
+                # With 15 platforms, concurrency limit of 10, and 0.1s delay:
+                # Sequential would take ~1.5s, concurrent should take ~0.2s (2 batches)
+                execution_time = end_time - start_time
+                assert execution_time < 0.5  # Should be much faster than sequential
+                assert len(result) == 15
+                
+                # Verify not all requests started at exactly the same time (batching)
+                # But also not completely sequential
+                assert len(call_times) == 15
+                time_range = max(call_times) - min(call_times)
+                assert 0.05 < time_range < 0.3  # Some spread due to batching, but not too much
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_platform_details_empty_platform_list(self, server):
+        """Test concurrent fetching with empty platform list."""
+        # Arrange
+        with patch.object(server, 'list_platforms', return_value=[]) as mock_list:
+            # Act
+            result = await server.list_platforms_with_details()
+            
+            # Assert
+            assert result == []
+            assert mock_list.call_count == 1
+    
+    @pytest.mark.asyncio 
+    async def test_concurrent_platform_details_preserve_error_semantics(self, server):
+        """Test that list_platforms errors are properly propagated."""
+        # Arrange - list_platforms fails
+        with patch.object(server, 'list_platforms', side_effect=CyberArkAPIError("Authentication failed", 401)):
+            # Act & Assert - Should propagate the error
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.list_platforms_with_details()
+            
+            assert exc_info.value.status_code == 401
+            assert "Authentication failed" in str(exc_info.value)
+
+
+class TestPlatformErrorHandling:
+    """Test error handling for platform operations - Task A4."""
+    
+    @pytest.fixture
+    def mock_config(self):
+        """Mock configuration for testing"""
+        return {
+            'subdomain': 'test',
+            'client_id': 'test-client',
+            'client_secret': 'test-secret',
+            'tenant_id': 'test-tenant'
+        }
+    
+    @pytest.fixture  
+    def mock_authenticator(self):
+        """Mock authenticator for testing"""
+        mock_auth = Mock()
+        mock_auth.get_auth_header.return_value = {"Authorization": "Bearer test-token"}
+        return mock_auth
+    
+    @pytest.fixture
+    def server(self, mock_config, mock_authenticator):
+        """Create server instance for testing"""
+        server = CyberArkMCPServer(
+            authenticator=mock_authenticator,
+            subdomain=mock_config['subdomain']
+        )
+        return server
+    
+    @pytest.mark.asyncio
+    async def test_platform_details_404_error(self, server):
+        """Test handling of 404 errors when platform details are not found."""
+        platform_id = "NonExistentPlatform"
+        
+        # Mock the API request method directly to return 404
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Platform not found", 404)):
+            # This should raise with appropriate error handling
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            assert exc_info.value.status_code == 404
+            assert platform_id in str(exc_info.value)
+    
+    @pytest.mark.asyncio
+    async def test_platform_details_403_error(self, server):
+        """Test handling of 403 errors when platform details access is forbidden."""
+        platform_id = "RestrictedPlatform"
+        
+        # Mock the API request method directly to return 403
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Insufficient permissions", 403)):
+            # This should raise with appropriate error handling
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            assert exc_info.value.status_code == 403
+            assert "Administrator role" in str(exc_info.value)
+    
+    @pytest.mark.asyncio
+    async def test_get_complete_platform_info_graceful_degradation_404(self, server):
+        """Test graceful degradation in get_complete_platform_info when platform details return 404."""
+        platform_id = "NonExistentPlatform"
+        
+        # Mock successful basic platform list that includes our platform
+        mock_platforms_list = [{"id": platform_id, "name": "Non-existent Platform", "systemType": "Windows"}]
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms_list):
+            with patch.object(server, 'get_platform_details', side_effect=CyberArkAPIError("Platform not found", 404)):
+                
+                # This should gracefully degrade to basic info only (already implemented)
+                result = await server.get_complete_platform_info(platform_id)
+                
+                # Should return basic platform info without failing
+                assert result["id"] == platform_id
+                assert result["name"] == "Non-existent Platform"
+                assert result["systemType"] == "Windows"
+    
+    @pytest.mark.asyncio
+    async def test_get_complete_platform_info_graceful_degradation_403(self, server):
+        """Test graceful degradation in get_complete_platform_info when platform details return 403."""
+        platform_id = "RestrictedPlatform"
+        
+        # Mock successful basic platform list that includes our platform
+        mock_platforms_list = [{"id": platform_id, "name": "Restricted Platform", "systemType": "Unix"}]
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms_list):
+            with patch.object(server, 'get_platform_details', side_effect=CyberArkAPIError("Insufficient permissions", 403)):
+                
+                # This should gracefully degrade to basic info only (already implemented)
+                result = await server.get_complete_platform_info(platform_id)
+                
+                # Should return basic platform info without failing
+                assert result["id"] == platform_id
+                assert result["name"] == "Restricted Platform"
+                assert result["systemType"] == "Unix"
+    
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_details_partial_failure_graceful_degradation(self, server):
+        """Test graceful degradation in list_platforms_with_details when some platform details fail."""
+        # Mock platform list with 3 platforms
+        mock_platforms = [
+            {"id": "WorkingPlatform1", "name": "Working Platform 1"},
+            {"id": "FailingPlatform", "name": "Failing Platform"}, 
+            {"id": "WorkingPlatform2", "name": "Working Platform 2"}
+        ]
+        
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
+            if platform_id == "FailingPlatform":
+                raise CyberArkAPIError("Insufficient permissions", 403)
+            return {
+                "id": platform_id,
+                "name": f"Complete info for {platform_id}",
+                "details": {"some": "details"}
+            }
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms):
+            with patch.object(server, 'get_complete_platform_info', side_effect=mock_get_complete_platform_info):
+                
+                # This should now handle graceful degradation (already implemented)
+                result = await server.list_platforms_with_details()
+                
+                # Should return successful platforms only, excluding the failing one
+                assert len(result) == 2
+                successful_ids = [p["id"] for p in result]
+                assert "WorkingPlatform1" in successful_ids
+                assert "WorkingPlatform2" in successful_ids
+                assert "FailingPlatform" not in successful_ids
+    
+    @pytest.mark.asyncio
+    async def test_list_platforms_with_details_mixed_error_types(self, server):
+        """Test handling of mixed error types (404, 403, network errors) in batch operations."""
+        # Mock platform list with various error scenarios
+        mock_platforms = [
+            {"id": "Platform404", "name": "Platform returning 404"},
+            {"id": "Platform403", "name": "Platform returning 403"},
+            {"id": "PlatformNetwork", "name": "Platform with network error"},
+            {"id": "PlatformSuccess", "name": "Successful Platform"}
+        ]
+        
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
+            if platform_id == "Platform404":
+                raise CyberArkAPIError("Platform not found", 404)
+            elif platform_id == "Platform403":
+                raise CyberArkAPIError("Insufficient permissions", 403)
+            elif platform_id == "PlatformNetwork":
+                raise Exception("Network connection failed")  # Generic network error
+            else:  # PlatformSuccess
+                return {
+                    "id": platform_id,
+                    "name": f"Complete info for {platform_id}",
+                    "details": {"some": "details"}
+                }
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms):
+            with patch.object(server, 'get_complete_platform_info', side_effect=mock_get_complete_platform_info):
+                
+                # This should handle all error types gracefully (already implemented)
+                result = await server.list_platforms_with_details()
+                
+                # Should return only successful platform
+                assert len(result) == 1
+                assert result[0]["id"] == "PlatformSuccess"
+    
+    @pytest.mark.asyncio
+    async def test_error_logging_for_troubleshooting(self, server):
+        """Test that appropriate error logging is performed for troubleshooting."""
+        platform_id = "FailingPlatform"
+        
+        # Mock the API request method to return 403
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Access denied", 403)):
+            # Mock logging to capture log messages
+            with patch.object(server, 'logger') as mock_logger:
+                
+                with pytest.raises(CyberArkAPIError):
+                    await server.get_platform_details(platform_id)
+                
+                # Verify appropriate log messages were generated
+                mock_logger.warning.assert_called()
+                log_message = mock_logger.warning.call_args[0][0]
+                assert "privileges" in log_message.lower()
+                assert platform_id in log_message
+    
+    @pytest.mark.asyncio
+    async def test_enhanced_error_messages_for_404(self, server):
+        """Test that 404 errors provide helpful context."""
+        platform_id = "MissingPlatform"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Not found", 404)):
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            error_message = str(exc_info.value)
+            assert platform_id in error_message
+            assert "does not exist" in error_message or "not accessible" in error_message
+    
+    @pytest.mark.asyncio
+    async def test_enhanced_error_messages_for_403(self, server):
+        """Test that 403 errors provide helpful context about permissions."""
+        platform_id = "RestrictedPlatform"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Forbidden", 403)):
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            error_message = str(exc_info.value)
+            assert platform_id in error_message
+            assert "Administrator role" in error_message
+
+    
+    @pytest.mark.asyncio
+    async def test_input_validation_error_handling(self, server):
+        """Test input validation in error handling methods."""
+        # Test empty platform_id
+        with pytest.raises(ValueError) as exc_info:
+            await server.get_platform_details("")
+        assert "Invalid platform_id" in str(exc_info.value)
+        
+        # Test None platform_id
+        with pytest.raises(ValueError) as exc_info:
+            await server.get_platform_details(None)
+        assert "Invalid platform_id" in str(exc_info.value)
+        
+        # Test non-string platform_id
+        with pytest.raises(ValueError) as exc_info:
+            await server.get_platform_details(123)
+        assert "Invalid platform_id" in str(exc_info.value)
+    
+    @pytest.mark.asyncio
+    async def test_rate_limiting_error_handling(self, server):
+        """Test handling of 429 rate limiting errors."""
+        platform_id = "RateLimitedPlatform"
+        
+        with patch.object(server, '_make_api_request', side_effect=CyberArkAPIError("Rate limit exceeded", 429)):
+            with pytest.raises(CyberArkAPIError) as exc_info:
+                await server.get_platform_details(platform_id)
+            
+            assert exc_info.value.status_code == 429
+            assert "Rate limit" in str(exc_info.value)
+            assert "retry after a delay" in str(exc_info.value)
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_error_resilience(self, server):
+        """Test that concurrent operations handle mixed success/failure gracefully."""
+        # Create a large mix of platforms with different error types
+        mock_platforms = []
+        for i in range(20):
+            if i % 4 == 0:
+                mock_platforms.append({"id": f"Success{i}", "name": f"Success Platform {i}"})
+            elif i % 4 == 1:
+                mock_platforms.append({"id": f"NotFound{i}", "name": f"Not Found Platform {i}"})
+            elif i % 4 == 2:
+                mock_platforms.append({"id": f"Forbidden{i}", "name": f"Forbidden Platform {i}"})
+            else:
+                mock_platforms.append({"id": f"Error{i}", "name": f"Error Platform {i}"})
+        
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
+            if "Success" in platform_id:
+                return {"id": platform_id, "name": f"Complete {platform_id}", "details": {"data": "success"}}
+            elif "NotFound" in platform_id:
+                raise CyberArkAPIError("Not found", 404)
+            elif "Forbidden" in platform_id:
+                raise CyberArkAPIError("Forbidden", 403)
+            else:
+                raise Exception("Unexpected error")
+        
+        with patch.object(server, 'list_platforms', return_value=mock_platforms):
+            with patch.object(server, 'get_complete_platform_info', side_effect=mock_get_complete_platform_info):
+                result = await server.list_platforms_with_details()
+                
+                # Should get only the successful platforms (every 4th one)
+                assert len(result) == 5  # 20/4 = 5 successful platforms
+                for platform in result:
+                    assert "Success" in platform["id"]

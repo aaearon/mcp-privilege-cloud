@@ -194,16 +194,28 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
 #### Platform Collection Resource
 - **URI**: `cyberark://platforms/`
 - **Type**: Collection Resource
-- **Description**: Lists all available platforms for account management
-- **Supports**: Filtering by system type, active status
+- **Description**: Lists all available platforms for account management with **enhanced complete information**
+- **Supports**: Filtering by system type, active status, advanced search
+- **Enhanced Features**: 
+  - Complete platform policy settings
+  - Connection component details
+  - Privileged access workflow configuration
+  - Raw API data preservation (no field transformations)
+  - Graceful fallback to basic information if enhanced features unavailable
 
-**Example Response**:
+**Example Enhanced Response**:
 ```json
 {
   "uri": "cyberark://platforms/",
   "type": "collection",
   "category": "platforms",
-  "count": 5,
+  "count": 2,
+  "metadata": {
+    "supports_complete_info": true,
+    "data_source": "cyberark_platforms_api_enhanced",
+    "enhanced_fields": ["policy_id", "general_settings", "connection_components", "privileged_access_workflows"],
+    "field_conversion": "none - preserves raw API data exactly"
+  },
   "items": [
     {
       "id": "WinServerLocal",
@@ -211,7 +223,34 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
       "uri": "cyberark://platforms/WinServerLocal/",
       "system_type": "Windows",
       "active": true,
-      "privileged_session_management": true
+      "policy_id": "WinServerLocal",
+      "policy_name": "Windows Server Local",
+      "general_settings": {
+        "allow_manual_change": true,
+        "perform_periodic_change": false,
+        "require_password_change_every_x_days": 90,
+        "enforce_checkin_exclusive_password": true
+      },
+      "connection_components": [
+        {
+          "psm_server_id": "PSM01",
+          "name": "PSM-RDP",
+          "connection_method": "RDP",
+          "enabled": true,
+          "user_role": "Administrator",
+          "parameters": {
+            "allow_mapping_local_drives": "Yes",
+            "audio_redirection": "Yes"
+          }
+        }
+      ],
+      "privileged_access_workflows": {
+        "require_dual_control_password_access_approval": false,
+        "enforce_checkin_exclusive_password": true,
+        "require_users_to_specify_reason_for_access": true
+      },
+      "privileged_session_management": true,
+      "record_sessions": true
     }
   ]
 }
@@ -317,6 +356,61 @@ Common error types:
 - `resource_not_found` - URI pattern not recognized
 - `resource_read_error` - Error reading resource content
 - `server_error` - CyberArk API or authentication error
+
+## Raw API Data Preservation
+
+### Overview
+
+The CyberArk MCP Server preserves all API data exactly as returned by CyberArk APIs, ensuring complete fidelity and data integrity. No field name conversions, value transformations, or data modifications are applied.
+
+### Key Principles
+
+#### Complete Data Fidelity
+- **No Field Name Conversion**: Original CamelCase field names preserved exactly (e.g., `PSMServerID`, `PolicyType`)
+- **No Value Transformation**: All values preserved as returned by API (`"Yes"` stays `"Yes"`, `"12"` stays `"12"`)
+- **Complete Data Integrity**: Empty/null values, special characters, and all original formatting preserved
+- **API Response Fidelity**: Zero modification of CyberArk API responses
+
+#### Raw Data Examples
+
+**Original CyberArk API Response** (preserved exactly):
+```json
+{
+  "id": "WinServerLocal",
+  "name": "Windows Server Local",
+  "systemType": "Windows",
+  "active": true,
+  "PolicyID": "WinServerLocal",
+  "PolicyName": "Windows Server Local",
+  "PSMServerID": "PSMServer_abc123",
+  "AllowManualChange": "Yes",
+  "RequirePasswordChangeEveryXDays": "90",
+  "PasswordLength": "12",
+  "ResetOveridesMinValidity": "Yes",
+  "FromHour": "-1",
+  "platformBaseID": "WinDomain"
+}
+```
+
+### Benefits of Raw Data Preservation
+
+#### Data Integrity
+- **Complete Information**: No data loss through transformation
+- **Original Context**: Field names and values maintain CyberArk context
+- **Debugging Capability**: Easier to correlate with CyberArk documentation
+- **API Consistency**: Direct correlation with CyberArk API responses
+
+#### Performance Benefits
+- **Zero Transformation Overhead**: No processing time spent on field conversion
+- **Memory Efficiency**: No duplicate field storage
+- **Reduced Complexity**: Simpler data pipeline
+- **Faster Processing**: Direct API response handling
+
+#### Client Flexibility
+- **Client-Side Control**: Clients can apply their own transformations if needed
+- **Multiple Client Support**: Different clients can handle data differently
+- **Future Compatibility**: Changes to transformation logic don't affect data
+- **Original Documentation**: Client developers can use CyberArk API docs directly
 
 ## Performance Considerations
 

@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 
 ## Features
 
-### Current (MVP+)
+### Current (Production Ready)
 - **Account Management**: Browse and search accounts via resources, create new privileged accounts
 - **Safe Management**: Browse safe hierarchy and view safe information via resources
 - **Platform Management**: Browse available platforms and configurations via resources
@@ -138,7 +138,7 @@ The server provides URI-based resource access for browsing and data retrieval:
 - **Health**: `cyberark://health/` - System status and connectivity information
 - **Safes**: `cyberark://safes/` - Browse safe hierarchy, list safes, and view safe contents
 - **Accounts**: `cyberark://accounts/` - Access account collections, search accounts, and view account details
-- **Platforms**: `cyberark://platforms/` - Browse platform configurations and view platform capabilities
+- **Platforms**: `cyberark://platforms/` - Browse platform configurations with **enhanced complete information** including policy settings, connection components, and privileged access workflows
 
 For detailed specifications, see [Resources Guide](docs/RESOURCES.md) and [API Reference](docs/API_REFERENCE.md).
 
@@ -191,7 +191,7 @@ pytest --cov=src/mcp_privilege_cloud       # Run with coverage
 - `tests/test_integration.py`: End-to-end integration tests
 - `tests/test_resources.py`: MCP resource implementation tests
 
-Total: 215+ tests across 5 test files
+Total: 267+ tests across 6 test files
 
 ## MCP Inspector Testing
 

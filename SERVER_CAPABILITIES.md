@@ -19,21 +19,9 @@ The CyberArk Privilege Cloud MCP Server provides two main types of capabilities:
 
 ## Tools
 
-The server provides 9 action tools for CyberArk management operations:
+The server provides 6 action tools for CyberArk management operations:
 
 ### Account Management Tools
-
-#### `get_account_details`
-- **Purpose**: Get detailed information for a specific account
-- **Parameters**:
-  - `account_id` (required): Unique account identifier
-- **Returns**: Detailed account object with all properties
-- **Example**:
-  ```json
-  {
-    "account_id": "12345"
-  }
-  ```
 
 #### `create_account`
 - **Purpose**: Create a new privileged account
@@ -114,36 +102,7 @@ The server provides 9 action tools for CyberArk management operations:
   }
   ```
 
-### Safe Management Tools
-
-#### `get_safe_details`
-- **Purpose**: Get detailed information for a specific safe
-- **Parameters**:
-  - `safe_name` (required): Safe name
-  - `include_accounts` (optional): Include account list
-  - `use_cache` (optional): Use cached data
-- **Returns**: Detailed safe object
-- **Example**:
-  ```json
-  {
-    "safe_name": "ProductionServers",
-    "include_accounts": true
-  }
-  ```
-
 ### Platform Management Tools
-
-#### `get_platform_details`
-- **Purpose**: Get detailed platform configuration
-- **Parameters**:
-  - `platform_id` (required): Platform identifier
-- **Returns**: Detailed platform object
-- **Example**:
-  ```json
-  {
-    "platform_id": "WinServerLocal"
-  }
-  ```
 
 #### `import_platform_package`
 - **Purpose**: Import a platform package

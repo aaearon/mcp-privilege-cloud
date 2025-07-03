@@ -2,12 +2,13 @@
 Platform resources for CyberArk MCP server.
 
 This module provides resources for accessing CyberArk platforms and their
-configurations through URI-based addressing.
+configurations through URI-based addressing. All platform data is returned
+exactly as provided by the CyberArk APIs with no field name or value transformations.
 """
 
 from typing import Any, Dict, List
 
-from .base import BaseResource, CollectionResource, EntityResource
+from .base import CollectionResource, EntityResource
 
 
 class PlatformCollectionResource(CollectionResource):
@@ -20,72 +21,139 @@ class PlatformCollectionResource(CollectionResource):
     """
     
     async def get_items(self) -> List[Dict[str, Any]]:
-        """Get list of all available platforms."""
-        # Use existing list_platforms method from the server
-        platforms = await self.server.list_platforms()
+        """Get list of all available platforms with complete information.
         
-        # Ensure platforms is a list of dictionaries
+        This enhanced implementation uses the list_platforms_with_details() method
+        to provide comprehensive platform information including:
+        - Basic platform info (id, name, systemType, etc.)
+        - Detailed policy settings from Policy INI configuration
+        - Connection components and privileged access workflows
+        - Raw API field names and values preserved exactly as returned
+        
+        IMPORTANT: No transformations are applied - all CyberArk API responses
+        are preserved exactly including field names, values, and empty/null fields.
+        
+        Falls back gracefully to basic platform info if enhanced features fail or timeout.
+        """
+        import asyncio
+        
+        try:
+            # Try to use enhanced API
+            if hasattr(self.server, 'list_platforms_with_details'):
+                platforms = await self.server.list_platforms_with_details()
+                return await self._format_enhanced_platforms(platforms)
+            else:
+                # Fallback to basic implementation if enhanced method not available
+                return await self._format_basic_platforms()
+                
+        except Exception as e:
+            # If enhanced method fails, fallback to basic implementation
+            if hasattr(self.server, 'logger'):
+                self.server.logger.warning(f"Enhanced platform listing failed, falling back to basic: {e}")
+            return await self._format_basic_platforms()
+    
+    async def _format_enhanced_platforms(self, platforms: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format enhanced platform data with complete information."""
         if not isinstance(platforms, list):
             raise ValueError(f"Expected list of platforms, got {type(platforms)}")
         
-        # Format platforms for resource consumption
         platform_items = []
         for platform in platforms:
             if not isinstance(platform, dict):
                 raise ValueError(f"Expected platform to be a dictionary, got {type(platform)}")
-                
-            # Extract data from the nested structure
+            
+            # Create enhanced platform item with complete information
+            platform_item = self._create_enhanced_platform_item(platform)
+            
+            
+            if platform_item:  # Only add if successfully processed
+                platform_items.append(platform_item)
+        
+        return platform_items
+    
+    async def _format_basic_platforms(self) -> List[Dict[str, Any]]:
+        """Format basic platform data using existing list_platforms method."""
+        platforms = await self.server.list_platforms()
+        
+        if not isinstance(platforms, list):
+            raise ValueError(f"Expected list of platforms, got {type(platforms)}")
+        
+        platform_items = []
+        for platform in platforms:
+            if not isinstance(platform, dict):
+                raise ValueError(f"Expected platform to be a dictionary, got {type(platform)}")
+            
+            # Start with the complete platform data, preserving original structure
+            platform_item = dict(platform)
+            
+            # Only add the URI field which is resource-specific
             general = platform.get("general", {})
-            if not general:
-                # Skip platforms without general info
-                continue
-                
-            platform_item = {
-                "id": general.get("id"),
-                "name": general.get("name"),
-                "uri": f"cyberark://platforms/{general.get('id')}",
-                "description": general.get("description", ""),
-                "system_type": general.get("systemType"),
-                "active": general.get("active", True),
-                "platform_base_id": general.get("platformBaseID"),
-                "platform_type": general.get("platformType"),
-            }
+            if general and general.get("id"):
+                platform_item["uri"] = f"cyberark://platforms/{general.get('id')}"
             
-            # Add credential management info if available
-            creds_mgmt = platform.get("credentialsManagement", {})
-            if creds_mgmt:
-                platform_item.update({
-                    "credential_management": True,
-                    "allow_manual_change": creds_mgmt.get("allowManualChange", False),
-                    "perform_periodic_change": creds_mgmt.get("performPeriodicChange", False),
-                    "allow_manual_verification": creds_mgmt.get("allowManualVerification", False),
-                })
-            
-            # Add session management info if available
-            session_mgmt = platform.get("sessionManagement", {})
-            if session_mgmt:
-                platform_item.update({
-                    "privileged_session_management": session_mgmt.get("requirePrivilegedSessionMonitoringAndIsolation", False),
-                    "record_sessions": session_mgmt.get("recordAndSaveSessionActivity", False),
-                    "psm_server_id": session_mgmt.get("PSMServerID"),
-                })
-            
-            # Remove None values and empty strings
-            platform_item = BaseResource._clean_data(platform_item, remove_empty_strings=True)
+            # Do not remove None values or empty strings - preserve raw API data exactly
             platform_items.append(platform_item)
         
         return platform_items
     
+    def _create_enhanced_platform_item(self, platform: Dict[str, Any]) -> Dict[str, Any]:
+        """Create enhanced platform item with complete information.
+        
+        Preserves original CyberArk API field names and values exactly:
+        - No CamelCase to snake_case conversion
+        - No value transformations (Yes/No, string numbers, etc.)
+        - No removal of empty/null values
+        - Only adds resource-specific 'uri' field
+        """
+        # Start with the complete platform data from combined API response
+        platform_item = dict(platform)
+        
+        # Only add the URI field which is resource-specific
+        if "id" in platform:
+            platform_item["uri"] = f"cyberark://platforms/{platform.get('id')}"
+        
+        # Do not remove None values or empty strings - preserve raw API data exactly
+        return platform_item
+    
+    
     async def get_metadata(self) -> Dict[str, Any]:
-        """Get platform collection metadata."""
+        """Get enhanced platform collection metadata."""
         base_metadata = await super().get_metadata()
+        
+        # Check if enhanced features are available and update metadata accordingly
+        has_enhanced_features = hasattr(self.server, 'list_platforms_with_details')
+        
         base_metadata.update({
             "supports_filtering": True,
             "supports_search": True,
-            "filterable_fields": ["system_type", "active", "platform_type"],
-            "sortable_fields": ["name", "id", "system_type"],
-            "data_source": "cyberark_platforms_api",
+            "filterable_fields": ["systemType", "active", "platformType"],
+            "sortable_fields": ["name", "id", "systemType"],
         })
+        
+        if has_enhanced_features:
+            # Enhanced metadata when complete info is available
+            base_metadata.update({
+                "data_source": "cyberark_platforms_api_enhanced",
+                "supports_complete_info": True,
+                "enhanced_fields": [
+                    "PolicyID", "PolicyName", "general", 
+                    "connectionComponents", "privilegedAccessWorkflows"
+                ],
+                "field_conversion": "none - preserves raw API data exactly",
+                "enhanced_filterable_fields": [
+                    "PolicyID", "connectionMethod", "PSMServerID"
+                ],
+
+            })
+        else:
+            # Basic metadata when only basic info is available
+            base_metadata.update({
+                "data_source": "cyberark_platforms_api_basic",
+                "supports_complete_info": False,
+                "field_conversion": "none - preserves raw API data exactly",
+                "note": "Enhanced platform details not available - upgrade server for complete information"
+            })
+        
         return base_metadata
 
 
@@ -106,68 +174,11 @@ class PlatformEntityResource(EntityResource):
         # Use existing get_platform_details method from the server
         platform_details = await self.server.get_platform_details(platform_id)
         
-        # Format the platform details
-        platform_data = {
-            "id": platform_details.get("Details", {}).get("PolicyID"),
-            "name": platform_details.get("Details", {}).get("PolicyName"),
-            "description": platform_details.get("Details", {}).get("Description", ""),
-            "system_type": platform_details.get("Details", {}).get("SystemType"),
-            "active": platform_details.get("Details", {}).get("Active", True),
-            "platform_base_id": platform_details.get("Details", {}).get("PlatformBaseID"),
-            "platform_type": platform_details.get("Details", {}).get("PlatformType"),
-            "search_for_usages": platform_details.get("Details", {}).get("SearchForUsages", False),
-        }
+        # Return the raw API response with only URI added
+        platform_data = dict(platform_details)
+        platform_data["uri"] = f"cyberark://platforms/{platform_id}"
         
-        # Add connection components if available
-        connection_components = platform_details.get("Details", {}).get("ConnectionComponents", [])
-        if connection_components:
-            platform_data["connection_components"] = []
-            for component in connection_components:
-                comp_data = {
-                    "psmserver_id": component.get("PSMServerID"),
-                    "name": component.get("Name"),
-                    "display_name": component.get("DisplayName"),
-                    "connection_method": component.get("ConnectionMethod"),
-                    "enabled": component.get("Enabled", False),
-                }
-                # Remove None values
-                comp_data = BaseResource._clean_data(comp_data)
-                platform_data["connection_components"].append(comp_data)
-        
-        # Add properties if available
-        properties = platform_details.get("Details", {}).get("Properties", [])
-        if properties:
-            platform_data["properties"] = []
-            for prop in properties:
-                prop_data = {
-                    "name": prop.get("Name"),
-                    "display_name": prop.get("DisplayName"),
-                    "type": prop.get("Type"),
-                    "required": prop.get("Required", False),
-                    "default_value": prop.get("DefaultValue"),
-                    "length": prop.get("Length"),
-                }
-                # Remove None values
-                prop_data = BaseResource._clean_data(prop_data)
-                platform_data["properties"].append(prop_data)
-        
-        # Add capabilities information
-        platform_data["capabilities"] = {
-            "privileged_session_management": platform_details.get("Details", {}).get("PrivilegedSessionManagement", False),
-            "credential_management": platform_details.get("Details", {}).get("CredentialsManagement", False),
-            "supports_password_change": any(
-                comp.get("ConnectionMethod") == "RPC" 
-                for comp in connection_components
-            ),
-        }
-        
-        # Add related resources
-        platform_data["related_resources"] = {
-            "accounts_using_platform": f"cyberark://accounts?platform_id={platform_id}",
-        }
-        
-        # Remove None values and empty lists/dicts
-        platform_data = BaseResource._clean_data(platform_data, remove_empty_collections=True)
+        # Do not remove None values or empty strings - preserve raw API data exactly
         
         return platform_data
     
