@@ -65,16 +65,6 @@ class PlatformCollectionResource(CollectionResource):
             # Create enhanced platform item with complete information
             platform_item = self._create_enhanced_platform_item(platform)
             
-            # Debug: Log what we're getting from enhanced platforms
-            if hasattr(self.server, 'logger'):
-                has_details = 'details' in platform
-                has_creds_mgmt = 'credentialsManagement' in platform
-                platform_keys = list(platform.keys())
-                self.server.logger.warning(f"DEBUG: Processing platform {platform.get('id', 'unknown')}: has_details={has_details}, has_creds_mgmt={has_creds_mgmt}, total_keys={len(platform_keys)}")
-                self.server.logger.warning(f"DEBUG: Platform {platform.get('id', 'unknown')} keys: {platform_keys}")
-                if has_details:
-                    details_keys = list(platform['details'].keys()) if platform['details'] else []
-                    self.server.logger.warning(f"DEBUG: Platform {platform.get('id', 'unknown')} details keys: {details_keys}")
             
             if platform_item:  # Only add if successfully processed
                 platform_items.append(platform_item)

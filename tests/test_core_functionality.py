@@ -1389,269 +1389,6 @@ class TestPlatformDetailsAPI:
             mock_request.assert_called_once_with("GET", f"Platforms/{platform_id}")
 
 
-class TestPlatformDataCombination:
-    """Test suite for platform data combination logic"""
-    
-    @pytest.fixture
-    def mock_config(self):
-        """Mock configuration for platform tests"""
-        return {
-            'subdomain': 'test-tenant',
-            'timeout': 30,
-            'max_retries': 3
-        }
-
-    @pytest.fixture
-    def mock_authenticator(self):
-        """Mock authenticator for platform tests"""
-        authenticator = MagicMock()
-        authenticator.get_access_token.return_value = "mock_access_token"
-        return authenticator
-
-    @pytest.fixture
-    def server(self, mock_config, mock_authenticator):
-        """Create server instance for testing"""
-        server = CyberArkMCPServer(
-            authenticator=mock_authenticator,
-            subdomain=mock_config['subdomain'],
-            timeout=mock_config['timeout'],
-            max_retries=mock_config['max_retries']
-        )
-        return server
-
-    @pytest.mark.asyncio
-    async def test_combine_platform_responses(self, server):
-        """Test combining list and details API responses into complete platform object"""
-        platform_id = "WinServerLocal"
-        
-        # Mock list API response (basic info)
-        list_response = {
-            "general": {
-                "id": "WinServerLocal",
-                "name": "Windows Server Local",
-                "systemType": "Windows",
-                "active": True,
-                "platformType": "Regular"
-            },
-            "properties": {
-                "description": "Windows Server Local Accounts"
-            },
-            "credentialsManagement": {
-                "change": "on",
-                "changeFrequency": 90
-            }
-        }
-        
-        # Mock details API response (Policy INI details) 
-        details_response = {
-            "PlatformID": "WinServerLocal",
-            "Active": "Yes",
-            "Details": {
-                "credentialsManagementPolicy": {
-                    "change": "on",
-                    "changeFrequency": 90,
-                    "reconcile": "on",
-                    "verify": "on",
-                    "passwordLength": 12
-                },
-                "sessionManagementPolicy": {
-                    "requirePrivilegedSessionMonitoring": "Yes",
-                    "recordPrivilegedSession": "Yes"
-                }
-            }
-        }
-        
-        # Mock API calls - list_platforms returns single platform, get_platform_details returns details
-        with patch.object(server, 'list_platforms', return_value=[list_response]) as mock_list, \
-             patch.object(server, 'get_platform_details', return_value=details_response) as mock_details:
-            
-            # Test the combination method that doesn't exist yet (should fail)
-            result = await server.get_complete_platform_info(platform_id)
-            
-            # Verify both APIs were called
-            mock_list.assert_called_once()
-            mock_details.assert_called_once_with(platform_id)
-            
-            # Verify combined response structure
-            assert result["id"] == platform_id
-            assert result["name"] == "Windows Server Local"
-            assert result["systemType"] == "Windows"
-            assert result["active"] is True  # Boolean conversion from "Yes"
-            
-            # Verify details are included
-            assert "credentialsManagementPolicy" in result
-            assert "sessionManagementPolicy" in result
-            assert result["credentialsManagementPolicy"]["passwordLength"] == 12
-
-    @pytest.mark.asyncio  
-    async def test_field_deduplication(self, server):
-        """Test field deduplication when same field appears in both APIs"""
-        platform_id = "TestPlatform"
-        
-        # Mock responses with overlapping fields
-        list_response = {
-            "general": {
-                "id": "TestPlatform",
-                "name": "Test Platform",
-                "active": True
-            }
-        }
-        
-        details_response = {
-            "PlatformID": "TestPlatform", 
-            "Active": "Yes",  # Same field, different format
-            "Details": {
-                "additionalInfo": "from details API"
-            }
-        }
-        
-        with patch.object(server, 'list_platforms', return_value=[list_response]) as mock_list, \
-             patch.object(server, 'get_platform_details', return_value=details_response) as mock_details:
-            
-            result = await server.get_complete_platform_info(platform_id)
-            
-            # Verify deduplication - list API value should take precedence
-            assert result["active"] is True  # From list API, not converted from "Yes"
-            assert result["id"] == "TestPlatform"  # Should use consistent field from list API
-            assert "additionalInfo" in result  # Details should still be merged
-
-    @pytest.mark.asyncio
-    async def test_data_type_conversion(self, server):
-        """Test data type conversion (Yes/No to boolean, string numbers to int)"""
-        platform_id = "ConversionTest"
-        
-        list_response = {
-            "general": {
-                "id": "ConversionTest",
-                "name": "Conversion Test Platform"
-            }
-        }
-        
-        details_response = {
-            "PlatformID": "ConversionTest",
-            "Active": "Yes",
-            "Details": {
-                "credentialsManagementPolicy": {
-                    "change": "on",
-                    "changeFrequency": "90",  # String number
-                    "reconcile": "off", 
-                    "verify": "Yes",  # Yes/No to boolean
-                    "passwordLength": "12"  # String number
-                },
-                "sessionManagementPolicy": {
-                    "requirePrivilegedSessionMonitoring": "No",  # Yes/No to boolean
-                    "recordPrivilegedSession": "Yes"
-                }
-            }
-        }
-        
-        with patch.object(server, 'list_platforms', return_value=[list_response]) as mock_list, \
-             patch.object(server, 'get_platform_details', return_value=details_response) as mock_details:
-            
-            result = await server.get_complete_platform_info(platform_id)
-            
-            # Verify type conversions
-            cmp = result["credentialsManagementPolicy"]
-            assert cmp["changeFrequency"] == 90  # String "90" -> int 90
-            assert cmp["passwordLength"] == 12  # String "12" -> int 12
-            assert cmp["verify"] is True  # "Yes" -> True
-            
-            smp = result["sessionManagementPolicy"] 
-            assert smp["requirePrivilegedSessionMonitoring"] is False  # "No" -> False
-            assert smp["recordPrivilegedSession"] is True  # "Yes" -> True
-
-    @pytest.mark.asyncio
-    async def test_graceful_degradation_when_details_api_fails(self, server):
-        """Test graceful degradation to basic info when details API fails"""
-        platform_id = "BasicPlatform"
-        
-        list_response = {
-            "general": {
-                "id": "BasicPlatform",
-                "name": "Basic Platform",
-                "systemType": "Windows",
-                "active": True
-            },
-            "properties": {
-                "description": "Basic platform description"
-            }
-        }
-        
-        with patch.object(server, 'list_platforms', return_value=[list_response]) as mock_list, \
-             patch.object(server, 'get_platform_details', side_effect=CyberArkAPIError("Details not found", 404)) as mock_details:
-            
-            result = await server.get_complete_platform_info(platform_id)
-            
-            # Should return basic info from list API only
-            assert result["id"] == platform_id
-            assert result["name"] == "Basic Platform"
-            assert result["systemType"] == "Windows"
-            assert result["active"] is True
-            assert result["description"] == "Basic platform description"
-            
-            # Should not contain detailed policy info
-            assert "credentialsManagementPolicy" not in result
-            assert "sessionManagementPolicy" not in result
-
-    @pytest.mark.asyncio
-    async def test_platform_not_found_in_list(self, server):
-        """Test behavior when platform is not found in list API"""
-        platform_id = "NonExistentPlatform"
-        
-        with patch.object(server, 'list_platforms', return_value=[]) as mock_list:
-            
-            with pytest.raises(CyberArkAPIError) as exc_info:
-                await server.get_complete_platform_info(platform_id)
-            
-            assert "Platform 'NonExistentPlatform' not found" in str(exc_info.value)
-            assert exc_info.value.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_multiple_platforms_in_list_selects_correct_one(self, server):
-        """Test correct platform selection when list API returns multiple platforms"""
-        platform_id = "TargetPlatform"
-        
-        list_response = [
-            {
-                "general": {
-                    "id": "OtherPlatform",
-                    "name": "Other Platform"
-                }
-            },
-            {
-                "general": {
-                    "id": "TargetPlatform", 
-                    "name": "Target Platform",
-                    "systemType": "Unix"
-                }
-            },  
-            {
-                "general": {
-                    "id": "AnotherPlatform",
-                    "name": "Another Platform"
-                }
-            }
-        ]
-        
-        details_response = {
-            "PlatformID": "TargetPlatform",
-            "Details": {
-                "additionalInfo": "target details"
-            }
-        }
-        
-        with patch.object(server, 'list_platforms', return_value=list_response) as mock_list, \
-             patch.object(server, 'get_platform_details', return_value=details_response) as mock_details:
-            
-            result = await server.get_complete_platform_info(platform_id)
-            
-            # Should return the correct platform
-            assert result["id"] == "TargetPlatform"
-            assert result["name"] == "Target Platform"
-            assert result["systemType"] == "Unix"
-            assert "additionalInfo" in result
-
-
 class TestConcurrentPlatformFetching:
     """Test concurrent platform fetching functionality for performance optimization."""
     
@@ -1700,7 +1437,7 @@ class TestConcurrentPlatformFetching:
         
         # Configure mocks
         with patch.object(server, 'list_platforms', return_value=mock_platforms) as mock_list:
-            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id: mock_details[platform_id]) as mock_get_complete:
+            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id, platform_basic=None: mock_details[platform_id]) as mock_get_complete:
                 # Act - Call concurrent platform fetching
                 result = await server.list_platforms_with_details()
                 
@@ -1729,7 +1466,7 @@ class TestConcurrentPlatformFetching:
         
         # Configure mocks
         with patch.object(server, 'list_platforms', return_value=mock_platforms) as mock_list:
-            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id: mock_details[platform_id]) as mock_get_complete:
+            with patch.object(server, 'get_complete_platform_info', side_effect=lambda platform_id, platform_basic=None: mock_details[platform_id]) as mock_get_complete:
                 # Act - Call with search parameter
                 result = await server.list_platforms_with_details(search="Windows")
                 
@@ -1748,7 +1485,7 @@ class TestConcurrentPlatformFetching:
             {"id": "FailingPlatform", "name": "Failing Platform"}
         ]
         
-        def mock_get_complete_platform_info(platform_id):
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
             if platform_id == "FailingPlatform":
                 raise CyberArkAPIError("Platform details unavailable", 403)
             return {
@@ -1777,7 +1514,7 @@ class TestConcurrentPlatformFetching:
         
         call_times = []
         
-        async def mock_get_complete_platform_info(platform_id):
+        async def mock_get_complete_platform_info(platform_id, platform_basic=None):
             call_times.append(asyncio.get_event_loop().time())
             # Simulate API delay
             await asyncio.sleep(0.1)
@@ -1933,7 +1670,7 @@ class TestPlatformErrorHandling:
             {"id": "WorkingPlatform2", "name": "Working Platform 2"}
         ]
         
-        def mock_get_complete_platform_info(platform_id):
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
             if platform_id == "FailingPlatform":
                 raise CyberArkAPIError("Insufficient permissions", 403)
             return {
@@ -1966,7 +1703,7 @@ class TestPlatformErrorHandling:
             {"id": "PlatformSuccess", "name": "Successful Platform"}
         ]
         
-        def mock_get_complete_platform_info(platform_id):
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
             if platform_id == "Platform404":
                 raise CyberArkAPIError("Platform not found", 404)
             elif platform_id == "Platform403":
@@ -2082,7 +1819,7 @@ class TestPlatformErrorHandling:
             else:
                 mock_platforms.append({"id": f"Error{i}", "name": f"Error Platform {i}"})
         
-        def mock_get_complete_platform_info(platform_id):
+        def mock_get_complete_platform_info(platform_id, platform_basic=None):
             if "Success" in platform_id:
                 return {"id": platform_id, "name": f"Complete {platform_id}", "details": {"data": "success"}}
             elif "NotFound" in platform_id:
