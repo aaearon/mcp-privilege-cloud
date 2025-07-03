@@ -997,10 +997,8 @@ class CyberArkMCPServer:
                 self.logger.info("No platforms found, returning empty list")
                 return []
             
-            # Limit platforms to prevent MCP timeouts (max 50 platforms with detailed info)
-            if len(platforms_list) > 50:
-                self.logger.warning(f"Large platform count ({len(platforms_list)}) detected - limiting to first 50 platforms to prevent timeout")
-                platforms_list = platforms_list[:50]
+            # Note: Platforms API returns all platforms in single call (no pagination support)
+            # Enhanced processing may be slower but provides complete information
 
         except CyberArkAPIError:
             # Re-raise CyberArkAPIError as-is to preserve original error context
@@ -1011,7 +1009,7 @@ class CyberArkMCPServer:
             raise CyberArkAPIError(f"Failed to retrieve platform list: {e}")
 
         # Step 2: Define concurrent fetching with enhanced error handling
-        semaphore = asyncio.Semaphore(3)  # Further reduced concurrent requests to prevent MCP timeouts
+        semaphore = asyncio.Semaphore(5)  # Balanced concurrency for all platforms while preventing timeouts
 
         async def fetch_platform_details(platform):
             """Fetch complete platform info with comprehensive error handling and rate limiting."""
@@ -1064,16 +1062,16 @@ class CyberArkMCPServer:
             start_time = asyncio.get_event_loop().time()
 
             # Use asyncio.gather for concurrent execution with return_exceptions=True for robustness
-            # Add timeout to prevent MCP timeouts (30 seconds max for entire operation)
+            # Increased timeout to handle all platforms (60 seconds max for entire operation)
             tasks = [fetch_platform_details(platform) for platform in platforms_list]
             try:
                 results = await asyncio.wait_for(
                     asyncio.gather(*tasks, return_exceptions=True),
-                    timeout=30.0
+                    timeout=60.0
                 )
             except asyncio.TimeoutError:
-                self.logger.warning(f"Concurrent platform fetch timed out after 30 seconds for {len(platforms_list)} platforms")
-                raise CyberArkAPIError("Platform fetching timed out - try with fewer platforms or use basic list_platforms()")
+                self.logger.warning(f"Concurrent platform fetch timed out after 60 seconds for {len(platforms_list)} platforms")
+                raise CyberArkAPIError("Platform fetching timed out - consider using basic list_platforms() for faster results")
 
             end_time = asyncio.get_event_loop().time()
             execution_time = end_time - start_time
