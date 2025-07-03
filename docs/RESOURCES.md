@@ -194,16 +194,16 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
 #### Platform Collection Resource
 - **URI**: `cyberark://platforms/`
 - **Type**: Collection Resource
-- **Description**: Lists all available platforms for account management with **enhanced complete information**
+- **Description**: Lists all available platforms for account management with **basic platform information**
 - **Supports**: Filtering by system type, active status, advanced search
-- **Enhanced Features**: 
-  - Complete platform policy settings
-  - Connection component details
-  - Privileged access workflow configuration
+- **Performance**: Optimized for fast response times (<2 seconds)
+- **Features**: 
+  - Basic platform information (id, name, systemType, active status)
   - Raw API data preservation (no field transformations)
-  - Graceful fallback to basic information if enhanced features unavailable
+  - Single API call for optimal performance
+  - Consistent field naming from CyberArk API
 
-**Example Enhanced Response**:
+**Example Basic Response**:
 ```json
 {
   "uri": "cyberark://platforms/",
@@ -211,46 +211,28 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
   "category": "platforms",
   "count": 2,
   "metadata": {
-    "supports_complete_info": true,
-    "data_source": "cyberark_platforms_api_enhanced",
-    "enhanced_fields": ["policy_id", "general_settings", "connection_components", "privileged_access_workflows"],
-    "field_conversion": "none - preserves raw API data exactly"
+    "supports_complete_info": false,
+    "data_source": "cyberark_platforms_api_basic",
+    "field_conversion": "none - preserves raw API data exactly",
+    "performance_optimized": true,
+    "note": "Optimized for performance using single API call"
   },
   "items": [
     {
       "id": "WinServerLocal",
       "name": "Windows Server Local",
       "uri": "cyberark://platforms/WinServerLocal/",
-      "system_type": "Windows",
+      "systemType": "Windows",
       "active": true,
-      "policy_id": "WinServerLocal",
-      "policy_name": "Windows Server Local",
-      "general_settings": {
-        "allow_manual_change": true,
-        "perform_periodic_change": false,
-        "require_password_change_every_x_days": 90,
-        "enforce_checkin_exclusive_password": true
-      },
-      "connection_components": [
-        {
-          "psm_server_id": "PSM01",
-          "name": "PSM-RDP",
-          "connection_method": "RDP",
-          "enabled": true,
-          "user_role": "Administrator",
-          "parameters": {
-            "allow_mapping_local_drives": "Yes",
-            "audio_redirection": "Yes"
-          }
-        }
-      ],
-      "privileged_access_workflows": {
-        "require_dual_control_password_access_approval": false,
-        "enforce_checkin_exclusive_password": true,
-        "require_users_to_specify_reason_for_access": true
-      },
-      "privileged_session_management": true,
-      "record_sessions": true
+      "description": "Windows Server for local accounts",
+      "platformBaseID": "WinServerLocal",
+      "platformType": "Regular",
+      "allowManualChange": true,
+      "performPeriodicChange": false,
+      "allowManualVerification": true,
+      "requirePrivilegedSessionMonitoringAndIsolation": true,
+      "recordAndSaveSessionActivity": true,
+      "PSMServerID": "PSMServer_1"
     }
   ]
 }
@@ -258,35 +240,56 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
 
 #### Platform Entity Resource
 - **URI**: `cyberark://platforms/{platform_id}/`
-- **Type**: Entity Resource
-- **Description**: Detailed platform configuration including connection components and properties
+- **Type**: Entity Resource  
+- **Description**: **Comprehensive platform configuration with complete detailed information**
+- **Data Sources**: Combines basic platform info + detailed Policy INI configuration (66+ fields)
+- **Performance**: ~200ms per platform for complete detailed information
 - **Related Resources**: Accounts using this platform
+- **Raw Data Preservation**: All field names and values preserved exactly as returned by CyberArk APIs
+
+**Key Features**:
+- **Complete Platform Details**: Combines data from both platforms list API and platform details API
+- **Comprehensive Policy Configuration**: 66+ detailed policy fields including credentials management, session settings, workflows
+- **Raw API Data Integrity**: No field transformations - preserves original CamelCase names and string values
+- **Graceful Degradation**: Falls back to basic platform info if detailed access is unavailable
+- **Enhanced Error Handling**: Specific guidance for 403/404 errors with troubleshooting context
 
 **Example Response**:
 ```json
 {
   "uri": "cyberark://platforms/WinServerLocal/",
   "type": "entity",
-  "category": "platforms",
+  "category": "platforms", 
   "identifier": "WinServerLocal",
   "data": {
     "id": "WinServerLocal",
     "name": "Windows Server Local",
-    "system_type": "Windows",
+    "systemType": "Windows",
     "active": true,
-    "connection_components": [
+    "platformType": "Regular",
+    "description": "Windows Server Local Accounts",
+    
+    // Detailed Policy INI configuration (66+ fields preserved exactly as returned)
+    "PasswordLength": "12",
+    "ResetOveridesMinValidity": "Yes", 
+    "XMLFile": "Yes",
+    "FromHour": "-1",
+    "PSMServerID": "PSMServer_abc123",
+    "PolicyType": "Regular",
+    "platformBaseID": "WinDomain",
+    
+    "ConnectionComponents": [
       {
-        "psmserver_id": "PSM01",
-        "name": "PSM-RDP",
-        "connection_method": "RDP",
-        "enabled": true
+        "PSMServerID": "PSM01",
+        "Name": "PSM-RDP", 
+        "ConnectionMethod": "RDP",
+        "Enabled": true
       }
     ],
-    "capabilities": {
-      "privileged_session_management": true,
-      "credential_management": true,
-      "supports_password_change": true
-    },
+    
+    // Additional detailed policy fields available...
+    // All field names and values preserved exactly as returned by CyberArk APIs
+    
     "related_resources": {
       "accounts_using_platform": "cyberark://accounts/?platform_id=WinServerLocal"
     }
