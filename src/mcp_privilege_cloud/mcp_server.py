@@ -353,6 +353,32 @@ async def get_platforms_resource() -> str:
     """Get platforms collection resource content."""
     return await _read_resource_content("cyberark://platforms")
 
+# Entity resource templates for individual items
+@mcp.resource("cyberark://platforms/{platform_id}", name="CyberArk Platform", description="Individual platform details")
+async def get_platform_entity_resource(platform_id: str) -> str:
+    """Get individual platform entity resource content."""
+    return await _read_resource_content(f"cyberark://platforms/{platform_id}")
+
+@mcp.resource("cyberark://accounts/{account_id}", name="CyberArk Account", description="Individual account details")
+async def get_account_entity_resource(account_id: str) -> str:
+    """Get individual account entity resource content."""
+    return await _read_resource_content(f"cyberark://accounts/{account_id}")
+
+@mcp.resource("cyberark://safes/{safe_name}", name="CyberArk Safe", description="Individual safe details")
+async def get_safe_entity_resource(safe_name: str) -> str:
+    """Get individual safe entity resource content."""
+    return await _read_resource_content(f"cyberark://safes/{safe_name}")
+
+@mcp.resource("cyberark://safes/{safe_name}/accounts", name="CyberArk Safe Accounts", description="Accounts in a specific safe")
+async def get_safe_accounts_resource(safe_name: str) -> str:
+    """Get accounts in a specific safe resource content."""
+    return await _read_resource_content(f"cyberark://safes/{safe_name}/accounts")
+
+@mcp.resource("cyberark://accounts/search", name="CyberArk Account Search", description="Search accounts with query parameters")
+async def get_account_search_resource() -> str:
+    """Get account search resource content."""
+    return await _read_resource_content("cyberark://accounts/search")
+
 
 async def _read_resource_content(uri: str) -> str:
     """Read specific CyberArk resource by URI."""
