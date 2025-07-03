@@ -7,8 +7,8 @@ This document provides essential context for AI assistants developing the CyberA
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
 **Current Status**: ✅ **PLATFORM ENHANCEMENT COMPLETE** - Production ready with comprehensive platform management, concurrent optimization, and performance testing  
-**Last Updated**: July 2, 2025  
-**Recent Enhancement**: Concurrent platform fetching optimization with 3-5x performance improvement, enhanced platform data combination logic with comprehensive Policy INI integration, data type conversion, and graceful fallback handling
+**Last Updated**: July 3, 2025  
+**Recent Enhancement**: Fixed platform pagination issue - removed artificial 50-platform limit to return all available platforms (125 total). Enhanced concurrent processing with optimized timeouts and improved error handling for complete platform visibility.
 
 ## Architecture Overview
 
@@ -133,7 +133,7 @@ The server now provides **`list_platforms_with_details(**kwargs)`** method that 
 
 #### Key Features
 - **Concurrent API Calls**: Fetches detailed platform information in parallel using `asyncio.gather()`
-- **Rate Limiting Protection**: Limits concurrent requests to 10 to avoid API rate limits
+- **Rate Limiting Protection**: Limits concurrent requests to 5 to avoid API rate limits
 - **Graceful Failure Handling**: Skips platforms that fail detailed info retrieval
 - **Parameter Pass-through**: Supports all `list_platforms()` parameters (search, filter, etc.)
 - **Performance Gains**: Typically 3-5x faster than sequential API calls
@@ -159,7 +159,7 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 - **Error Handling**: 20% failure rate adds <0.3s overhead with graceful degradation
 
 **Technical Implementation**:
-- **Concurrency Limit**: 10 concurrent requests (configurable via semaphore)
+- **Concurrency Limit**: 5 concurrent requests (configurable via semaphore)
 - **Batch Processing**: Automatically handles large platform lists (tested up to 125 platforms)
 - **Failure Isolation**: Individual platform failures don't affect overall operation
 - **Memory Optimization**: Enhanced platform objects are 4.9x larger but <3KB each
