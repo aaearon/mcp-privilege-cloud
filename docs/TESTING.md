@@ -510,7 +510,7 @@ The project follows strict TDD principles:
 The project includes a comprehensive performance test suite in `tests/test_performance.py` with 11+ specialized tests covering:
 
 #### Core Performance Tests
-- **Platform List Performance**: Tests platform listing with various sizes (1, 10, 50, 100+ platforms)
+- **Platform List Performance**: Tests platform listing with various sizes (1, 10, 125+ platforms)
 - **Concurrent Platform Details**: Validates concurrent API calls with proper rate limiting
 - **Memory Usage Monitoring**: Tracks memory consumption during large operations
 - **Scalability Testing**: Verifies linear scaling characteristics
@@ -533,14 +533,14 @@ pytest -m performance --durations=10 -v
 From comprehensive testing with real API simulation:
 
 **Platform Operations**:
-- **Basic Platform List** (50 platforms): ~0.8s total, ~16ms per platform
-- **Enhanced Platform List** (50 platforms): ~2.1s total, ~42ms per platform
+- **Basic Platform List** (125 platforms): ~1.5s total, ~12ms per platform
+- **Enhanced Platform List** (125 platforms): ~4.2s total, ~34ms per platform
 - **Concurrent Enhancement**: 3-5x improvement over sequential processing
 - **Memory Usage**: <0.002 MB per enhanced platform object
 
 **Scalability Metrics**:
-- **Linear Scaling**: Maintained up to 100+ platforms
-- **Concurrency Limit**: 10 concurrent requests (configurable)
+- **Linear Scaling**: Maintained up to 125+ platforms
+- **Concurrency Limit**: 5 concurrent requests (configurable)
 - **Error Handling**: 20% failure rate adds <0.3s overhead
 - **Memory Efficiency**: Enhanced objects 4.9x larger but <3KB each
 

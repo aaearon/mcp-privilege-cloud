@@ -200,7 +200,7 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
   - Complete platform policy settings
   - Connection component details
   - Privileged access workflow configuration
-  - Field conversion (CamelCase to snake_case)
+  - Raw API data preservation (no field transformations)
   - Graceful fallback to basic information if enhanced features unavailable
 
 **Example Enhanced Response**:
@@ -214,7 +214,7 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
     "supports_complete_info": true,
     "data_source": "cyberark_platforms_api_enhanced",
     "enhanced_fields": ["policy_id", "general_settings", "connection_components", "privileged_access_workflows"],
-    "field_conversion": "camelCase_to_snake_case"
+    "field_conversion": "none - preserves raw API data exactly"
   },
   "items": [
     {
@@ -357,163 +357,60 @@ Common error types:
 - `resource_read_error` - Error reading resource content
 - `server_error` - CyberArk API or authentication error
 
-## Field Mapping and Transformation
+## Raw API Data Preservation
 
 ### Overview
 
-The CyberArk MCP Server implements comprehensive field transformation to provide consistent, user-friendly data structures. This transformation applies to platform resources and ensures compatibility with various client expectations.
+The CyberArk MCP Server preserves all API data exactly as returned by CyberArk APIs, ensuring complete fidelity and data integrity. No field name conversions, value transformations, or data modifications are applied.
 
-### Field Name Transformation Rules
+### Key Principles
 
-#### CamelCase to snake_case Conversion
+#### Complete Data Fidelity
+- **No Field Name Conversion**: Original CamelCase field names preserved exactly (e.g., `PSMServerID`, `PolicyType`)
+- **No Value Transformation**: All values preserved as returned by API (`"Yes"` stays `"Yes"`, `"12"` stays `"12"`)
+- **Complete Data Integrity**: Empty/null values, special characters, and all original formatting preserved
+- **API Response Fidelity**: Zero modification of CyberArk API responses
 
-All CyberArk API field names are automatically converted from CamelCase/PascalCase to snake_case:
+#### Raw Data Examples
 
-**Examples**:
-- `SystemType` → `system_type`
-- `platformBaseID` → `platform_base_id`
-- `PSMServerID` → `psm_server_id`
-- `allowManualChange` → `allow_manual_change`
-- `requirePasswordChangeEveryXDays` → `require_password_change_every_x_days`
-- `enforceCheckinExclusivePassword` → `enforce_checkin_exclusive_password`
-
-#### Special ID Handling
-
-ID fields receive special processing to ensure consistent naming:
-- `PolicyID` → `policy_id`
-- `PSMServerID` → `psm_server_id`
-- `platformBaseID` → `platform_base_id`
-
-### Value Transformation Rules
-
-#### Boolean Conversion
-
-CyberArk API Yes/No strings are automatically converted to boolean values:
-
-**Examples**:
-- `"Yes"` → `true`
-- `"No"` → `false`
-- `"YES"` → `true` (case insensitive)
-- `"True"` → `true`
-- `"False"` → `false`
-
-Non-boolean strings remain unchanged:
-- `"Maybe"` → `"Maybe"`
-- `"Unknown"` → `"Unknown"`
-
-#### Numeric String Conversion
-
-String representations of integers are converted to numeric values:
-
-**Examples**:
-- `"90"` → `90`
-- `"30"` → `30`
-- `"-1"` → `-1` (unlimited values)
-- `"0"` → `0`
-
-Non-numeric or decimal strings remain unchanged:
-- `"Auto"` → `"Auto"`
-- `"Unlimited"` → `"Unlimited"`
-- `"123.45"` → `"123.45"` (decimals preserved as strings)
-
-### Policy String Preservation
-
-Certain values are identified as policy strings and preserved exactly as-is, even if they contain transformable patterns:
-
-**Preserved Patterns**:
-- Windows/Unix paths: `C:\\Program Files\\App`, `/usr/local/bin/script`
-- Domain names: `BUILTIN\\Administrators`, `NT AUTHORITY\\SYSTEM`
-- SQL statements: `SELECT * FROM Users WHERE Active='Yes'`
-- Commands: `cmd.exe /c echo 'Yes' > output.txt`
-- Registry keys: `HKEY_LOCAL_MACHINE\\SOFTWARE`
-
-### Nested Structure Transformation
-
-Field transformation applies recursively to nested objects and arrays:
-
-**Before Transformation**:
+**Original CyberArk API Response** (preserved exactly):
 ```json
 {
-  "GeneralSettings": {
-    "AllowManualChange": "Yes",
-    "RequirePasswordChangeEveryXDays": "90"
-  },
-  "ConnectionComponents": [
-    {
-      "PSMServerID": "PSM01",
-      "Enabled": "Yes",
-      "Parameters": {
-        "AllowMappingLocalDrives": "Yes",
-        "MaxConcurrentConnections": "5"
-      }
-    }
-  ]
+  "id": "WinServerLocal",
+  "name": "Windows Server Local",
+  "systemType": "Windows",
+  "active": true,
+  "PolicyID": "WinServerLocal",
+  "PolicyName": "Windows Server Local",
+  "PSMServerID": "PSMServer_abc123",
+  "AllowManualChange": "Yes",
+  "RequirePasswordChangeEveryXDays": "90",
+  "PasswordLength": "12",
+  "ResetOveridesMinValidity": "Yes",
+  "FromHour": "-1",
+  "platformBaseID": "WinDomain"
 }
 ```
 
-**After Transformation**:
-```json
-{
-  "general_settings": {
-    "allow_manual_change": true,
-    "require_password_change_every_x_days": 90
-  },
-  "connection_components": [
-    {
-      "psm_server_id": "PSM01",
-      "enabled": true,
-      "parameters": {
-        "allow_mapping_local_drives": true,
-        "max_concurrent_connections": 5
-      }
-    }
-  ]
-}
-```
+### Benefits of Raw Data Preservation
 
-### Implementation Details
+#### Data Integrity
+- **Complete Information**: No data loss through transformation
+- **Original Context**: Field names and values maintain CyberArk context
+- **Debugging Capability**: Easier to correlate with CyberArk documentation
+- **API Consistency**: Direct correlation with CyberArk API responses
 
-#### Transformation Methods
+#### Performance Benefits
+- **Zero Transformation Overhead**: No processing time spent on field conversion
+- **Memory Efficiency**: No duplicate field storage
+- **Reduced Complexity**: Simpler data pipeline
+- **Faster Processing**: Direct API response handling
 
-The field transformation is implemented using static methods in the `PlatformEntityResource` class:
-
-- `_camel_to_snake(name)` - Converts field names from CamelCase to snake_case
-- `_convert_yes_no_to_boolean(value)` - Converts Yes/No strings to boolean values
-- `_convert_string_to_int(value)` - Converts numeric strings to integers
-- `_is_policy_string(key, value)` - Identifies policy strings to preserve
-- `_transform_platform_details(data)` - Recursively transforms entire data structures
-
-#### Edge Case Handling
-
-- **Empty Values**: `null`, `""`, `{}`, `[]` are preserved as-is
-- **Mixed Data Types**: Only string values are considered for transformation
-- **Complex Expressions**: Values containing special characters or complex patterns are preserved
-- **Backward Compatibility**: Original field names are still supported for compatibility
-
-### Performance Impact
-
-Field transformation adds minimal overhead:
-- Recursive processing for nested structures
-- Regex-based field name conversion
-- Policy string pattern matching
-- In-memory transformations with no external dependencies
-
-### Client Benefits
-
-#### Consistent Field Names
-- Predictable snake_case naming across all resources
-- Reduced need for client-side field name mapping
-- Better integration with Python and other snake_case conventions
-
-#### Type Safety
-- Boolean values instead of string representations
-- Numeric values for calculations and comparisons
-- Preserved complex policy strings where appropriate
-
-#### Reduced Complexity
-- Automatic transformation eliminates client-side conversion code
-- Consistent data types across similar fields
-- Nested structure consistency
+#### Client Flexibility
+- **Client-Side Control**: Clients can apply their own transformations if needed
+- **Multiple Client Support**: Different clients can handle data differently
+- **Future Compatibility**: Changes to transformation logic don't affect data
+- **Original Documentation**: Client developers can use CyberArk API docs directly
 
 ## Performance Considerations
 
