@@ -2,12 +2,13 @@
 Platform resources for CyberArk MCP server.
 
 This module provides resources for accessing CyberArk platforms and their
-configurations through URI-based addressing.
+configurations through URI-based addressing. All platform data is returned
+exactly as provided by the CyberArk APIs with no field name or value transformations.
 """
 
 from typing import Any, Dict, List
 
-from .base import BaseResource, CollectionResource, EntityResource
+from .base import CollectionResource, EntityResource
 
 
 class PlatformCollectionResource(CollectionResource):
@@ -23,17 +24,21 @@ class PlatformCollectionResource(CollectionResource):
         """Get list of all available platforms with complete information.
         
         This enhanced implementation uses the list_platforms_with_details() method
-        from Task A3 to provide comprehensive platform information including:
+        to provide comprehensive platform information including:
         - Basic platform info (id, name, systemType, etc.)
-        - Detailed policy settings 
-        - Connection components
-        - Privileged access workflows
-        - Enhanced field conversion and data formatting
+        - Detailed policy settings from Policy INI configuration
+        - Connection components and privileged access workflows
+        - Raw API field names and values preserved exactly as returned
         
-        Falls back gracefully to basic platform info if enhanced features fail.
+        IMPORTANT: No transformations are applied - all CyberArk API responses
+        are preserved exactly including field names, values, and empty/null fields.
+        
+        Falls back gracefully to basic platform info if enhanced features fail or timeout.
         """
+        import asyncio
+        
         try:
-            # Try to use enhanced API from Task A3 first
+            # Try to use enhanced API
             if hasattr(self.server, 'list_platforms_with_details'):
                 platforms = await self.server.list_platforms_with_details()
                 return await self._format_enhanced_platforms(platforms)
@@ -60,6 +65,17 @@ class PlatformCollectionResource(CollectionResource):
             # Create enhanced platform item with complete information
             platform_item = self._create_enhanced_platform_item(platform)
             
+            # Debug: Log what we're getting from enhanced platforms
+            if hasattr(self.server, 'logger'):
+                has_details = 'details' in platform
+                has_creds_mgmt = 'credentialsManagement' in platform
+                platform_keys = list(platform.keys())
+                self.server.logger.warning(f"DEBUG: Processing platform {platform.get('id', 'unknown')}: has_details={has_details}, has_creds_mgmt={has_creds_mgmt}, total_keys={len(platform_keys)}")
+                self.server.logger.warning(f"DEBUG: Platform {platform.get('id', 'unknown')} keys: {platform_keys}")
+                if has_details:
+                    details_keys = list(platform['details'].keys()) if platform['details'] else []
+                    self.server.logger.warning(f"DEBUG: Platform {platform.get('id', 'unknown')} details keys: {details_keys}")
+            
             if platform_item:  # Only add if successfully processed
                 platform_items.append(platform_item)
         
@@ -76,187 +92,52 @@ class PlatformCollectionResource(CollectionResource):
         for platform in platforms:
             if not isinstance(platform, dict):
                 raise ValueError(f"Expected platform to be a dictionary, got {type(platform)}")
-                
-            # Extract data from the nested structure (existing logic)
+            
+            # Start with the complete platform data, preserving original structure
+            platform_item = dict(platform)
+            
+            # Only add the URI field which is resource-specific
             general = platform.get("general", {})
-            if not general:
-                continue
-                
-            platform_item = {
-                "id": general.get("id"),
-                "name": general.get("name"),
-                "uri": f"cyberark://platforms/{general.get('id')}",
-                "description": general.get("description", ""),
-                "system_type": general.get("systemType"),
-                "active": general.get("active", True),
-                "platform_base_id": general.get("platformBaseID"),
-                "platform_type": general.get("platformType"),
-            }
+            if general and general.get("id"):
+                platform_item["uri"] = f"cyberark://platforms/{general.get('id')}"
             
-            # Add credential management info if available
-            creds_mgmt = platform.get("credentialsManagement", {})
-            if creds_mgmt:
-                platform_item.update({
-                    "credential_management": True,
-                    "allow_manual_change": creds_mgmt.get("allowManualChange", False),
-                    "perform_periodic_change": creds_mgmt.get("performPeriodicChange", False),
-                    "allow_manual_verification": creds_mgmt.get("allowManualVerification", False),
-                })
-            
-            # Add session management info if available
-            session_mgmt = platform.get("sessionManagement", {})
-            if session_mgmt:
-                platform_item.update({
-                    "privileged_session_management": session_mgmt.get("requirePrivilegedSessionMonitoringAndIsolation", False),
-                    "record_sessions": session_mgmt.get("recordAndSaveSessionActivity", False),
-                    "psm_server_id": session_mgmt.get("PSMServerID"),
-                })
-            
-            # Remove None values and empty strings
-            platform_item = BaseResource._clean_data(platform_item, remove_empty_strings=True)
+            # Do not remove None values or empty strings - preserve raw API data exactly
             platform_items.append(platform_item)
         
         return platform_items
     
     def _create_enhanced_platform_item(self, platform: Dict[str, Any]) -> Dict[str, Any]:
-        """Create enhanced platform item with complete information and field conversion."""
-        # Start with basic platform info
-        platform_item = {
-            "id": platform.get("id"),
-            "name": platform.get("name"),
-            "uri": f"cyberark://platforms/{platform.get('id')}",
-            "description": platform.get("description", ""),
-            "system_type": platform.get("systemType"),
-            "active": platform.get("active", True),
-            "platform_base_id": platform.get("platformBaseID"),
-            "platform_type": platform.get("platformType"),
-        }
+        """Create enhanced platform item with complete information.
         
-        # Add enhanced details if available
-        details = platform.get("details", {})
-        if details:
-            # Add policy information
-            platform_item.update({
-                "policy_id": details.get("policyId"),
-                "policy_name": details.get("policyName"),
-            })
-            
-            # Add general settings with field conversion
-            general_settings = details.get("generalSettings", {})
-            if general_settings:
-                converted_general = self._convert_field_names(general_settings)
-                platform_item["general_settings"] = converted_general
-            
-            # Add connection components with field conversion
-            connection_components = details.get("connectionComponents", [])
-            if connection_components:
-                converted_components = []
-                for component in connection_components:
-                    converted_component = self._convert_field_names(component)
-                    # Handle nested parameters
-                    if "parameters" in component:
-                        converted_component["parameters"] = self._convert_field_names(component["parameters"])
-                    converted_components.append(converted_component)
-                platform_item["connection_components"] = converted_components
-            else:
-                platform_item["connection_components"] = []
-            
-            # Add privileged access workflows with field conversion
-            workflows = details.get("privilegedAccessWorkflows", {})
-            if workflows:
-                converted_workflows = self._convert_field_names(workflows)
-                platform_item["privileged_access_workflows"] = converted_workflows
-            else:
-                platform_item["privileged_access_workflows"] = {}
+        Preserves original CyberArk API field names and values exactly:
+        - No CamelCase to snake_case conversion
+        - No value transformations (Yes/No, string numbers, etc.)
+        - No removal of empty/null values
+        - Only adds resource-specific 'uri' field
+        """
+        # Start with the complete platform data from combined API response
+        platform_item = dict(platform)
         
-        # Add credential management info if available (from basic platform info)
-        creds_mgmt = platform.get("credentialsManagement", {})
-        if creds_mgmt:
-            platform_item.update({
-                "credential_management": True,
-                "allow_manual_change": creds_mgmt.get("allowManualChange", False),
-                "perform_periodic_change": creds_mgmt.get("performPeriodicChange", False),
-                "allow_manual_verification": creds_mgmt.get("allowManualVerification", False),
-            })
+        # Only add the URI field which is resource-specific
+        if "id" in platform:
+            platform_item["uri"] = f"cyberark://platforms/{platform.get('id')}"
         
-        # Add session management info if available (from basic platform info)
-        session_mgmt = platform.get("sessionManagement", {})
-        if session_mgmt:
-            platform_item.update({
-                "privileged_session_management": session_mgmt.get("requirePrivilegedSessionMonitoringAndIsolation", False),
-                "record_sessions": session_mgmt.get("recordAndSaveSessionActivity", False),
-                "psm_server_id": session_mgmt.get("PSMServerID"),
-            })
-        
-        # Remove None values and empty strings
-        platform_item = BaseResource._clean_data(platform_item, remove_empty_strings=True)
+        # Do not remove None values or empty strings - preserve raw API data exactly
         return platform_item
     
-    def _convert_field_names(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert CamelCase field names to snake_case for consistency."""
-        if not isinstance(data, dict):
-            return data
-        
-        converted = {}
-        for key, value in data.items():
-            # Convert CamelCase to snake_case
-            snake_key = self._camel_to_snake(key)
-            
-            # Recursively convert nested dictionaries
-            if isinstance(value, dict):
-                converted[snake_key] = self._convert_field_names(value)
-            elif isinstance(value, list) and value and isinstance(value[0], dict):
-                converted[snake_key] = [self._convert_field_names(item) for item in value]
-            else:
-                converted[snake_key] = value
-        
-        return converted
-    
-    def _camel_to_snake(self, name: str) -> str:
-        """Convert CamelCase to snake_case."""
-        import re
-        
-        # Handle special cases
-        special_cases = {
-            "PSMServerID": "psm_server_id",
-            "PSMServerId": "psm_server_id", 
-            "platformBaseID": "platform_base_id",
-            "systemType": "system_type",
-            "platformType": "platform_type",
-            "allowManualChange": "allow_manual_change",
-            "performPeriodicChange": "perform_periodic_change",
-            "allowManualVerification": "allow_manual_verification",
-            "requirePasswordChangeEveryXDays": "require_password_change_every_x_days",
-            "enforceCheckinExclusivePassword": "enforce_checkin_exclusive_password",
-            "enforceOneTimePasswordAccess": "enforce_one_time_password_access",
-            "requireDualControlPasswordAccessApproval": "require_dual_control_password_access_approval",
-            "requireUsersToSpecifyReasonForAccess": "require_users_to_specify_reason_for_access",
-            "connectionMethod": "connection_method",
-            "userRole": "user_role",
-            "policyId": "policy_id",
-            "policyName": "policy_name",
-            "psmServerId": "psm_server_id"
-        }
-        
-        if name in special_cases:
-            return special_cases[name]
-        
-        # General conversion: insert underscore before uppercase letters
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
     
     async def get_metadata(self) -> Dict[str, Any]:
         """Get enhanced platform collection metadata."""
         base_metadata = await super().get_metadata()
         
-        # Check if enhanced features are available
+        # Check if enhanced features are available and update metadata accordingly
         has_enhanced_features = hasattr(self.server, 'list_platforms_with_details')
         
         base_metadata.update({
             "supports_filtering": True,
             "supports_search": True,
-            "filterable_fields": ["system_type", "active", "platform_type"],
-            "sortable_fields": ["name", "id", "system_type"],
+            "filterable_fields": ["systemType", "active", "platformType"],
+            "sortable_fields": ["name", "id", "systemType"],
         })
         
         if has_enhanced_features:
@@ -265,19 +146,22 @@ class PlatformCollectionResource(CollectionResource):
                 "data_source": "cyberark_platforms_api_enhanced",
                 "supports_complete_info": True,
                 "enhanced_fields": [
-                    "policy_id", "policy_name", "general_settings", 
-                    "connection_components", "privileged_access_workflows"
+                    "PolicyID", "PolicyName", "general", 
+                    "connectionComponents", "privilegedAccessWorkflows"
                 ],
-                "field_conversion": "camelCase_to_snake_case",
+                "field_conversion": "none - preserves raw API data exactly",
                 "enhanced_filterable_fields": [
-                    "policy_id", "connection_method", "psm_server_id"
-                ]
+                    "PolicyID", "connectionMethod", "PSMServerID"
+                ],
+
             })
         else:
             # Basic metadata when only basic info is available
             base_metadata.update({
-                "data_source": "cyberark_platforms_api",
-                "supports_complete_info": False
+                "data_source": "cyberark_platforms_api_basic",
+                "supports_complete_info": False,
+                "field_conversion": "none - preserves raw API data exactly",
+                "note": "Enhanced platform details not available - upgrade server for complete information"
             })
         
         return base_metadata
@@ -291,156 +175,6 @@ class PlatformEntityResource(EntityResource):
     URI: cyberark://platforms/{platform_id}
     """
     
-    
-    @staticmethod
-    def _camel_to_snake(name: str) -> str:
-        """Convert CamelCase/camelCase to snake_case.
-        
-        Handles various CyberArk API field name patterns:
-        - SystemType -> system_type
-        - PSMServerID -> psm_server_id  
-        - allowManualChange -> allow_manual_change
-        - requirePasswordChangeEveryXDays -> require_password_change_every_x_days
-        """
-        if not name:
-            return name
-            
-        # Handle special cases first
-        # Convert common ID patterns
-        name = name.replace('ID', '_id')
-        name = name.replace('_id_', '_id')  # Fix double replacement
-        
-        # Insert underscores before uppercase letters (but not at start)
-        import re
-        # First, handle sequences of uppercase letters followed by lowercase
-        name = re.sub('([A-Z]+)([A-Z][a-z])', r'\1_\2', name)
-        # Then handle lowercase followed by uppercase
-        name = re.sub('([a-z])([A-Z])', r'\1_\2', name)
-        
-        # Convert to lowercase
-        result = name.lower()
-        
-        # Clean up multiple underscores
-        result = re.sub('_+', '_', result)
-        
-        # Remove leading/trailing underscores
-        result = result.strip('_')
-        
-        return result
-    
-    @staticmethod 
-    def _convert_yes_no_to_boolean(value: Any) -> Any:
-        """Convert Yes/No strings to boolean values.
-        
-        Handles CyberArk API boolean representations:
-        - "Yes" -> True
-        - "No" -> False
-        - Case insensitive
-        - Also handles "True"/"False" strings
-        - Non-boolean strings remain unchanged
-        """
-        if not isinstance(value, str):
-            return value
-            
-        value_lower = value.lower()
-        if value_lower in ('yes', 'true'):
-            return True
-        elif value_lower in ('no', 'false'):
-            return False
-        else:
-            return value
-    
-    @staticmethod
-    def _convert_string_to_int(value: Any) -> Any:
-        """Convert string numbers to integers where appropriate.
-        
-        Handles CyberArk API numeric strings:
-        - "90" -> 90
-        - "-1" -> -1 (for unlimited values)
-        - Non-numeric strings remain unchanged
-        - Decimal strings remain unchanged
-        """
-        if not isinstance(value, str) or not value:
-            return value
-            
-        # Only convert if it's a valid integer (no decimal point)
-        if value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
-            try:
-                return int(value)
-            except ValueError:
-                return value
-        else:
-            return value
-    
-    @staticmethod
-    def _is_policy_string(key: str, value: str) -> bool:
-        """Determine if a string value should be preserved as-is.
-        
-        Policy strings that contain paths, commands, SQL, etc. should not
-        be transformed even if they contain Yes/No or numeric values.
-        """
-        if not isinstance(value, str):
-            return False
-            
-        # Check for common policy string patterns
-        policy_indicators = [
-            '\\',  # Windows paths or domain names
-            '/',   # Unix paths
-            'SELECT', 'INSERT', 'UPDATE', 'DELETE',  # SQL
-            'cmd.exe', 'powershell', 'bash',  # Commands
-            'HKEY_', 'BUILTIN\\', 'NT AUTHORITY\\',  # Registry/Windows
-            'C:', 'D:', '/usr/', '/etc/', '/var/',  # Paths
-        ]
-        
-        value_upper = value.upper()
-        for indicator in policy_indicators:
-            if indicator.upper() in value_upper:
-                return True
-                
-        # Check for complex expressions (contains special chars beyond basic alphanumeric)
-        import re
-        if re.search(r'[\\/:;=\'"<>{}[\]()&|]', value):
-            return True
-            
-        return False
-    
-    @classmethod
-    def _transform_platform_details(cls, data: Any) -> Any:
-        """Transform platform details API response to snake_case fields.
-        
-        Recursively transforms:
-        - Field names: CamelCase -> snake_case
-        - Yes/No strings -> boolean (except in policy strings)
-        - Numeric strings -> integers (except in policy strings)
-        """
-        if data is None:
-            return None
-            
-        if isinstance(data, dict):
-            transformed = {}
-            for key, value in data.items():
-                # Transform the key name
-                snake_key = cls._camel_to_snake(key)
-                
-                # Recursively transform the value
-                if isinstance(value, (dict, list)):
-                    transformed_value = cls._transform_platform_details(value)
-                elif isinstance(value, str) and not cls._is_policy_string(key, value):
-                    # Apply string transformations only if not a policy string
-                    transformed_value = cls._convert_yes_no_to_boolean(value)
-                    if transformed_value == value:  # If not converted to boolean, try int
-                        transformed_value = cls._convert_string_to_int(value)
-                else:
-                    transformed_value = value
-                    
-                transformed[snake_key] = transformed_value
-            return transformed
-            
-        elif isinstance(data, list):
-            return [cls._transform_platform_details(item) for item in data]
-        else:
-            return data
-
     async def get_entity_data(self) -> Dict[str, Any]:
         """Get detailed data for a specific platform."""
         platform_id = self.uri.identifier
@@ -450,75 +184,11 @@ class PlatformEntityResource(EntityResource):
         # Use existing get_platform_details method from the server
         platform_details = await self.server.get_platform_details(platform_id)
         
-        # Apply field transformation to the entire platform details response
-        # This handles the raw API response and transforms field names and values
-        transformed_details = self._transform_platform_details(platform_details)
+        # Return the raw API response with only URI added
+        platform_data = dict(platform_details)
+        platform_data["uri"] = f"cyberark://platforms/{platform_id}"
         
-        # Extract the transformed details section
-        details = transformed_details.get("details", {})
-        
-        # Format the platform data using transformed field names
-        platform_data = {
-            "id": details.get("policy_id"),
-            "name": details.get("policy_name"),
-            "description": details.get("description", ""),
-            "system_type": details.get("system_type"),
-            "active": details.get("active", True),
-            "platform_base_id": details.get("platform_base_id"),
-            "platform_type": details.get("platform_type"),
-            "search_for_usages": details.get("search_for_usages", False),
-        }
-        
-        # Add connection components if available (already transformed)
-        connection_components = details.get("connection_components", [])
-        if connection_components:
-            platform_data["connection_components"] = []
-            for component in connection_components:
-                comp_data = {
-                    "psm_server_id": component.get("psm_server_id"),
-                    "name": component.get("name"),
-                    "display_name": component.get("display_name"),
-                    "connection_method": component.get("connection_method"),
-                    "enabled": component.get("enabled", False),
-                }
-                # Remove None values
-                comp_data = BaseResource._clean_data(comp_data)
-                platform_data["connection_components"].append(comp_data)
-        
-        # Add properties if available (already transformed)
-        properties = details.get("properties", [])
-        if properties:
-            platform_data["properties"] = []
-            for prop in properties:
-                prop_data = {
-                    "name": prop.get("name"),
-                    "display_name": prop.get("display_name"),
-                    "type": prop.get("type"),
-                    "required": prop.get("required", False),
-                    "default_value": prop.get("default_value"),
-                    "length": prop.get("length"),
-                }
-                # Remove None values
-                prop_data = BaseResource._clean_data(prop_data)
-                platform_data["properties"].append(prop_data)
-        
-        # Add capabilities information (using transformed field names)
-        platform_data["capabilities"] = {
-            "privileged_session_management": details.get("privileged_session_management", False),
-            "credential_management": details.get("credentials_management", False),
-            "supports_password_change": any(
-                comp.get("connection_method") == "RPC" 
-                for comp in connection_components
-            ),
-        }
-        
-        # Add related resources
-        platform_data["related_resources"] = {
-            "accounts_using_platform": f"cyberark://accounts?platform_id={platform_id}",
-        }
-        
-        # Remove None values and empty lists/dicts
-        platform_data = BaseResource._clean_data(platform_data, remove_empty_collections=True)
+        # Do not remove None values or empty strings - preserve raw API data exactly
         
         return platform_data
     

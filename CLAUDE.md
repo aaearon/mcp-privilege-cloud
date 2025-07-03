@@ -38,6 +38,7 @@ This document provides essential context for AI assistants developing the CyberA
 - **API Version Policy**: ALWAYS use Gen2 endpoints when available (not Gen1)
 - **Response Parsing**: `value` field for arrays (except Platforms API uses `Platforms`)
 - **Platform APIs**: Require Privilege Cloud Administrator role membership
+- **Data Integrity**: All API responses preserved exactly - no field name or value transformations applied
 
 ## Available MCP Tools (Actions Only)
 
@@ -70,11 +71,11 @@ The server now provides **`get_complete_platform_info(platform_id)`** method tha
 - **Field Deduplication**: List API values take precedence for overlapping fields
 - **Graceful Degradation**: Falls back to basic info if details API fails
 
-#### Data Type Conversion
-- **Boolean Conversion**: `"Yes"/"No"` → `True/False`
-- **Numeric Conversion**: String numbers → integers (e.g., `"90"` → `90`)
-- **Policy Strings**: Keeps `"on"/"off"` as strings for policy settings
-- **Recursive Processing**: Applies conversions to nested structures
+#### Raw Data Preservation
+- **No Field Name Conversion**: Original CamelCase field names preserved (e.g., `PSMServerID`, `PolicyType`)
+- **No Value Transformation**: All values preserved exactly as returned by API (`"Yes"` stays `"Yes"`, `"12"` stays `"12"`)
+- **Complete Data Integrity**: Empty/null values, special characters, and all original formatting preserved
+- **API Response Fidelity**: Zero modification of CyberArk API responses
 
 #### Enhanced Platform Structure
 ```json
@@ -82,22 +83,18 @@ The server now provides **`get_complete_platform_info(platform_id)`** method tha
   "id": "WinServerLocal",
   "name": "Windows Server Local",
   "systemType": "Windows", 
-  "active": true,                    // Boolean conversion applied
+  "active": true,                    // From list API (original boolean)
   "platformType": "Regular",
   "description": "Windows Server Local Accounts",
   
-  // Detailed Policy INI configuration (from details API)
-  "credentialsManagementPolicy": {
-    "change": "on",
-    "changeFrequency": 90,           // String "90" → int 90
-    "reconcile": "on",
-    "verify": true,                  // "Yes" → true
-    "passwordLength": 12             // String "12" → int 12
-  },
-  "sessionManagementPolicy": {
-    "requirePrivilegedSessionMonitoring": false,  // "No" → false
-    "recordPrivilegedSession": true               // "Yes" → true
-  }
+  // Detailed Policy INI configuration (from details API) - RAW VALUES
+  "PasswordLength": "12",            // Preserved as string from API
+  "ResetOveridesMinValidity": "Yes", // Preserved as string from API
+  "XMLFile": "Yes",                  // Preserved as string from API
+  "FromHour": "-1",                  // Preserved as string from API
+  "PSMServerID": "PSMServer_abc123", // Original CamelCase field name
+  "PolicyType": "Regular",           // Original CamelCase field name
+  "platformBaseID": "WinDomain"      // Original CamelCase field name
 }
 ```
 
@@ -116,12 +113,12 @@ platform_info = await server.get_complete_platform_info("WinServerLocal")
 
 # Access basic info (from list API)
 print(platform_info["name"])        # "Windows Server Local"
-print(platform_info["active"])      # True (boolean)
+print(platform_info["active"])      # True (original boolean from API)
 
-# Access detailed policy info (from details API)
-cmp = platform_info["credentialsManagementPolicy"]
-print(cmp["passwordLength"])         # 12 (converted from "12")
-print(cmp["verify"])                 # True (converted from "Yes")
+# Access detailed policy info (from details API) - RAW VALUES
+print(platform_info["PasswordLength"])         # "12" (preserved as string)
+print(platform_info["ResetOveridesMinValidity"]) # "Yes" (preserved as string)
+print(platform_info["PSMServerID"])              # "PSMServer_abc123" (original CamelCase)
 
 # Graceful handling when details unavailable
 basic_info = await server.get_complete_platform_info("RestrictedPlatform")
@@ -166,7 +163,7 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 - **Batch Processing**: Automatically handles large platform lists (tested up to 125 platforms)
 - **Failure Isolation**: Individual platform failures don't affect overall operation
 - **Memory Optimization**: Enhanced platform objects are 4.9x larger but <3KB each
-- **Field Conversion**: CamelCase to snake_case conversion adds <0.5ms overhead per platform
+- **Raw Data Preservation**: No field conversion overhead - original API data structure maintained
 
 #### Error Handling
 - **List API Errors**: Propagated immediately (authentication, authorization)
@@ -181,9 +178,9 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 | **Accounts** | List and search accounts | `cyberark://accounts/` | All accessible accounts across safes |
 | **Account Search** | Advanced account search | `cyberark://accounts/search?query=...` | Search with filters and keywords |
 | **Safes** | List accessible safes | `cyberark://safes/` | All safes with pagination support |
-| **Platforms** | List available platforms | `cyberark://platforms/` | Platform definitions for account creation |
+| **Platforms** | List available platforms | `cyberark://platforms/` | Platform definitions with raw API data preserved exactly |
 
-*Resources provide read-only access via URIs and are cached for better performance*
+*Resources provide read-only access via URIs with complete API data fidelity - no transformations applied*
 
 ## Configuration
 
