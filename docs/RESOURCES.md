@@ -240,35 +240,56 @@ cyberark://{category}/[{identifier}/][{subcategory}/][?{query_params}]
 
 #### Platform Entity Resource
 - **URI**: `cyberark://platforms/{platform_id}/`
-- **Type**: Entity Resource
-- **Description**: Detailed platform configuration including connection components and properties
+- **Type**: Entity Resource  
+- **Description**: **Comprehensive platform configuration with complete detailed information**
+- **Data Sources**: Combines basic platform info + detailed Policy INI configuration (66+ fields)
+- **Performance**: ~200ms per platform for complete detailed information
 - **Related Resources**: Accounts using this platform
+- **Raw Data Preservation**: All field names and values preserved exactly as returned by CyberArk APIs
+
+**Key Features**:
+- **Complete Platform Details**: Combines data from both platforms list API and platform details API
+- **Comprehensive Policy Configuration**: 66+ detailed policy fields including credentials management, session settings, workflows
+- **Raw API Data Integrity**: No field transformations - preserves original CamelCase names and string values
+- **Graceful Degradation**: Falls back to basic platform info if detailed access is unavailable
+- **Enhanced Error Handling**: Specific guidance for 403/404 errors with troubleshooting context
 
 **Example Response**:
 ```json
 {
   "uri": "cyberark://platforms/WinServerLocal/",
   "type": "entity",
-  "category": "platforms",
+  "category": "platforms", 
   "identifier": "WinServerLocal",
   "data": {
     "id": "WinServerLocal",
     "name": "Windows Server Local",
-    "system_type": "Windows",
+    "systemType": "Windows",
     "active": true,
-    "connection_components": [
+    "platformType": "Regular",
+    "description": "Windows Server Local Accounts",
+    
+    // Detailed Policy INI configuration (66+ fields preserved exactly as returned)
+    "PasswordLength": "12",
+    "ResetOveridesMinValidity": "Yes", 
+    "XMLFile": "Yes",
+    "FromHour": "-1",
+    "PSMServerID": "PSMServer_abc123",
+    "PolicyType": "Regular",
+    "platformBaseID": "WinDomain",
+    
+    "ConnectionComponents": [
       {
-        "psmserver_id": "PSM01",
-        "name": "PSM-RDP",
-        "connection_method": "RDP",
-        "enabled": true
+        "PSMServerID": "PSM01",
+        "Name": "PSM-RDP", 
+        "ConnectionMethod": "RDP",
+        "Enabled": true
       }
     ],
-    "capabilities": {
-      "privileged_session_management": true,
-      "credential_management": true,
-      "supports_password_change": true
-    },
+    
+    // Additional detailed policy fields available...
+    // All field names and values preserved exactly as returned by CyberArk APIs
+    
     "related_resources": {
       "accounts_using_platform": "cyberark://accounts/?platform_id=WinServerLocal"
     }

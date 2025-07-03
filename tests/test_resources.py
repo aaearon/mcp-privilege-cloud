@@ -346,22 +346,31 @@ class TestPlatformResources:
         assert data["items"][0]["id"] == "WinServerLocal"
         
     async def test_platform_entity_resource(self):
-        """Test PlatformEntityResource."""
-        self.mock_server.get_platform_details.return_value = {
-            "Details": {
-                "PolicyID": "WinServerLocal",
-                "PolicyName": "Windows Server Local",
-                "SystemType": "Windows",
-                "Active": True,
-                "ConnectionComponents": [
-                    {
-                        "PSMServerID": "PSM01",
-                        "Name": "PSM-RDP",
-                        "ConnectionMethod": "RDP",
-                        "Enabled": True
-                    }
-                ]
-            }
+        """Test PlatformEntityResource with complete platform information."""
+        # Mock the get_complete_platform_info method instead of get_platform_details
+        self.mock_server.get_complete_platform_info.return_value = {
+            "id": "WinServerLocal",
+            "name": "Windows Server Local",
+            "systemType": "Windows",
+            "active": True,
+            "platformType": "Regular",
+            "description": "Windows Server Local Accounts",
+            # Detailed Policy INI configuration fields
+            "PasswordLength": "12",
+            "ResetOveridesMinValidity": "Yes",
+            "XMLFile": "Yes",
+            "FromHour": "-1",
+            "PSMServerID": "PSMServer_abc123",
+            "PolicyType": "Regular",
+            "platformBaseID": "WinDomain",
+            "ConnectionComponents": [
+                {
+                    "PSMServerID": "PSM01",
+                    "Name": "PSM-RDP",
+                    "ConnectionMethod": "RDP",
+                    "Enabled": True
+                }
+            ]
         }
         
         uri = ResourceURI("cyberark://platforms/WinServerLocal/")
@@ -372,7 +381,25 @@ class TestPlatformResources:
         
         assert data["type"] == "entity"
         assert data["identifier"] == "WinServerLocal"
-        assert len(data["data"]["Details"]["ConnectionComponents"]) == 1
+        assert data["data"]["id"] == "WinServerLocal"
+        assert data["data"]["name"] == "Windows Server Local"
+        assert data["data"]["systemType"] == "Windows"
+        assert data["data"]["active"] is True
+        
+        # Verify detailed Policy INI fields are present
+        assert data["data"]["PasswordLength"] == "12"
+        assert data["data"]["ResetOveridesMinValidity"] == "Yes"
+        assert data["data"]["PSMServerID"] == "PSMServer_abc123"
+        
+        # Verify connection components
+        assert len(data["data"]["ConnectionComponents"]) == 1
+        assert data["data"]["ConnectionComponents"][0]["PSMServerID"] == "PSM01"
+        
+        # Verify URI is added
+        assert data["data"]["uri"] == "cyberark://platforms/WinServerLocal"
+        
+        # Verify the correct method was called
+        self.mock_server.get_complete_platform_info.assert_called_once_with("WinServerLocal")
 
 
 
