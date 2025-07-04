@@ -4,10 +4,9 @@ This document provides a comprehensive overview of all capabilities provided by 
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server provides two main types of capabilities:
+The CyberArk Privilege Cloud MCP Server provides comprehensive access to CyberArk Privilege Cloud through:
 
-1. **Tools**: Action-based operations for creating and modifying CyberArk entities
-2. **Resources**: URI-based read-only access to CyberArk data for browsing and discovery
+**Tools**: Function-based operations for all CyberArk interactions, including data access and entity management. All tools return exact CyberArk API data with no field manipulation.
 
 ## Server Information
 
@@ -19,7 +18,82 @@ The CyberArk Privilege Cloud MCP Server provides two main types of capabilities:
 
 ## Tools
 
-The server provides 6 action tools for CyberArk management operations:
+The server provides 10 tools for CyberArk operations, returning exact API data with no manipulation:
+
+### Data Access Tools
+
+#### `list_accounts`
+- **Purpose**: List all accessible accounts
+- **Parameters**: None
+- **Returns**: List of account objects with exact CyberArk API fields
+- **Example Response**:
+  ```json
+  [
+    {
+      "id": "123_456",
+      "name": "admin@server01",
+      "userName": "admin",
+      "address": "server01.corp.com",
+      "platformId": "WinServerLocal",
+      "safeName": "IT-Infrastructure",
+      "secretType": "password",
+      "createdTime": "2025-01-01T00:00:00Z"
+    }
+  ]
+  ```
+
+#### `search_accounts`
+- **Purpose**: Search accounts with various criteria
+- **Parameters**:
+  - `query` (optional): General search keywords
+  - `safe_name` (optional): Filter by safe name
+  - `username` (optional): Filter by username  
+  - `address` (optional): Filter by address
+  - `platform_id` (optional): Filter by platform ID
+- **Returns**: List of matching account objects with search scores
+- **Example**:
+  ```json
+  {
+    "query": "admin",
+    "safe_name": "IT-Infrastructure",
+    "platform_id": "WinServerLocal"
+  }
+  ```
+
+#### `list_safes`
+- **Purpose**: List all accessible safes
+- **Parameters**: None
+- **Returns**: List of safe objects with exact CyberArk API fields
+- **Example Response**:
+  ```json
+  [
+    {
+      "safeName": "IT-Infrastructure",
+      "safeNumber": 123,
+      "description": "IT Infrastructure accounts",
+      "managingCPM": "PasswordManager",
+      "createdBy": "Administrator"
+    }
+  ]
+  ```
+
+#### `list_platforms`
+- **Purpose**: List all available platforms
+- **Parameters**: None  
+- **Returns**: List of platform objects with exact CyberArk API fields
+- **Example Response**:
+  ```json
+  [
+    {
+      "id": "WinServerLocal",
+      "name": "Windows Server Local",
+      "systemType": "Windows",
+      "active": true,
+      "platformType": "Regular",
+      "description": "Windows Server Local Accounts"
+    }
+  ]
+  ```
 
 ### Account Management Tools
 
@@ -116,56 +190,26 @@ The server provides 6 action tools for CyberArk management operations:
   }
   ```
 
-## Resources
+## Key Features
 
-The server provides URI-based resource access for browsing and discovery of CyberArk data. Resources are read-only and designed for efficient caching and navigation.
+### Tool-Based Architecture
+- **Direct Function Calls**: Simple tool invocation vs complex URI handling
+- **Better Client Compatibility**: Works consistently across all MCP clients  
+- **Exact API Data**: Zero field manipulation - returns raw CyberArk API responses
+- **Type Safety**: Full TypeScript/Python type annotations for all parameters
+- **Error Handling**: Structured error responses with detailed messages
 
-### Resource Types
+### Data Integrity
+- **Original Field Names**: Preserves CamelCase fields (e.g., `userName`, `platformId`)
+- **Raw API Values**: No data transformation or conversion applied
+- **Complete Structures**: Full API response objects maintained
+- **Search Scores**: Preserved when available (e.g., `_score` field)
 
-1. **Collection Resources**: Lists of entities with pagination support
-2. **Entity Resources**: Individual objects with full details
-3. **Search Resources**: Query-based filtered views
-4. **System Resources**: Health and status information
-
-### Available Resources
-
-#### Account Resources
-- **`cyberark://accounts/`** - Collection of all accessible accounts
-  - Returns paginated list of accounts across all accessible safes
-  - Supports filtering by safe, username, address
-  - Excludes sensitive data (passwords/secrets)
-
-- **`cyberark://accounts/search?query=...`** - Advanced account search
-  - Parameters: `keywords`, `safe_name`, `username`, `address`, `platform_id`
-  - Returns filtered account collections based on search criteria
-  - Example: `cyberark://accounts/search?safe_name=Production&platform_id=WinServerLocal`
-
-#### Safe Resources
-- **`cyberark://safes/`** - Collection of all accessible safes
-  - Returns list of safes with metadata (creation date, description, etc.)
-  - Excludes Internal Safes by default
-  - Includes account counts when available
-
-#### Platform Resources
-- **`cyberark://platforms/`** - Collection of all available platforms
-  - Returns platform definitions with system types and capabilities
-  - Includes both active and inactive platforms
-  - Contains platform configuration metadata
-
-#### System Resources
-- **`cyberark://health/`** - System health and connectivity status
-  - Authentication status and token validity
-  - API endpoint connectivity
-  - Permission verification results
-
-### Resource Features
-
-- **URI-based Addressing**: Direct access via standardized URIs
-- **Hierarchical Navigation**: Browse from collections to entities
-- **Search Capabilities**: Query-based resource filtering
-- **Metadata Support**: Rich metadata for each resource
-- **Caching Friendly**: Resources designed for client-side caching
-- **Error Handling**: Structured error responses
+### Performance & Reliability
+- **Direct Server Methods**: Tools call server methods directly
+- **Efficient Operations**: No URI parsing or resource registry overhead
+- **Concurrent Safe**: All tools support concurrent execution
+- **Authentication**: Automatic OAuth token refresh and validation
 
 ## Authentication & Security
 

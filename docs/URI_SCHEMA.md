@@ -1,6 +1,23 @@
-# CyberArk MCP URI Schema Reference
+# CyberArk MCP URI Schema Reference (Legacy)
 
-This document provides a comprehensive reference for the CyberArk Privilege Cloud MCP URI schema, including patterns, examples, and usage guidelines.
+**⚠️ DEPRECATED**: This document describes the legacy URI schema for resources. Resources have been replaced by tools for better MCP client compatibility.
+
+## Migration Notice
+
+URI-based resources have been replaced with direct tool functions. Instead of using URIs like `cyberark://accounts/`, use the corresponding tools:
+
+- `cyberark://accounts/` → `list_accounts()`
+- `cyberark://accounts/search?query=...` → `search_accounts(query=..., safe_name=..., etc.)`
+- `cyberark://safes/` → `list_safes()`
+- `cyberark://platforms/` → `list_platforms()`
+
+For current capabilities, see [Server Capabilities](../SERVER_CAPABILITIES.md).
+
+---
+
+## Legacy URI Schema (For Reference Only)
+
+This section is maintained for historical reference and migration purposes.
 
 ## URI Format
 

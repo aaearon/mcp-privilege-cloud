@@ -1,10 +1,27 @@
-# CyberArk Privilege Cloud MCP Resources
+# CyberArk Privilege Cloud MCP Tools (Formerly Resources)
 
-This document provides comprehensive documentation for the CyberArk Privilege Cloud MCP Resources implementation, enabling URI-based access to CyberArk entities through the Model Context Protocol.
+**⚠️ DEPRECATED**: This document describes the legacy resource-based approach. Resources have been replaced by tools for better MCP client compatibility.
 
-## Overview
+## Migration from Resources to Tools
 
-MCP Resources provide a standardized way to access and represent CyberArk data objects using URI-based addressing. This enables MCP clients to browse, cache, and reference CyberArk entities like safes, accounts, and platforms through a hierarchical URI structure.
+Resources have been converted to tools for better MCP client compatibility. All functionality is preserved with direct function calls instead of URI-based access.
+
+### Migration Guide
+
+| Legacy Resource | New Tool | Benefits |
+|----------------|----------|----------|
+| `cyberark://accounts/` | `list_accounts()` | Direct function call, better client support |
+| `cyberark://accounts/search?query=...` | `search_accounts(query, safe_name, username, address, platform_id)` | Type-safe parameters, easier to use |
+| `cyberark://safes/` | `list_safes()` | Simplified access, no URI parsing |
+| `cyberark://platforms/` | `list_platforms()` | Direct API data, no resource wrapper |
+
+## Tool Benefits Over Resources
+
+- **Better Client Compatibility**: Works consistently across all MCP clients
+- **Type Safety**: Full parameter validation and type hints
+- **Direct API Data**: Returns exact CyberArk API responses with no manipulation
+- **Simplified Architecture**: No URI parsing or resource registry overhead
+- **Performance**: Direct server method calls without resource layer
 
 ## Benefits
 

@@ -40,19 +40,25 @@ This document provides essential context for AI assistants developing the CyberA
 - **Platform APIs**: Require Privilege Cloud Administrator role membership
 - **Data Integrity**: All API responses preserved exactly - no field name or value transformations applied
 
-## Available MCP Tools (Actions Only)
+## Available MCP Tools
 
 | Tool | Purpose | Parameters | Returns |
 |------|---------|------------|---------|
-
+| **Data Access Tools** | | | |
+| `list_accounts` | List all accessible accounts | None | List of account objects with exact API fields |
+| `search_accounts` | Search accounts with criteria | `query`, `safe_name`, `username`, `address`, `platform_id` (all optional) | List of matching accounts with search scores |
+| `list_safes` | List all accessible safes | None | List of safe objects with exact API fields |
+| `list_platforms` | List all available platforms | None | List of platform objects with exact API fields |
+| **Account Management Tools** | | | |
 | `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
 | `change_account_password` | Change password for an account | `account_id` (required); `new_password` (optional) | Operation result |
 | `set_next_password` | Set the next password for an account | `account_id`, `password` (required) | Operation result |
 | `verify_account_password` | Verify the current password for an account | `account_id` (required) | Verification result |
 | `reconcile_account_password` | Reconcile account password with target system | `account_id` (required) | Reconciliation result |
-
-| `get_platform_details` | Get comprehensive platform configuration from Policy INI file | `platform_id` (required) | Complete platform configuration with 66+ detailed settings including credentials management policy, session management, workflows, and connection components |
+| **Platform Management Tools** | | | |
 | `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
+
+> **Breaking Change**: Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
 
 ## Enhanced Platform Data Combination
 
@@ -171,16 +177,18 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 - **Logging**: Comprehensive performance metrics and failure tracking
 - **Graceful Degradation**: Returns successful platforms even if some fail
 
-## Available MCP Resources (Read Operations)
+## Data Access Tools (Replaced Resources)
 
-| Resource | Purpose | URI Pattern | Description |
-|----------|---------|-------------|-------------|
-| **Accounts** | List and search accounts | `cyberark://accounts/` | All accessible accounts across safes |
-| **Account Search** | Advanced account search | `cyberark://accounts/search?query=...` | Search with filters and keywords |
-| **Safes** | List accessible safes | `cyberark://safes/` | All safes with pagination support |
-| **Platforms** | List available platforms | `cyberark://platforms/` | Platform definitions with raw API data preserved exactly |
+The following tools provide the same functionality as the previous resources but with better MCP client compatibility:
 
-*Resources provide read-only access via URIs with complete API data fidelity - no transformations applied*
+| Previous Resource | New Tool | Description |
+|-------------------|----------|-------------|
+| `cyberark://accounts/` | `list_accounts()` | All accessible accounts across safes |
+| `cyberark://accounts/search?query=...` | `search_accounts()` | Search with filters and keywords |
+| `cyberark://safes/` | `list_safes()` | All safes with pagination support |
+| `cyberark://platforms/` | `list_platforms()` | Platform definitions with raw API data preserved exactly |
+
+*Tools provide direct function calls with complete API data fidelity - no transformations applied*
 
 ## Configuration
 

@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 ### Basic Test Commands
 ```bash
-# Run all tests (148+ total)
+# Run all tests (218+ total)
 pytest
 
 # Run with verbose output
@@ -92,36 +92,33 @@ The test suite is organized into specialized test files with comprehensive cover
 - Platform package import MCP wrapper
 - Platform management parameter validation
 
-**TestMCPResourceIntegration** - Resource testing framework (4+ tests)
-- Resource discovery and validation
-- Resource content retrieval testing
-- Resource error handling
+**TestMCPListingTools** - Data access tool testing (4+ tests)
+- List tools validation (`list_accounts`, `list_safes`, `list_platforms`)
+- Search tool testing (`search_accounts`)
+- Tool parameter validation and response formatting
 
-#### `tests/test_integration.py` (25+ tests)
-**TestPlatformIntegration** - Comprehensive end-to-end integration testing (9+ tests)
-- Complete platform workflow from MCP resource to API calls
-- Track A & B enhancement integration (server + resource improvements)
-- Field transformation integration across all data types
-- Mixed success/failure scenarios with graceful degradation
-- Error handling integration across all layers (auth, server, resource)
-- Performance characteristics of concurrent operations
-- Backward compatibility with existing implementations
-- Resource metadata integration testing
-- MCP server initialization with enhanced features
+#### `tests/test_tools.py` (9+ tests)
+- Direct tool function testing
+- Parameter validation for all tools
+- Error handling for tool operations
+- Raw API data verification
 
-#### `tests/test_resources.py` (24+ tests)
-- Resource implementation testing
-- Resource registry functionality
-- Resource content generation and validation
-- Resource error handling and edge cases
-- Resource URI pattern matching
+#### `tests/test_integration_tools.py` (2+ tests)
+- Tool integration testing with server methods
+- End-to-end tool workflow validation
+
+#### Legacy Test Files (Removed)
+- `tests/test_resources.py` - Removed (resources converted to tools)
+- `tests/test_integration_old.py` - Removed (legacy resource integration tests)
+
+The testing architecture has been simplified by removing the resource layer complexity while maintaining comprehensive coverage for all tool functionality.
 
 ### Test Coverage Metrics
-- **Total Tests**: 267+ comprehensive test cases
+- **Total Tests**: 218+ comprehensive test cases (simplified after resource removal)
 - **Target Coverage**: Minimum 80% code coverage
 - **Mock Strategy**: All external CyberArk API dependencies are mocked
-- **Test Types**: Unit, integration, MCP tools, and MCP resources tests
-- **Platform Enhancement Coverage**: Complete Track A & B integration testing
+- **Test Types**: Unit, integration, MCP tools tests (resources removed)
+- **Tool Coverage**: Complete coverage for all 10 MCP tools
 
 ## Running Tests
 
