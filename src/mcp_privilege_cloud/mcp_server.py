@@ -293,146 +293,92 @@ async def import_platform_package(
         raise
 
 
-# Initialize resource registry and register all resource types
-from mcp.types import Resource
-from .resources import (
-    ResourceRegistry,
-    HealthResource,
-    SafeCollectionResource, SafeEntityResource, SafeAccountsResource,
-    AccountCollectionResource, AccountEntityResource, AccountSearchResource,
-    PlatformCollectionResource, PlatformEntityResource, PlatformPackagesResource
-)
-
-# Create global resource registry
-resource_registry = ResourceRegistry()
-
-# Register all resource types with their URI patterns
-def setup_resources():
-    """Set up all resource types with the registry and register with MCP."""
-    # System resources
-    resource_registry.register_resource("health", HealthResource)
+# New tool functions to replace resources - return raw API data
+@mcp.tool()
+async def list_accounts() -> List[Dict[str, Any]]:
+    """List all accessible accounts in CyberArk Privilege Cloud.
     
-    # Safe resources
-    resource_registry.register_resource("safes", SafeCollectionResource)
-    resource_registry.register_resource("safes/{safe_name}", SafeEntityResource)
-    resource_registry.register_resource("safes/{safe_name}/accounts", SafeAccountsResource)
-    
-    # Account resources
-    resource_registry.register_resource("accounts", AccountCollectionResource)
-    resource_registry.register_resource("accounts/{account_id}", AccountEntityResource)
-    resource_registry.register_resource("accounts/search", AccountSearchResource)
-    
-    # Platform resources
-    resource_registry.register_resource("platforms", PlatformCollectionResource)
-    resource_registry.register_resource("platforms/{platform_id}", PlatformEntityResource)
-    resource_registry.register_resource("platforms/packages", PlatformPackagesResource)
-    
-    # Resources are registered via @mcp.resource decorators below
-
-
-@mcp.resource("cyberark://health", name="CyberArk Health", description="System health status")
-async def get_health_resource() -> str:
-    """Get health resource content."""
-    return await _read_resource_content("cyberark://health")
-
-
-@mcp.resource("cyberark://safes", name="CyberArk Safes", description="All accessible safes")
-async def get_safes_resource() -> str:
-    """Get safes collection resource content."""
-    return await _read_resource_content("cyberark://safes")
-
-
-@mcp.resource("cyberark://accounts", name="CyberArk Accounts", description="All accessible accounts")
-async def get_accounts_resource() -> str:
-    """Get accounts collection resource content."""
-    return await _read_resource_content("cyberark://accounts")
-
-
-@mcp.resource("cyberark://platforms", name="CyberArk Platforms", description="All available platforms")
-async def get_platforms_resource() -> str:
-    """Get platforms collection resource content."""
-    return await _read_resource_content("cyberark://platforms")
-
-# Entity resource templates for individual items
-@mcp.resource("cyberark://platforms/{platform_id}", name="CyberArk Platform", description="Individual platform details")
-async def get_platform_entity_resource(platform_id: str) -> str:
-    """Get individual platform entity resource content."""
-    return await _read_resource_content(f"cyberark://platforms/{platform_id}")
-
-@mcp.resource("cyberark://accounts/{account_id}", name="CyberArk Account", description="Individual account details")
-async def get_account_entity_resource(account_id: str) -> str:
-    """Get individual account entity resource content."""
-    return await _read_resource_content(f"cyberark://accounts/{account_id}")
-
-@mcp.resource("cyberark://safes/{safe_name}", name="CyberArk Safe", description="Individual safe details")
-async def get_safe_entity_resource(safe_name: str) -> str:
-    """Get individual safe entity resource content."""
-    return await _read_resource_content(f"cyberark://safes/{safe_name}")
-
-@mcp.resource("cyberark://safes/{safe_name}/accounts", name="CyberArk Safe Accounts", description="Accounts in a specific safe")
-async def get_safe_accounts_resource(safe_name: str) -> str:
-    """Get accounts in a specific safe resource content."""
-    return await _read_resource_content(f"cyberark://safes/{safe_name}/accounts")
-
-@mcp.resource("cyberark://accounts/search", name="CyberArk Account Search", description="Search accounts with query parameters")
-async def get_account_search_resource() -> str:
-    """Get account search resource content."""
-    return await _read_resource_content("cyberark://accounts/search")
-
-
-async def _read_resource_content(uri: str) -> str:
-    """Read specific CyberArk resource by URI."""
+    Returns:
+        List of account objects with their exact API fields
+    """
     try:
-        # Ensure server is initialized and set in registry
         server = CyberArkMCPServer.from_environment()
-        resource_registry.set_server(server)
-        
-        # Create resource instance for the URI
-        resource = await resource_registry.create_resource(uri)
-        if not resource:
-            error_data = {
-                "error": "resource_not_found",
-                "message": f"No resource handler found for URI: {uri}",
-                "available_patterns": resource_registry.get_registered_patterns()
-            }
-            return json.dumps(error_data, indent=2)
-        
-        # Get resource content
-        content = await resource.get_content()
-        logger.info(f"Successfully read resource: {uri}")
-        return content
-        
-    except ValueError as e:
-        # Handle missing environment variables gracefully (not as error)
-        if "environment variable is required" in str(e):
-            logger.debug(f"Environment not configured for resource {uri}: {e}")
-            unavailable_data = {
-                "message": "Resource temporarily unavailable - environment not configured",
-                "uri": uri,
-                "status": "unavailable"
-            }
-            return json.dumps(unavailable_data, indent=2)
-        else:
-            # Re-raise other ValueError instances
-            raise
-            
+        return await server.list_accounts()
     except Exception as e:
-        logger.error(f"Error reading resource {uri}: {e}")
-        error_data = {
-            "error": "resource_read_error", 
-            "message": str(e),
-            "uri": uri
-        }
-        return json.dumps(error_data, indent=2)
+        logger.error(f"Error listing accounts: {e}")
+        raise
+
+@mcp.tool()
+async def search_accounts(
+    query: Optional[str] = None,
+    safe_name: Optional[str] = None,
+    username: Optional[str] = None,
+    address: Optional[str] = None,
+    platform_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Search for accounts with various criteria.
+    
+    Args:
+        query: General search keywords
+        safe_name: Filter by safe name
+        username: Filter by username
+        address: Filter by address
+        platform_id: Filter by platform ID
+        
+    Returns:
+        List of matching account objects with exact API fields
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        return await server.search_accounts(
+            keywords=query,
+            safe_name=safe_name,
+            username=username,
+            address=address,
+            platform_id=platform_id
+        )
+    except Exception as e:
+        logger.error(f"Error searching accounts: {e}")
+        raise
+
+@mcp.tool()
+async def list_safes() -> List[Dict[str, Any]]:
+    """List all accessible safes in CyberArk Privilege Cloud.
+    
+    Returns:
+        List of safe objects with their exact API fields
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        return await server.list_safes()
+    except Exception as e:
+        logger.error(f"Error listing safes: {e}")
+        raise
+
+@mcp.tool()
+async def list_platforms() -> List[Dict[str, Any]]:
+    """List all available platforms in CyberArk Privilege Cloud.
+    
+    Returns:
+        List of platform objects with their exact API fields
+    """
+    try:
+        server = CyberArkMCPServer.from_environment()
+        return await server.list_platforms()
+    except Exception as e:
+        logger.error(f"Error listing platforms: {e}")
+        raise
+
+
+
+
+
+
 
 
 def main():
     """Main entry point for the MCP server"""
     logger.info("Starting CyberArk Privilege Cloud MCP Server")
-    
-    # Set up resource registry
-    setup_resources()
-    logger.info("Resource registry initialized with all CyberArk resources")
     
     # Verify required environment variables
     required_vars = [
