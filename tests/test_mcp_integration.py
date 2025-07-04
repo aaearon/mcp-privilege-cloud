@@ -20,9 +20,11 @@ from mcp_privilege_cloud.mcp_server import create_account, set_next_password
 
 # Platform management MCP tools  
 from mcp_privilege_cloud.mcp_server import import_platform_package
-from mcp_privilege_cloud.server import CyberArkMCPServer
 
-# Safe management MCP tools - replaced with resources
+# New listing MCP tools that replaced resources
+from mcp_privilege_cloud.mcp_server import list_accounts, search_accounts, list_safes, list_platforms
+
+from mcp_privilege_cloud.server import CyberArkMCPServer
 
 
 class TestMCPAccountTools:
@@ -423,6 +425,114 @@ class TestMCPPlatformTools:
                 
                 with pytest.raises(ValueError, match="Platform package file not found"):
                     await import_platform_package("/tmp/nonexistent.zip")
+
+
+class TestMCPListingTools:
+    """Test MCP listing tools that replaced resources"""
+
+    @pytest.fixture
+    def mock_env_vars(self):
+        """Mock environment variables for tests."""
+        return {
+            "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
+            "CYBERARK_CLIENT_ID": "test-client-id",
+            "CYBERARK_CLIENT_SECRET": "test-secret",
+            "CYBERARK_SUBDOMAIN": "test-subdomain"
+        }
+
+    @pytest.mark.asyncio
+    async def test_list_accounts_tool(self, mock_env_vars):
+        """Test the list_accounts MCP tool"""
+        mock_accounts = [
+            {
+                "id": "123_456",
+                "name": "admin@server01",
+                "address": "server01.corp.com",
+                "userName": "admin",
+                "platformId": "WinServerLocal",
+                "safeName": "IT-Infrastructure"
+            }
+        ]
+        
+        with patch.dict(os.environ, mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'list_accounts', new_callable=AsyncMock) as mock_list:
+                mock_list.return_value = mock_accounts
+                
+                result = await list_accounts()
+                
+                assert result == mock_accounts
+                mock_list.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_accounts_tool(self, mock_env_vars):
+        """Test the search_accounts MCP tool"""
+        mock_accounts = [
+            {
+                "id": "123_456",
+                "name": "admin@server01",
+                "userName": "admin",
+                "platformId": "WinServerLocal",
+                "_score": 0.85
+            }
+        ]
+        
+        with patch.dict(os.environ, mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'search_accounts', new_callable=AsyncMock) as mock_search:
+                mock_search.return_value = mock_accounts
+                
+                result = await search_accounts(query="admin", safe_name="IT-Infrastructure")
+                
+                assert result == mock_accounts
+                mock_search.assert_called_once_with(
+                    keywords="admin",
+                    safe_name="IT-Infrastructure",
+                    username=None,
+                    address=None,
+                    platform_id=None
+                )
+
+    @pytest.mark.asyncio
+    async def test_list_safes_tool(self, mock_env_vars):
+        """Test the list_safes MCP tool"""
+        mock_safes = [
+            {
+                "safeName": "IT-Infrastructure",
+                "safeNumber": 123,
+                "description": "IT Infrastructure accounts",
+                "createdBy": "Administrator"
+            }
+        ]
+        
+        with patch.dict(os.environ, mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'list_safes', new_callable=AsyncMock) as mock_list:
+                mock_list.return_value = mock_safes
+                
+                result = await list_safes()
+                
+                assert result == mock_safes
+                mock_list.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_list_platforms_tool(self, mock_env_vars):
+        """Test the list_platforms MCP tool"""
+        mock_platforms = [
+            {
+                "id": "WinServerLocal",
+                "name": "Windows Server Local",
+                "systemType": "Windows",
+                "active": True,
+                "platformType": "Regular"
+            }
+        ]
+        
+        with patch.dict(os.environ, mock_env_vars):
+            with patch.object(CyberArkMCPServer, 'list_platforms', new_callable=AsyncMock) as mock_list:
+                mock_list.return_value = mock_platforms
+                
+                result = await list_platforms()
+                
+                assert result == mock_platforms
+                mock_list.assert_called_once()
 
 
 
