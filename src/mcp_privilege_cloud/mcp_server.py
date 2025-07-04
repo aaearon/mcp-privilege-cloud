@@ -402,6 +402,20 @@ async def _read_resource_content(uri: str) -> str:
         logger.info(f"Successfully read resource: {uri}")
         return content
         
+    except ValueError as e:
+        # Handle missing environment variables gracefully (not as error)
+        if "environment variable is required" in str(e):
+            logger.debug(f"Environment not configured for resource {uri}: {e}")
+            unavailable_data = {
+                "message": "Resource temporarily unavailable - environment not configured",
+                "uri": uri,
+                "status": "unavailable"
+            }
+            return json.dumps(unavailable_data, indent=2)
+        else:
+            # Re-raise other ValueError instances
+            raise
+            
     except Exception as e:
         logger.error(f"Error reading resource {uri}: {e}")
         error_data = {
