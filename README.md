@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/aaearon-mcp-privilege-cloud-badge.png)](https://mseep.ai/app/aaearon-mcp-privilege-cloud)
+
 # CyberArk Privilege Cloud MCP Server
 
 A Model Context Protocol (MCP) server that provides seamless integration with CyberArk Privilege Cloud. This server enables AI assistants and other MCP clients to interact with CyberArk's privileged account management capabilities.
