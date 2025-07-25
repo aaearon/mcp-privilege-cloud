@@ -111,13 +111,13 @@ The test suite is organized into specialized test files with comprehensive cover
 - `tests/test_resources.py` - Removed (resources converted to tools)
 - `tests/test_integration_old.py` - Removed (legacy resource integration tests)
 
-The testing architecture has been simplified by removing the resource layer complexity while maintaining comprehensive coverage for all tool functionality.
+The testing architecture has been simplified by converting to a tool-based architecture while maintaining comprehensive coverage for all tool functionality.
 
 ### Test Coverage Metrics
 - **Total Tests**: 218+ comprehensive test cases (simplified after resource removal)
 - **Target Coverage**: Minimum 80% code coverage
 - **Mock Strategy**: All external CyberArk API dependencies are mocked
-- **Test Types**: Unit, integration, MCP tools tests (resources removed)
+- **Test Types**: Unit, integration, MCP tools tests
 - **Tool Coverage**: Complete coverage for all 10 MCP tools
 
 ## Running Tests
@@ -150,8 +150,8 @@ pytest tests/test_mcp_integration.py
 # Integration tests only
 pytest tests/test_integration.py
 
-# Resource tests only
-pytest tests/test_resources.py
+# Tool tests only
+pytest tests/test_tools.py
 ```
 
 #### Run by Test Categories
@@ -171,8 +171,8 @@ pytest tests/test_integration.py::TestPlatformIntegration -v
 # Platform management tests
 pytest -k platform
 
-# Resource tests
-pytest -k resource
+# Tool tests
+pytest -k tool
 
 # Account management tests (tools and operations)
 pytest -k account
@@ -287,11 +287,7 @@ You should see these **6 tools** in the Inspector:
 - `reconcile_account_password`
 - `import_platform_package`
 
-And these **4 resources**:
-- `cyberark://health/` - System health status
-- `cyberark://safes/` - All accessible safes
-- `cyberark://accounts/` - All accessible accounts
-- `cyberark://platforms/` - All available platforms
+All tools return exact CyberArk API data with no field manipulation.
 
 ### Parameter Validation Testing
 
@@ -334,32 +330,26 @@ Test tool parameter validation without real API calls:
 }
 ```
 
-### Resource Testing
+### Tool Testing
 
-Resources provide read-only access to CyberArk data through URI-based endpoints. Test resource accessibility without real API calls:
+Tools provide access to CyberArk operations through function calls. Test tool accessibility without real API calls:
 
-#### Test Resource Discovery
-Resources should be discoverable in the MCP Inspector under the "Resources" section.
+#### Test Tool Discovery
+Tools should be discoverable in the MCP Inspector under the "Tools" section.
 
-#### Test Resource URIs
-```bash
-# Health status resource
-cyberark://health/
+#### Test Tool Parameters
+Each tool should validate parameters correctly:
+- **list_accounts**: No parameters required
+- **search_accounts**: Optional query, safe_name, username, address, platform_id parameters
+- **list_safes**: No parameters required
+- **list_platforms**: No parameters required
+- **create_account**: Required platform_id, safe_name; optional name, address, user_name, etc.
+- **Password management tools**: Required account_id parameter
 
-# Safes collection resource  
-cyberark://safes/
-
-# Accounts collection resource
-cyberark://accounts/
-
-# Platforms collection resource
-cyberark://platforms/
-```
-
-#### Expected Resource Behavior
-- **Without credentials**: Resources should return error information explaining missing configuration
-- **With credentials**: Resources should return formatted JSON data from CyberArk APIs
-- **Invalid URIs**: Should return clear error messages for unsupported resource patterns
+#### Expected Tool Behavior
+- **Without credentials**: Tools should return authentication error information
+- **With credentials**: Tools should return properly formatted CyberArk API data
+- **Invalid parameters**: Should return clear parameter validation error messages
 
 ### Testing With Real Credentials
 
@@ -410,27 +400,44 @@ INFO - CyberArk server connection established successfully
 
 ### Real API Testing Sequence
 
-#### Test 1: Read Health Resource
-```
-Resource URI: cyberark://health/
+#### Test 1: List Accounts Tool
+```json
+{
+  "tool": "list_accounts",
+  "arguments": {}
+}
 ```
 **Expected Response:**
 ```json
+[
+  {
+    "id": "123_456",
+    "name": "DatabaseAdmin",
+    "address": "db.company.com",
+    "userName": "dbadmin",
+    "platformId": "MySQLDB",
+    "safeName": "Database-Safes"
+  }
+]
+```
+
+#### Test 2: List Safes Tool
+```json
 {
-  "status": "healthy",
-  "timestamp": "2025-07-01T...",
-  "safes_accessible": 5
+  "tool": "list_safes",
+  "arguments": {}
 }
 ```
 
-#### Test 2: Read Safes Resource
-```
-Resource URI: cyberark://safes/
-```
-
-#### Test 3: Read Accounts Resource
-```
-Resource URI: cyberark://accounts/
+#### Test 3: Search Accounts Tool
+```json
+{
+  "tool": "search_accounts",
+  "arguments": {
+    "safe_name": "IT-Infrastructure",
+    "query": "server"
+  }
+}
 ```
 
 #### Test 4: Create Account Tool
@@ -456,9 +463,12 @@ Resource URI: cyberark://accounts/
 }
 ```
 
-#### Test 6: Read Platforms Resource
-```
-Resource URI: cyberark://platforms/
+#### Test 6: List Platforms Tool
+```json
+{
+  "tool": "list_platforms",
+  "arguments": {}
+}
 ```
 
 ## Test Categories
@@ -467,13 +477,13 @@ Resource URI: cyberark://platforms/
 - **Authentication Module**: Token management, OAuth flow, credential validation
 - **Server Core**: HTTP client, API response parsing, error handling
 - **MCP Tools**: Action tool wrappers, parameter validation, response formatting
-- **MCP Resources**: Resource content generation, URI pattern matching, registry functionality
+- **Tool Integration**: Tool validation, parameter processing, response formatting
 
 ### Integration Tests
 - **End-to-end Workflows**: Complete operations from authentication to action execution
 - **Cross-component Integration**: Authentication + server + MCP layer testing
 - **API Compliance**: Real CyberArk API behavior validation
-- **Resource Integration**: Resource content retrieval and formatting testing
+- **Tool Integration**: Complete tool workflows and error handling validation
 
 ### Performance Tests
 - **Response Time Testing**: API call performance measurement
@@ -632,10 +642,9 @@ pytest --cov=src/mcp_privilege_cloud --cov-report=xml
 - ✅ Fast test execution (< 2 minutes for full suite)
 
 ### MCP Inspector Integration
-- ✅ All 6 action tools visible in Inspector interface
-- ✅ All 4 resources accessible in Inspector interface
+- ✅ All 10 tools visible in Inspector interface
 - ✅ Tool parameters correctly displayed and validated
-- ✅ Resource content properly loaded and displayed
+- ✅ Tool content properly loaded and displayed
 - ✅ Successful tool execution with real credentials
 - ✅ Clear error messages for invalid operations
 
@@ -649,9 +658,9 @@ pytest --cov=src/mcp_privilege_cloud --cov-report=xml
 
 After successful testing:
 1. **Integration**: Connect to preferred MCP client (Claude Desktop, etc.)
-2. **Automation**: Integrate action tools and resources into automated workflows
+2. **Automation**: Integrate tools into automated workflows
 3. **Monitoring**: Set up production logging and monitoring
-4. **Enhancement**: Add additional password management features and resources
+4. **Enhancement**: Add additional password management and account lifecycle tools
 
 ---
 

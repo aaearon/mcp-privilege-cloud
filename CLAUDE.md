@@ -142,18 +142,15 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 - **Logging**: Comprehensive performance metrics and failure tracking
 - **Graceful Degradation**: Returns successful platforms even if some fail
 
-## Data Access Tools (Replaced Resources)
+## Data Access Tools
 
-The following tools provide the same functionality as the previous resources but with better MCP client compatibility:
+The server provides comprehensive data access tools for CyberArk operations with complete API data fidelity:
 
-| Previous Resource | New Tool | Description |
-|-------------------|----------|-------------|
-| `cyberark://accounts/` | `list_accounts()` | All accessible accounts across safes |
-| `cyberark://accounts/search?query=...` | `search_accounts()` | Search with filters and keywords |
-| `cyberark://safes/` | `list_safes()` | All safes with pagination support |
-| `cyberark://platforms/` | `list_platforms()` | Platform definitions with raw API data preserved exactly |
+**Account Tools**: `list_accounts()`, `search_accounts()` - Access and search all privileged accounts
+**Safe Tools**: `list_safes()` - Access all safes with complete details  
+**Platform Tools**: `list_platforms()` - Access platform definitions with raw API data preserved exactly
 
-*Tools provide direct function calls with complete API data fidelity - no transformations applied*
+*All tools return exact CyberArk API data with no field manipulation or transformations applied*
 
 ## Configuration
 
