@@ -72,50 +72,9 @@ The project includes several entry points for development:
 - **`debug_platform_api.py`** - Platform API debugging script
 - **`test_mvp.py`** - MVP functionality verification
 
-## Architecture Overview
+## Architecture
 
-### Core Components
-
-The project follows a layered architecture with clear separation of concerns:
-
-```
-src/mcp_privilege_cloud/
-├── auth.py          # OAuth 2.0 authentication module
-├── server.py        # Core CyberArk API integration
-└── mcp_server.py    # MCP protocol implementation
-```
-
-#### 1. Authentication Module (`auth.py`)
-- **OAuth 2.0 Client Credentials Flow**: Secure token-based authentication
-- **Automatic Token Refresh**: 15-minute expiration with 60-second safety margin
-- **Concurrent Request Handling**: Double-checked locking pattern
-- **Error Recovery**: Comprehensive retry logic for auth failures
-
-#### 2. Server Module (`server.py`)
-- **CyberArk API Integration**: Core business logic for account/safe/platform operations
-- **HTTP Client Management**: Proper authentication headers and timeout handling
-- **Response Processing**: Handles API inconsistencies (value vs Platforms fields)
-- **Error Handling**: Network, permission, and rate limiting scenarios
-
-#### 3. MCP Integration (`mcp_server.py`)
-- **FastMCP Server**: MCP protocol implementation
-- **Action Tools**: 6 action tools for account and platform operations
-- **Resource Endpoints**: Structured resource endpoints for data access
-- **Parameter Validation**: Input validation and type checking
-- **Cross-Platform Support**: Windows encoding compatibility
-
-### API Integration Details
-
-**Base URLs**:
-- **API Base**: `https://{subdomain}.privilegecloud.cyberark.cloud/PasswordVault/api`
-- **Authentication**: `https://{tenant-id}.id.cyberark.cloud/oauth2/platformtoken`
-
-**Key Implementation Notes**:
-- Uses `.cloud` TLD (not `.com`)
-- Always use Gen2 API endpoints when available
-- Handle inconsistent response formats across endpoints
-- Implement proper URL encoding for special characters
-- Follow principle of least privilege for service accounts
+For a complete overview of the system architecture, components, and API integration details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Development Workflow
 
@@ -184,7 +143,7 @@ Follow the feature branch Git workflow:
 Follow this systematic approach for adding new action tools:
 
 1. **Define Tool Specification**:
-   - Document in `docs/development/SERVER_CAPABILITIES.md`
+   - Document in `docs/API_REFERENCE.md`
    - Define parameters, return types, and behavior
 
 2. **Write Comprehensive Tests** (TDD):

@@ -5,11 +5,11 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
 ## Features
 
 ### Current (Production Ready)
-- **Account Management**: Browse and search accounts via resources, create new privileged accounts
-- **Safe Management**: Browse safe hierarchy and view safe information via resources
-- **Platform Management**: Browse available platforms and configurations via resources
+- **Account Management**: List, search, and create privileged accounts via MCP tools
+- **Safe Management**: List and browse safes via MCP tools  
+- **Platform Management**: List platforms and import platform packages via MCP tools
 - **Password Operations**: Change, verify, set next, and reconcile account passwords
-- **MCP Resources**: URI-based access to CyberArk entities for browsing and caching
+- **MCP Tools**: Function-based access to CyberArk operations with exact API data
 - **OAuth 2.0 Authentication**: Secure API token authentication with CyberArk Identity
 - **Health Monitoring**: Built-in health check functionality
 - **Comprehensive Logging**: Detailed logging for all operations
@@ -89,7 +89,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
    python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
    ```
 
-For detailed setup instructions, service account configuration, and troubleshooting, see [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
+For detailed setup instructions and service account configuration, see the Configuration section above.
 
 ## Usage
 
@@ -125,22 +125,27 @@ python -m src.mcp_privilege_cloud.mcp_server
 
 ### Available Tools
 
-The server provides 6 MCP tools for CyberArk action operations:
+The server provides 10 MCP tools for CyberArk operations:
 
-- **Account Management**: `create_account`
-- **Password Operations**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
-- **Platform Management**: `import_platform_package`
+#### Data Access Tools
+- **`list_accounts`**: List all accessible accounts with exact API fields
+- **`search_accounts`**: Search accounts with filters (query, safe_name, username, address, platform_id)  
+- **`list_safes`**: List all accessible safes with complete details
+- **`list_platforms`**: List all available platforms with raw API data
 
-### Available Resources
+#### Account Management Tools
+- **`create_account`**: Create new privileged accounts
+- **`change_account_password`**: Change account passwords (CPM-managed)
+- **`set_next_password`**: Set next password for accounts
+- **`verify_account_password`**: Verify current account passwords
+- **`reconcile_account_password`**: Reconcile passwords with target systems
 
-The server provides URI-based resource access for browsing and data retrieval:
+#### Platform Management Tools
+- **`import_platform_package`**: Import platform packages (.zip files)
 
-- **Health**: `cyberark://health/` - System status and connectivity information
-- **Safes**: `cyberark://safes/` - Browse safe hierarchy, list safes, and view safe contents
-- **Accounts**: `cyberark://accounts/` - Access account collections, search accounts, and view account details
-- **Platforms**: `cyberark://platforms/` - Browse platform configurations with **enhanced complete information** including policy settings, connection components, and privileged access workflows
+> **Breaking Change**: Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
 
-For detailed specifications, see [Resources Guide](docs/RESOURCES.md) and [API Reference](docs/API_REFERENCE.md).
+For detailed specifications, see [API Reference](docs/API_REFERENCE.md).
 
 ## Standardized MCP Server Approach
 
@@ -204,7 +209,22 @@ For detailed testing instructions, see [Testing Guide](docs/TESTING.md).
 
 ## Troubleshooting
 
-For comprehensive troubleshooting, setup issues, and debugging guidance, see [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
+### Quick Diagnostics
+```bash
+# Verify health status
+python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
+
+# Check environment variables
+echo "Config: ${CYBERARK_CLIENT_ID:+SET} ${CYBERARK_SUBDOMAIN:+SET}"
+```
+
+### Common Issues
+- **Missing environment variables**: Create `.env` file with required credentials
+- **Authentication failed**: Verify service account credentials in CyberArk Identity
+- **Permission errors**: Ensure service account has appropriate safe permissions
+- **Connection issues**: Verify `.cloud` TLD (not `.com`) and network connectivity
+
+For additional troubleshooting, check the project's issue tracker or development documentation.
 
 ## Security Considerations
 
@@ -220,7 +240,6 @@ For comprehensive troubleshooting, setup issues, and debugging guidance, see [Tr
 ### User Guides
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications with examples
 - **[Testing Guide](docs/TESTING.md)** - Test execution and MCP Inspector usage
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Setup, debugging, and common issues
 
 ### Developer Guides  
 - **[Development Guide](DEVELOPMENT.md)** - Architecture, contributing, and code standards
