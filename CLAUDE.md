@@ -10,53 +10,18 @@ This document provides essential context for AI assistants developing the CyberA
 **Last Updated**: July 3, 2025  
 **Recent Enhancement**: Fixed platform pagination issue - removed artificial 50-platform limit to return all available platforms (125 total). Enhanced concurrent processing with optimized timeouts and improved error handling for complete platform visibility.
 
-## Architecture Overview
+## Architecture
 
-### Core Components
-
-1. **Authentication Module** (`src/mcp_privilege_cloud/auth.py`)
-   - OAuth 2.0 client credentials flow with 15-minute token expiration
-   - Automatic token refresh with double-checked locking
-   - Environment variable-based credential management
-
-2. **Server Module** (`src/mcp_privilege_cloud/server.py`)
-   - CyberArk API integration with authentication headers
-   - Account, safe, and platform management operations
-   - Error handling for 401/403/429 status codes
-
-3. **MCP Integration** (`src/mcp_privilege_cloud/mcp_server.py`)
-   - FastMCP server implementation
-   - 7 exposed action tools for CyberArk operations
-   - Proper tool parameter validation
-   - Windows-compatible encoding handling
-
-### Critical API Integration Notes
-
-- **Base URL**: `https://{subdomain}.privilegecloud.cyberark.cloud/PasswordVault/api`
-- **Authentication**: `https://{tenant-id}.id.cyberark.cloud/oauth2/platformtoken`
-- **TLD**: Uses `.cloud` not `.com` (common mistake)
-- **API Version Policy**: ALWAYS use Gen2 endpoints when available (not Gen1)
-- **Response Parsing**: `value` field for arrays (except Platforms API uses `Platforms`)
-- **Platform APIs**: Require Privilege Cloud Administrator role membership
-- **Data Integrity**: All API responses preserved exactly - no field name or value transformations applied
+For a complete overview of the system architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Available MCP Tools
 
-| Tool | Purpose | Parameters | Returns |
-|------|---------|------------|---------|
-| **Data Access Tools** | | | |
-| `list_accounts` | List all accessible accounts | None | List of account objects with exact API fields |
-| `search_accounts` | Search accounts with criteria | `query`, `safe_name`, `username`, `address`, `platform_id` (all optional) | List of matching accounts with search scores |
-| `list_safes` | List all accessible safes | None | List of safe objects with exact API fields |
-| `list_platforms` | List all available platforms | None | List of platform objects with exact API fields |
-| **Account Management Tools** | | | |
-| `create_account` | Create new privileged account | `platform_id`, `safe_name` (required); `name`, `address`, `user_name`, `secret`, `secret_type`, `platform_account_properties`, `secret_management`, `remote_machines_access` (optional) | Created account object with ID |
-| `change_account_password` | Change password for an account | `account_id` (required); `new_password` (optional) | Operation result |
-| `set_next_password` | Set the next password for an account | `account_id`, `password` (required) | Operation result |
-| `verify_account_password` | Verify the current password for an account | `account_id` (required) | Verification result |
-| `reconcile_account_password` | Reconcile account password with target system | `account_id` (required) | Reconciliation result |
-| **Platform Management Tools** | | | |
-| `import_platform_package` | Import platform package | `platform_package_file` (required) | Import result with platform ID |
+The server provides 10 MCP tools for CyberArk operations. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
+
+**Tool Categories**:
+- **Data Access Tools**: `list_accounts`, `search_accounts`, `list_safes`, `list_platforms`
+- **Account Management Tools**: `create_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+- **Platform Management Tools**: `import_platform_package`
 
 > **Breaking Change**: Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
 
@@ -306,10 +271,11 @@ The following tools provide the same functionality as the previous resources but
 ## References
 
 - **README.md** - Complete setup and configuration documentation
-- **TESTING.md** - Comprehensive testing guidelines and commands  
-- **TROUBLESHOOTING.md** - ✅ NEW: Comprehensive troubleshooting guide for platform error scenarios (Task A4)
-- **SERVER_CAPABILITIES.md** - Complete tool specifications and examples
+- **ARCHITECTURE.md** - System architecture and component details
+- **DEVELOPMENT.md** - Development workflows and procedures
 - **INSTRUCTIONS.md** - Development workflow and coding standards
+- **docs/API_REFERENCE.md** - Complete tool specifications and examples
+- **docs/TESTING.md** - Comprehensive testing guidelines and procedures
 
 ---
 

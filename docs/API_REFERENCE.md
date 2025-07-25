@@ -839,6 +839,35 @@ async def robust_account_creation(account_data):
             return {"success": False, "reason": "error", "error": str(e)}
 ```
 
+## Performance Characteristics
+
+### Response Times (Typical)
+- Health check resource: < 100ms
+- Collection resources: < 500ms
+- Individual entity resources: < 300ms
+- Search resources: < 1000ms
+- Tool operations: < 2000ms
+
+### Scalability
+- Supports concurrent operations
+- Connection pooling for API calls
+- Efficient caching mechanisms
+- Pagination for large datasets
+
+### Rate Limiting
+- Respects CyberArk API rate limits
+- Automatic retry with exponential backoff
+- Connection management optimization
+
+## Best Practices
+
+- Start with health check resource to verify connectivity
+- Use collection resources (accounts/, safes/, platforms/) for discovery and browsing
+- Use search resources for filtered views and specific queries
+- Use tools only for create/modify operations (account creation, password management)
+- Implement client-side caching for frequently accessed resources
+- Handle errors gracefully with user feedback
+
 ---
 
-This API reference provides comprehensive documentation for integrating with the CyberArk Privilege Cloud MCP Server. For additional examples and troubleshooting guidance, refer to the [Testing Guide](TESTING.md) and [Troubleshooting Guide](TROUBLESHOOTING.md).
+This API reference provides comprehensive documentation for integrating with the CyberArk Privilege Cloud MCP Server. For additional examples and testing guidance, refer to the [Testing Guide](TESTING.md).

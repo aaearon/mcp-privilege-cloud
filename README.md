@@ -89,7 +89,7 @@ A Model Context Protocol (MCP) server that provides seamless integration with Cy
    python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
    ```
 
-For detailed setup instructions, service account configuration, and troubleshooting, see [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
+For detailed setup instructions and service account configuration, see the Configuration section above.
 
 ## Usage
 
@@ -145,7 +145,7 @@ The server provides 10 MCP tools for CyberArk operations:
 
 > **Breaking Change**: Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
 
-For detailed specifications, see [Server Capabilities](SERVER_CAPABILITIES.md) and [API Reference](docs/API_REFERENCE.md).
+For detailed specifications, see [API Reference](docs/API_REFERENCE.md).
 
 ## Standardized MCP Server Approach
 
@@ -209,7 +209,22 @@ For detailed testing instructions, see [Testing Guide](docs/TESTING.md).
 
 ## Troubleshooting
 
-For comprehensive troubleshooting, setup issues, and debugging guidance, see [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
+### Quick Diagnostics
+```bash
+# Verify health status
+python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
+
+# Check environment variables
+echo "Config: ${CYBERARK_CLIENT_ID:+SET} ${CYBERARK_SUBDOMAIN:+SET}"
+```
+
+### Common Issues
+- **Missing environment variables**: Create `.env` file with required credentials
+- **Authentication failed**: Verify service account credentials in CyberArk Identity
+- **Permission errors**: Ensure service account has appropriate safe permissions
+- **Connection issues**: Verify `.cloud` TLD (not `.com`) and network connectivity
+
+For additional troubleshooting, check the project's issue tracker or development documentation.
 
 ## Security Considerations
 
@@ -225,7 +240,6 @@ For comprehensive troubleshooting, setup issues, and debugging guidance, see [Tr
 ### User Guides
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications with examples
 - **[Testing Guide](docs/TESTING.md)** - Test execution and MCP Inspector usage
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Setup, debugging, and common issues
 
 ### Developer Guides  
 - **[Development Guide](DEVELOPMENT.md)** - Architecture, contributing, and code standards
