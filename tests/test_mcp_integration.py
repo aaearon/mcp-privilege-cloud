@@ -395,10 +395,8 @@ class TestMCPPlatformTools:
     def platform_mock_env_vars(self):
         """Mock environment variables for platform tests"""
         return {
-            "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
             "CYBERARK_CLIENT_ID": "test-client",
-            "CYBERARK_CLIENT_SECRET": "test-secret",
-            "CYBERARK_SUBDOMAIN": "test-subdomain"
+            "CYBERARK_CLIENT_SECRET": "test-secret"
         }
 
     @pytest.mark.asyncio
@@ -434,10 +432,8 @@ class TestMCPListingTools:
     def mock_env_vars(self):
         """Mock environment variables for tests."""
         return {
-            "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
             "CYBERARK_CLIENT_ID": "test-client-id",
-            "CYBERARK_CLIENT_SECRET": "test-secret",
-            "CYBERARK_SUBDOMAIN": "test-subdomain"
+            "CYBERARK_CLIENT_SECRET": "test-secret"
         }
 
     @pytest.mark.asyncio
