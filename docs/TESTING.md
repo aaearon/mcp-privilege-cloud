@@ -259,7 +259,7 @@ For testing tool structure and validation without real CyberArk credentials:
 
 #### Expected Server Output
 ```
-ERROR - Missing required environment variables: ['CYBERARK_IDENTITY_TENANT_ID', 'CYBERARK_CLIENT_ID', 'CYBERARK_CLIENT_SECRET', 'CYBERARK_SUBDOMAIN']
+ERROR - Missing required environment variables: ['CYBERARK_CLIENT_ID', 'CYBERARK_CLIENT_SECRET']
 ```
 **Note**: This is expected for testing - the server will still start and you can test tool structure.
 
@@ -357,14 +357,10 @@ Each tool should validate parameters correctly:
 Create `.env` file in project root:
 ```bash
 # Required Configuration
-CYBERARK_IDENTITY_TENANT_ID=your-tenant-id
 CYBERARK_CLIENT_ID=your-service-account-username
 CYBERARK_CLIENT_SECRET=your-service-account-password
-CYBERARK_SUBDOMAIN=your-privilege-cloud-subdomain
 
 # Optional Configuration
-CYBERARK_API_TIMEOUT=30
-CYBERARK_MAX_RETRIES=3
 CYBERARK_LOG_LEVEL=INFO
 ```
 
