@@ -105,8 +105,7 @@ class TestMCPAccountTools:
                 secret="SecurePassword123!",
                 secret_type="password",
                 platform_account_properties=account_platform_properties,
-                secret_management=account_secret_mgmt,
-                remote_machines_access=None
+                secret_management=account_secret_mgmt
             )
 
     @pytest.mark.asyncio
@@ -181,12 +180,12 @@ class TestMCPAccountTools:
             "status": "Next password set successfully"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool
             result = await set_next_password(
                 account_id=account_id,
@@ -198,11 +197,11 @@ class TestMCPAccountTools:
             assert result["id"] == account_id
             assert "lastModifiedTime" in result
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password,
-                change_immediately=True
+                new_password=new_password
             )
 
     @pytest.mark.asyncio

@@ -249,6 +249,7 @@ class CyberArkMCPServer:
         try:
             # Create the change credentials model
             change_creds = ArkPCloudChangeAccountCredentials(
+                account_id=account_id,
                 change_creds_for_group=True  # Equivalent to ChangeCredsForGroup
             )
             
