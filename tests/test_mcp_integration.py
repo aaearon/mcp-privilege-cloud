@@ -56,15 +56,7 @@ class TestMCPAccountTools:
             mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
-                safe_name="IT-Infrastructure",
-                name=None,
-                address=None,
-                user_name=None,
-                secret=None,
-                secret_type=None,
-                platform_account_properties=None,
-                secret_management=None,
-                remote_machines_access=None
+                safe_name="IT-Infrastructure"
             )
 
     @pytest.mark.asyncio
@@ -161,22 +153,20 @@ class TestMCPAccountTools:
         
         account_id = "invalid_account"
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.change_account_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.change_account_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Verify that the error is propagated
             with pytest.raises(CyberArkAPIError, match="Account not found"):
                 await change_account_password(account_id=account_id)
             
-            # Verify server method was called
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id,
-                new_password=None
+                account_id=account_id
             )
 
     @pytest.mark.asyncio
