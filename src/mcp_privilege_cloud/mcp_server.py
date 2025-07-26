@@ -47,13 +47,20 @@ logger = logging.getLogger(__name__)
 # Initialize the MCP server
 mcp = FastMCP("CyberArk Privilege Cloud MCP Server")
 
-# Create a single server instance for all tools
-try:
-    server = CyberArkMCPServer.from_environment()
-    logger.info("Successfully initialized CyberArk MCP Server")
-except ValueError as e:
-    logger.error(f"Failed to initialize server: {e}")
-    sys.exit(1)
+# Server instance will be created lazily by tools
+server = None
+
+def get_server():
+    """Get or create the server instance lazily."""
+    global server
+    if server is None:
+        try:
+            server = CyberArkMCPServer.from_environment()
+            logger.info("Successfully initialized CyberArk MCP Server")
+        except ValueError as e:
+            logger.error(f"Failed to initialize server: {e}")
+            raise
+    return server
 
 def tool_wrapper(func):
     """Decorator to handle server interaction and error logging for MCP tools."""
@@ -63,7 +70,8 @@ def tool_wrapper(func):
     async def wrapper(*args, **kwargs):
         try:
             # Get the corresponding server method and call it
-            server_method = getattr(server, func.__name__)
+            server_instance = get_server()
+            server_method = getattr(server_instance, func.__name__)
             result = await server_method(*args, **kwargs)
             logger.info(f"Successfully executed tool: {func.__name__}")
             return result
