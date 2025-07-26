@@ -67,27 +67,20 @@ def reset_server():
     global server
     server = None
 
-def tool_wrapper(func):
-    """Decorator to handle server interaction and error logging for MCP tools."""
-    import functools
-    
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        try:
-            # Get the corresponding server method and call it
-            server_instance = get_server()
-            server_method = getattr(server_instance, func.__name__)
-            result = await server_method(*args, **kwargs)
-            logger.info(f"Successfully executed tool: {func.__name__}")
-            return result
-        except Exception as e:
-            logger.error(f"Error executing tool '{func.__name__}': {e}")
-            raise
-    return wrapper
+async def execute_tool(tool_name: str, *args, **kwargs):
+    """Execute a CyberArk tool by calling the corresponding server method."""
+    try:
+        server_instance = get_server()
+        server_method = getattr(server_instance, tool_name)
+        result = await server_method(*args, **kwargs)
+        logger.info(f"Successfully executed tool: {tool_name}")
+        return result
+    except Exception as e:
+        logger.error(f"Error executing tool '{tool_name}': {e}")
+        raise
 
 
 @mcp.tool()
-@tool_wrapper
 async def create_account(
     platform_id: str,
     safe_name: str,
@@ -121,10 +114,12 @@ async def create_account(
     Example:
         create_account("WinServerLocal", "Production-Servers", address="web01.corp.com", user_name="admin")
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("create_account", platform_id=platform_id, safe_name=safe_name, 
+                             name=name, address=address, user_name=user_name, secret=secret, 
+                             secret_type=secret_type, platform_account_properties=platform_account_properties,
+                             secret_management=secret_management, remote_machines_access=remote_machines_access)
 
 @mcp.tool()
-@tool_wrapper
 async def change_account_password(
     account_id: str,
     new_password: Optional[str] = None
@@ -148,10 +143,9 @@ async def change_account_password(
         - Password changes are audited and logged in CyberArk
         - Use CPM-generated passwords when possible for better security compliance
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("change_account_password", account_id=account_id, new_password=new_password)
 
 @mcp.tool()
-@tool_wrapper
 async def set_next_password(
     account_id: str,
     new_password: str,
@@ -176,10 +170,9 @@ async def set_next_password(
         - Password changes are audited and logged in CyberArk
         - Use strong passwords that comply with your organization's policy
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("set_next_password", account_id=account_id, new_password=new_password, change_immediately=change_immediately)
 
 @mcp.tool()
-@tool_wrapper
 async def verify_account_password(
     account_id: str
 ) -> Dict[str, Any]:
@@ -201,10 +194,9 @@ async def verify_account_password(
         - Password verifications are audited and logged in CyberArk
         - This operation does not expose the actual password, only verification status
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("verify_account_password", account_id=account_id)
 
 @mcp.tool()
-@tool_wrapper
 async def reconcile_account_password(
     account_id: str
 ) -> Dict[str, Any]:
@@ -227,7 +219,7 @@ async def reconcile_account_password(
         - This operation may take longer to complete as it involves communication with target systems
         - The operation synchronizes credentials between vault and target without exposing passwords
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("reconcile_account_password", account_id=account_id)
 
 
 
@@ -241,7 +233,6 @@ async def reconcile_account_password(
 
 
 @mcp.tool()
-@tool_wrapper
 async def import_platform_package(
     platform_package_file: str
 ) -> Dict[str, Any]:
@@ -265,12 +256,11 @@ async def import_platform_package(
         
     Note: Requires Privilege Cloud Administrator role for platform management operations
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("import_platform_package", platform_package_file=platform_package_file)
 
 
-# New tool functions to replace resources - return raw API data
+# Data access tools - return raw API data
 @mcp.tool()
-@tool_wrapper
 async def get_account_details(account_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific account in CyberArk Privilege Cloud.
     
@@ -280,20 +270,18 @@ async def get_account_details(account_id: str) -> Dict[str, Any]:
     Returns:
         Account object with complete details and exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("get_account_details", account_id=account_id)
 
 @mcp.tool()
-@tool_wrapper
 async def list_accounts() -> List[Dict[str, Any]]:
     """List all accessible accounts in CyberArk Privilege Cloud.
     
     Returns:
         List of account objects with their exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("list_accounts")
 
 @mcp.tool()
-@tool_wrapper
 async def search_accounts(
     query: Optional[str] = None,
     safe_name: Optional[str] = None,
@@ -313,10 +301,10 @@ async def search_accounts(
     Returns:
         List of matching account objects with exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("search_accounts", query=query, safe_name=safe_name, 
+                             username=username, address=address, platform_id=platform_id)
 
 @mcp.tool()
-@tool_wrapper
 async def get_safe_details(safe_name: str) -> Dict[str, Any]:
     """Get detailed information about a specific safe in CyberArk Privilege Cloud.
     
@@ -326,20 +314,18 @@ async def get_safe_details(safe_name: str) -> Dict[str, Any]:
     Returns:
         Safe object with complete details and exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("get_safe_details", safe_name=safe_name)
 
 @mcp.tool()
-@tool_wrapper
 async def list_safes() -> List[Dict[str, Any]]:
     """List all accessible safes in CyberArk Privilege Cloud.
     
     Returns:
         List of safe objects with their exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("list_safes")
 
 @mcp.tool()
-@tool_wrapper
 async def get_platform_details(platform_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific platform in CyberArk Privilege Cloud.
     
@@ -349,17 +335,16 @@ async def get_platform_details(platform_id: str) -> Dict[str, Any]:
     Returns:
         Platform object with complete configuration details and exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("get_platform_details", platform_id=platform_id)
 
 @mcp.tool()
-@tool_wrapper
 async def list_platforms() -> List[Dict[str, Any]]:
     """List all available platforms in CyberArk Privilege Cloud.
     
     Returns:
         List of platform objects with their exact API fields
     """
-    pass  # Decorator handles all logic
+    return await execute_tool("list_platforms")
 
 
 def main():

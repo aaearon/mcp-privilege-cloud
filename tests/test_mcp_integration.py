@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#\!/usr/bin/env python3
 """
 MCP Integration Tests
 
@@ -56,7 +56,15 @@ class TestMCPAccountTools:
             mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
-                safe_name="IT-Infrastructure"
+                safe_name="IT-Infrastructure",
+                name=None,
+                address=None,
+                user_name=None,
+                secret=None,
+                secret_type=None,
+                platform_account_properties=None,
+                secret_management=None,
+                remote_machines_access=None
             )
 
     @pytest.mark.asyncio
@@ -105,7 +113,8 @@ class TestMCPAccountTools:
                 secret="SecurePassword123!",
                 secret_type="password",
                 platform_account_properties=account_platform_properties,
-                secret_management=account_secret_mgmt
+                secret_management=account_secret_mgmt,
+                remote_machines_access=None
             )
 
     @pytest.mark.asyncio
@@ -125,7 +134,6 @@ class TestMCPAccountTools:
         mock_server.change_account_password.return_value = mock_response
         
         with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
-            
             # Call the MCP tool
             result = await change_account_password(account_id=account_id)
             
@@ -136,10 +144,9 @@ class TestMCPAccountTools:
             
             # Verify server method was called correctly
             mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id
+                account_id=account_id,
+                new_password=None
             )
-
-
 
     @pytest.mark.asyncio
     async def test_change_account_password_mcp_tool_error_handling(self):
@@ -161,7 +168,8 @@ class TestMCPAccountTools:
             
             # Verify server method was called correctly
             mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id
+                account_id=account_id,
+                new_password=None
             )
 
     @pytest.mark.asyncio
@@ -197,7 +205,8 @@ class TestMCPAccountTools:
             mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password
+                new_password=new_password,
+                change_immediately=True
             )
 
     @pytest.mark.asyncio
@@ -262,7 +271,8 @@ class TestMCPAccountTools:
             mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password
+                new_password=new_password,
+                change_immediately=True
             )
 
     @pytest.mark.asyncio
@@ -402,7 +412,7 @@ class TestMCPPlatformTools:
             result = await import_platform_package(platform_file)
             
             assert result == mock_response
-            mock_server.import_platform_package.assert_called_once_with(platform_file)
+            mock_server.import_platform_package.assert_called_once_with(platform_package_file=platform_file)
 
     @pytest.mark.asyncio
     async def test_mcp_import_platform_package_error_handling(self, platform_mock_env_vars):
@@ -472,7 +482,10 @@ class TestMCPListingTools:
             assert result == mock_accounts
             mock_server.search_accounts.assert_called_once_with(
                 query="admin",
-                safe_name="IT-Infrastructure"
+                safe_name="IT-Infrastructure",
+                username=None,
+                address=None,
+                platform_id=None
             )
 
     @pytest.mark.asyncio
@@ -517,7 +530,3 @@ class TestMCPListingTools:
             
             assert result == mock_platforms
             mock_server.list_platforms.assert_called_once()
-
-
-
-

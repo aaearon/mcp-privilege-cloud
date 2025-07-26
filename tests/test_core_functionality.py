@@ -27,9 +27,9 @@ class TestAuthentication:
                 
                 # Mock the SDK services
                 server.sdk_authenticator = mock_sdk_auth
-                server._accounts_service = Mock()
-                server._safes_service = Mock()
-                server._platforms_service = Mock()
+                server.accounts_service = Mock()
+                server.safes_service = Mock()
+                server.platforms_service = Mock()
                 
                 yield server
 
@@ -37,9 +37,9 @@ class TestAuthentication:
     def test_server_initialization_with_sdk(self, server):
         """Test that server initializes with SDK authenticator"""
         assert server.sdk_authenticator is not None
-        assert hasattr(server, '_accounts_service')
-        assert hasattr(server, '_safes_service')
-        assert hasattr(server, '_platforms_service')
+        assert hasattr(server, 'accounts_service')
+        assert hasattr(server, 'safes_service')
+        assert hasattr(server, 'platforms_service')
 
     @pytest.mark.auth
     def test_server_from_environment(self):
@@ -48,9 +48,18 @@ class TestAuthentication:
             'CYBERARK_CLIENT_ID': 'test-client',
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator'):
+            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+                # Mock the entire authentication chain
+                mock_sdk_auth = Mock()
+                mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
+                mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
+                
                 server = CyberArkMCPServer.from_environment()
                 assert server.sdk_authenticator is not None
+                # Services should be None due to mock error
+                assert server.accounts_service is None
+                assert server.safes_service is None
+                assert server.platforms_service is None
 
     @pytest.mark.auth  
     def test_server_missing_client_id_env_var(self):
@@ -101,9 +110,9 @@ class TestServerCore:
                 
                 # Mock the SDK services
                 server.sdk_authenticator = mock_sdk_auth
-                server._accounts_service = Mock()
-                server._safes_service = Mock()
-                server._platforms_service = Mock()
+                server.accounts_service = Mock()
+                server.safes_service = Mock()
+                server.platforms_service = Mock()
                 
                 return server
 
@@ -119,9 +128,16 @@ class TestServerCore:
         }
         
         with patch.dict(os.environ, env_vars):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator'):
+            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+                # Mock the entire authentication chain to avoid service initialization errors
+                mock_sdk_auth = Mock()
+                mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
+                mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
+                
                 server = CyberArkMCPServer.from_environment()
                 assert server.sdk_authenticator is not None
+                # Services should be None due to mock error
+                assert server.accounts_service is None
 
     def test_server_from_environment_missing_required(self):
         """Test server initialization with missing required environment variables"""
@@ -172,7 +188,7 @@ class TestServerCore:
         mock_platform.model_dump.return_value = {"id": "TestPlatform", "name": "Test Platform"}
         
         # Platforms service returns a direct list of platform objects
-        server_instance._platforms_service.list_platforms.return_value = [mock_platform]
+        server_instance.platforms_service.list_platforms.return_value = [mock_platform]
         
         result = await server_instance.health_check()
         
@@ -191,12 +207,12 @@ class TestServerCore:
         mock_page = Mock()
         mock_page.items = [mock_account]
         
-        server_instance._accounts_service.list_accounts.return_value = [mock_page]
+        server_instance.accounts_service.list_accounts.return_value = [mock_page]
         
         result = await server_instance.list_accounts()
         
         # Verify the service was called and results returned
-        server_instance._accounts_service.list_accounts.assert_called_once()
+        server_instance.accounts_service.list_accounts.assert_called_once()
         assert len(result) == 1
         assert result[0]["id"] == "test1"
 
@@ -208,11 +224,11 @@ class TestServerCore:
         mock_platform.model_dump.return_value = {"id": "TestPlatform", "name": "Test Platform"}
         
         # Platforms service returns a direct list of platform objects
-        server_instance._platforms_service.list_platforms.return_value = [mock_platform]
+        server_instance.platforms_service.list_platforms.return_value = [mock_platform]
         
         result = await server_instance.list_platforms()
         
         # Verify the service was called and results returned
-        server_instance._platforms_service.list_platforms.assert_called_once()
+        server_instance.platforms_service.list_platforms.assert_called_once()
         assert len(result) == 1
         assert result[0]["id"] == "TestPlatform"
