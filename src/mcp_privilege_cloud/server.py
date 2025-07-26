@@ -1,145 +1,110 @@
-import asyncio
-import httpx
-import os
 import logging
+from functools import lru_cache
 from typing import Optional, Dict, Any, List, Union
-from datetime import datetime
 
-from .auth import CyberArkAuthenticator
+from .exceptions import CyberArkAPIError
+from .sdk_auth import CyberArkSDKAuthenticator
+
+# ark-sdk-python imports for account management
+from ark_sdk_python.services.pcloud.accounts import ArkPCloudAccountsService
+from ark_sdk_python.models.services.pcloud.accounts import (
+    ArkPCloudAccountsFilter,
+    ArkPCloudAddAccount,
+    ArkPCloudChangeAccountCredentials,
+    ArkPCloudSetAccountNextCredentials,
+    ArkPCloudVerifyAccountCredentials,
+    ArkPCloudReconcileAccountCredentials
+)
+
+# ark-sdk-python imports for safe and platform management
+from ark_sdk_python.services.pcloud.safes import ArkPCloudSafesService
+from ark_sdk_python.services.pcloud.platforms import ArkPCloudPlatformsService
+from ark_sdk_python.models.services.pcloud.platforms import ArkPCloudImportPlatform, ArkPCloudGetPlatform
+from ark_sdk_python.models.services.pcloud.safes import ArkPCloudGetSafe
+
+# Backward compatibility - re-export CyberArkAPIError from server module
+__all__ = ["CyberArkMCPServer", "CyberArkAPIError"]
 
 logger = logging.getLogger(__name__)
 
 
-class CyberArkAPIError(Exception):
-    """Raised when CyberArk API returns an error"""
-
-    def __init__(self, message: str, status_code: Optional[int] = None):
-        super().__init__(message)
-        self.status_code = status_code
-
-
 class CyberArkMCPServer:
-    """CyberArk Privilege Cloud MCP Server"""
+    """CyberArk Privilege Cloud MCP Server - SDK-based Implementation
+    
+    This class provides comprehensive CyberArk operations using ark-sdk-python
+    with enhanced platform data processing capabilities.
+    """
 
-    def __init__(
-        self,
-        authenticator: CyberArkAuthenticator,
-        subdomain: str,
-        timeout: int = 30,
-        max_retries: int = 3
-    ):
-        self.authenticator = authenticator
-        self.subdomain = subdomain
-        self.timeout = timeout
-        self.max_retries = max_retries
+    def __init__(self):
+        # Initialize SDK authenticator for all operations
+        self.sdk_authenticator = CyberArkSDKAuthenticator.from_environment()
+        self._accounts_service: Optional[ArkPCloudAccountsService] = None
+        self._safes_service: Optional[ArkPCloudSafesService] = None
+        self._platforms_service: Optional[ArkPCloudPlatformsService] = None
+        
         self.logger = logger
-
-        # Construct base API URL
-        self.base_url = f"https://{subdomain}.privilegecloud.cyberark.cloud/PasswordVault/api"
 
     @classmethod
     def from_environment(cls) -> "CyberArkMCPServer":
         """Create server from environment variables"""
-        subdomain = os.getenv("CYBERARK_SUBDOMAIN")
-        timeout = int(os.getenv("CYBERARK_API_TIMEOUT", "30"))
-        max_retries = int(os.getenv("CYBERARK_MAX_RETRIES", "3"))
+        return cls()
 
-        if not subdomain:
-            raise ValueError("CYBERARK_SUBDOMAIN environment variable is required")
+    @lru_cache(maxsize=None)
+    def _get_service(self, service_class):
+        """Factory method to get an initialized SDK service.
+        
+        Args:
+            service_class: The SDK service class to instantiate
+            
+        Returns:
+            Initialized service instance
+        """
+        sdk_auth = self.sdk_authenticator.get_authenticated_client()
+        return service_class(sdk_auth)
 
-        # Create authenticator from environment
-        authenticator = CyberArkAuthenticator.from_environment()
+    @property
+    def accounts_service(self) -> ArkPCloudAccountsService:
+        """Get or create the accounts service instance"""
+        if self._accounts_service is None:
+            self._accounts_service = self._get_service(ArkPCloudAccountsService)
+        return self._accounts_service
+    
+    @accounts_service.setter 
+    def accounts_service(self, service: ArkPCloudAccountsService):
+        """Set the accounts service instance (mainly for testing)"""
+        self._accounts_service = service
 
-        return cls(
-            authenticator=authenticator,
-            subdomain=subdomain,
-            timeout=timeout,
-            max_retries=max_retries
-        )
+    @property
+    def safes_service(self) -> ArkPCloudSafesService:
+        """Get or create the safes service instance"""
+        if self._safes_service is None:
+            self._safes_service = self._get_service(ArkPCloudSafesService)
+        return self._safes_service
+    
+    @safes_service.setter 
+    def safes_service(self, service: ArkPCloudSafesService):
+        """Set the safes service instance (mainly for testing)"""
+        self._safes_service = service
 
-    def _get_api_url(self, endpoint: str) -> str:
-        """Construct full API URL for an endpoint"""
-        return f"{self.base_url}/{endpoint}"
+    @property
+    def platforms_service(self) -> ArkPCloudPlatformsService:
+        """Get or create the platforms service instance"""
+        if self._platforms_service is None:
+            self._platforms_service = self._get_service(ArkPCloudPlatformsService)
+        return self._platforms_service
+    
+    @platforms_service.setter 
+    def platforms_service(self, service: ArkPCloudPlatformsService):
+        """Set the platforms service instance (mainly for testing)"""
+        self._platforms_service = service
 
-    async def _make_api_request(
-        self,
-        method: str,
-        endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        retry_count: int = 0
-    ) -> Dict[str, Any]:
-        """Make an authenticated API request to CyberArk"""
-        url = self._get_api_url(endpoint)
-
-        try:
-            # Get authentication headers
-            auth_headers = await self.authenticator.get_auth_header()
-            headers = {
-                "Content-Type": "application/json",
-                **auth_headers
-            }
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                self.logger.debug(f"Making {method} request to {url}")
-
-                if method.upper() == "GET":
-                    response = await client.get(url, headers=headers, params=params)
-                elif method.upper() == "POST":
-                    response = await client.post(url, headers=headers, json=json or data, params=params)
-                elif method.upper() == "PUT":
-                    response = await client.put(url, headers=headers, json=json or data, params=params)
-                elif method.upper() == "DELETE":
-                    response = await client.delete(url, headers=headers, params=params)
-                else:
-                    raise ValueError(f"Unsupported HTTP method: {method}")
-
-                response.raise_for_status()
-
-                # Handle different response types
-                if response.headers.get("content-type", "").startswith("application/json"):
-                    return response.json()
-                else:
-                    return {"result": response.text}
-
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401 and retry_count < self.max_retries:
-                self.logger.warning("Received 401, refreshing token and retrying")
-                # Force token refresh by clearing cached token
-                self.authenticator._token = None
-                return await self._make_api_request(method, endpoint, params, data, json, retry_count + 1)
-            else:
-                self._handle_api_error(e)
-                raise CyberArkAPIError(f"API request failed: {e}", e.response.status_code)
-        except httpx.ConnectError as e:
-            self._log_error(f"Network error: {e}")
-            raise CyberArkAPIError(f"Network error: {e}")
-        except Exception as e:
-            self._log_error(f"Unexpected error: {e}")
-            raise CyberArkAPIError(f"Unexpected error: {e}")
-
-    def _handle_api_error(self, error: httpx.HTTPStatusError):
-        """Handle API errors with appropriate logging"""
-        status_code = error.response.status_code
-        self.logger.error(f"API error {status_code}: {error}")
-
-        if status_code == 429:
-            self.logger.warning("Rate limit exceeded")
-        elif status_code == 403:
-            self.logger.error("Insufficient permissions")
-        elif status_code == 404:
-            self.logger.warning("Resource not found")
-
-    def _log_error(self, message: str):
-        """Log error message"""
-        self.logger.error(message)
+    # Legacy API methods removed - all operations now use ark-sdk-python directly
 
     def get_available_tools(self) -> List[str]:
         """Get list of available MCP tools"""
         return [
             "list_accounts",
-            "get_account_details",
+            "get_account_details", 
             "search_accounts",
             "create_account",
             "change_account_password",
@@ -152,105 +117,91 @@ class CyberArkMCPServer:
             "get_platform_details",
             "import_platform_package"
         ]
+    
+    def clear_cache(self):
+        """Clear all cached services and authentication state. Used for testing."""
+        # Clear LRU cache for _get_service method
+        self._get_service.cache_clear()
+        
+        # Reset service instances
+        self._accounts_service = None
+        self._safes_service = None
+        self._platforms_service = None
+        
+        # Reset authentication state
+        if hasattr(self.sdk_authenticator, '_sdk_auth'):
+            self.sdk_authenticator._sdk_auth = None
+            self.sdk_authenticator._is_authenticated = False
 
-    # Account Management Tools
-
-    async def list_accounts(
-        self,
-        safe_name: Optional[str] = None,
-        **kwargs
-    ) -> List[Dict[str, Any]]:
-        """List accounts from CyberArk Privilege Cloud
-
-        Args:
-            safe_name: Optional safe name to filter accounts by
-            **kwargs: Additional valid API parameters including:
-                - search: Keywords to search for
-                - searchType: "contains" or "startswith"
-                - sort: Sort order
-                - offset: Pagination offset
-                - limit: Maximum results to return
-                - filter: Filter expression (e.g., "safeName eq MySafe")
-                - savedfilter: Predefined filter names
-
-        Returns:
-            List of account dictionaries
-        """
-        params = {}
-
-        if safe_name:
-            params["filter"] = f"safeName eq {safe_name}"
-
-        # Add any additional valid API parameters
-        params.update(kwargs)
-
-        self.logger.info(f"Listing accounts with filters: {params}")
-        response = await self._make_api_request("GET", "Accounts", params=params)
-
-        # CyberArk API returns accounts in 'value' field
-        return response.get("value", [])
+    # Account Management - Using ark-sdk-python
+    async def list_accounts(self, safe_name: Optional[str] = None, **kwargs) -> List[Dict[str, Any]]:
+        """List accounts from CyberArk Privilege Cloud using ark-sdk-python"""
+        try:
+            # Build filter if safe_name is provided
+            account_filter = None
+            if safe_name:
+                account_filter = ArkPCloudAccountsFilter(safe_name=safe_name)
+            
+            # Get accounts using SDK
+            pages = list(self.accounts_service.list_accounts(accounts_filter=account_filter))
+            
+            # Convert SDK models to dicts and flatten pagination
+            accounts = [acc.model_dump() for page in pages for acc in page.items]
+            
+            self.logger.info(f"Retrieved {len(accounts)} accounts using ark-sdk-python")
+            return accounts
+            
+        except Exception as e:
+            self.logger.error(f"Error listing accounts with ark-sdk-python: {e}")
+            raise
 
     async def get_account_details(self, account_id: str) -> Dict[str, Any]:
-        """Get detailed information about a specific account"""
-        self.logger.info(f"Getting details for account ID: {account_id}")
-        return await self._make_api_request("GET", f"Accounts/{account_id}")
+        """Get detailed information about a specific account using ark-sdk-python"""
+        try:
+            account = self.accounts_service.get_account(account_id=account_id)
+            self.logger.info(f"Retrieved account details for ID: {account_id} using ark-sdk-python")
+            return account.model_dump()
+        except Exception as e:
+            self.logger.error(f"Error getting account details for ID {account_id} with ark-sdk-python: {e}")
+            raise
 
     async def search_accounts(
         self,
-        keywords: Optional[str] = None,
+        query: Optional[str] = None,
         safe_name: Optional[str] = None,
         username: Optional[str] = None,
         address: Optional[str] = None,
         platform_id: Optional[str] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """Search for accounts with various criteria using proper API filter syntax
-
-        Args:
-            keywords: General search keywords (mapped to 'search' parameter)
-            safe_name: Filter by safe name (added to filter expression)
-            username: Filter by username (added to filter expression)
-            address: Filter by address (added to filter expression)
-            platform_id: Filter by platform ID (added to filter expression)
-            **kwargs: Additional search parameters
-
-        Returns:
-            List of account objects matching the search criteria
-
-        Note:
-            This method uses the GET /Accounts endpoint with proper parameter names:
-            - 'search' for general keywords
-            - 'filter' for complex filtering with expressions like "safeName eq MySafe AND userName eq myuser"
-            - Other parameters like searchType can be passed via kwargs
-        """
-        params = {}
-        filter_expressions = []
-
-        # Handle general keyword search
-        if keywords:
-            params["search"] = keywords
-
-        # Build filter expressions for specific criteria
-        if safe_name:
-            filter_expressions.append(f"safeName eq {safe_name}")
-        if username:
-            filter_expressions.append(f"userName eq {username}")
-        if address:
-            filter_expressions.append(f"address eq {address}")
-        if platform_id:
-            filter_expressions.append(f"platformId eq {platform_id}")
-
-        # Combine filter expressions with AND operator
-        if filter_expressions:
-            params["filter"] = " AND ".join(filter_expressions)
-
-        # Add any additional search parameters
-        params.update(kwargs)
-
-        self.logger.info(f"Searching accounts with criteria: {params}")
-        response = await self._make_api_request("GET", "Accounts", params=params)
-
-        return response.get("value", [])
+        """Search for accounts with various criteria using ark-sdk-python"""
+        try:
+            # Build filter with provided criteria
+            account_filter = ArkPCloudAccountsFilter(
+                safe_name=safe_name,
+                user_name=username,  # SDK uses user_name
+                address=address,
+                platform_id=platform_id
+            )
+            
+            # Add search query if provided
+            search_query = query
+            
+            # Get accounts using SDK with filter and search
+            pages = list(self.accounts_service.list_accounts(
+                accounts_filter=account_filter,
+                search=search_query
+            ))
+            
+            # Convert SDK models to dicts and flatten pagination
+            accounts = [acc.model_dump() for page in pages for acc in page.items]
+            
+            self.logger.info(f"Found {len(accounts)} accounts matching search criteria using ark-sdk-python")
+            return accounts
+            
+        except Exception as e:
+            self.logger.error(f"Error searching accounts with ark-sdk-python: {e}")
+            raise
 
     async def create_account(
         self,
@@ -266,285 +217,136 @@ class CyberArkMCPServer:
         remote_machines_access: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """Create a new privileged account in CyberArk Privilege Cloud"""
-
-        # Validate required parameters
-        if not platform_id:
-            raise ValueError("platformId is required")
-        if not safe_name:
-            raise ValueError("safeName is required")
-
-        # Validate secret type if provided
-        if secret_type and secret_type not in ["password", "key"]:
-            raise ValueError("secretType must be 'password' or 'key'")
-
-        # Validate account name for special characters if provided
-        if name:
-            invalid_chars = r'\/:;*?"<>|	 '  # Includes tab and space
-            if any(char in name for char in invalid_chars):
-                raise ValueError("Account name contains invalid characters")
-
-        # Build request payload, filtering out None and empty values
-        payload = {}
-
-        # Required fields
-        payload["platformId"] = platform_id
-        payload["safeName"] = safe_name
-
-        # Optional fields - only add if not None or empty
-        if name:
-            payload["name"] = name
-        if address:
-            payload["address"] = address
-        if user_name:
-            payload["userName"] = user_name
-        if secret:
-            payload["secret"] = secret
-        if secret_type:
-            payload["secretType"] = secret_type
-        if platform_account_properties:
-            payload["platformAccountProperties"] = platform_account_properties
-        if secret_management:
-            payload["secretManagement"] = secret_management
-        if remote_machines_access:
-            payload["remoteMachinesAccess"] = remote_machines_access
-
-        # Add any additional parameters
-        for key, value in kwargs.items():
-            if value is not None and value != "":
-                # Convert snake_case to camelCase for API compatibility
-                if key == "platform_account_properties":
-                    payload["platformAccountProperties"] = value
-                elif key == "secret_management":
-                    payload["secretManagement"] = value
-                elif key == "remote_machines_access":
-                    payload["remoteMachinesAccess"] = value
-                elif key == "secret_type":
-                    payload["secretType"] = value
-                elif key == "user_name":
-                    payload["userName"] = value
-                elif key == "safe_name":
-                    payload["safeName"] = value
-                elif key == "platform_id":
-                    payload["platformId"] = value
-                else:
-                    payload[key] = value
-
-        self.logger.info(f"Creating account in safe '{safe_name}' with platform '{platform_id}'")
-
+        """Create a new privileged account using ark-sdk-python"""
         try:
-            response = await self._make_api_request("POST", "Accounts", json=payload)
-            self.logger.info(f"Successfully created account with ID: {response.get('id', 'unknown')}")
-            return response
+            # Handle required fields for SDK model
+            if name is None:
+                # If name is not provided, generate a default based on address and user_name
+                if address and user_name:
+                    name = f"{user_name}@{address}"
+                elif user_name:
+                    name = user_name
+                elif address:
+                    name = f"account@{address}"
+                else:
+                    name = f"account-{platform_id}"
+
+            if secret is None:
+                # If secret is not provided, use empty string - CPM will generate
+                secret = ""
+
+            # Create the account model
+            add_account = ArkPCloudAddAccount(
+                platform_id=platform_id,
+                safe_name=safe_name,
+                name=name,
+                address=address,
+                user_name=user_name,
+                secret=secret,
+                secret_type=secret_type,
+                platform_account_properties=platform_account_properties,
+                secret_management=secret_management,
+                remote_machines_access=remote_machines_access
+            )
+            
+            # Create the account using SDK
+            created_account = self.accounts_service.add_account(account=add_account)
+            
+            self.logger.info(f"Successfully created account with ID: {created_account.id}")
+            return created_account.model_dump()
+            
         except Exception as e:
-            self.logger.error(f"Failed to create account: {e}")
+            self.logger.error(f"Error creating account with ark-sdk-python: {e}")
             raise
 
-    async def change_account_password(
-        self,
-        account_id: str,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """Initiate CPM-managed password change for an existing account in CyberArk Privilege Cloud
-
-        This method triggers the Central Policy Manager (CPM) to change the account password
-        according to the platform's password policy. The CPM will automatically generate
-        a new password based on the platform configuration.
-
-        Args:
-            account_id: The unique ID of the account to change password for
-            **kwargs: Additional parameters (not used currently)
-
-        Returns:
-            Dict containing password change response with status and timestamps
-
-        Raises:
-            ValueError: If account_id is missing or invalid
-            CyberArkAPIError: If the API request fails
-        """
-        # Validate required parameters
-        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
-            raise ValueError("account_id is required")
-
-        # Ensure account_id is a string
-        if not isinstance(account_id, str):
-            raise ValueError("account_id is required")
-
-        # Clean account_id
-        account_id = account_id.strip()
-
-        # Build request payload for CPM-managed password change
-        payload = {"ChangeCredsForGroup": True}
-
-        # Log operation
-        self.logger.info(f"Initiating CPM-managed password change for account ID: {account_id}")
-
+    async def change_account_password(self, account_id: str, **kwargs) -> Dict[str, Any]:
+        """Initiate CPM-managed password change using ark-sdk-python"""
         try:
-            response = await self._make_api_request(
-                "POST",
-                f"Accounts/{account_id}/Change/",
-                json=payload
+            # Create the change credentials model
+            change_creds = ArkPCloudChangeAccountCredentials(
+                account_id=account_id,
+                change_creds_for_group=True  # Equivalent to ChangeCredsForGroup
             )
-            self.logger.info(f"CPM-managed password change initiated successfully for account ID: {account_id}")
-            return response
+            
+            # Change the account password using SDK
+            result = self.accounts_service.change_account_credentials(
+                account_id=account_id,
+                change_account_credentials=change_creds
+            )
+            
+            self.logger.info(f"Successfully initiated password change for account ID: {account_id}")
+            return result.model_dump()
+            
         except Exception as e:
-            self.logger.error(f"Failed to initiate CPM-managed password change for account ID: {account_id} - {e}")
+            self.logger.error(f"Error changing password for account ID {account_id} with ark-sdk-python: {e}")
             raise
 
     async def set_next_password(
-        self,
-        account_id: str,
-        new_password: str,
-        change_immediately: bool = True,
-        **kwargs
+        self, account_id: str, new_password: str, change_immediately: bool = True, **kwargs
     ) -> Dict[str, Any]:
-        """Set the next password for an existing account in CyberArk Privilege Cloud
-
-        This method manually sets the next password for an account, which is different from
-        CPM-managed password changes. The password will be set immediately by default.
-
-        Args:
-            account_id: The unique ID of the account to set password for
-            new_password: The new password to set for the account
-            change_immediately: Whether to change the password immediately (default: True)
-            **kwargs: Additional parameters (not used currently)
-
-        Returns:
-            Dict containing password set response with status and timestamps
-
-        Raises:
-            ValueError: If account_id or new_password is missing or invalid
-            CyberArkAPIError: If the API request fails
-        """
-        # Validate required parameters
-        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
-            raise ValueError("account_id is required")
-
-        if not new_password or (isinstance(new_password, str) and not new_password.strip()):
-            raise ValueError("new_password is required")
-
-        # Ensure account_id is a string
-        if not isinstance(account_id, str):
-            raise ValueError("account_id must be a string")
-
-        # Ensure new_password is a string
-        if not isinstance(new_password, str):
-            raise ValueError("new_password must be a string")
-
-        # Clean account_id
-        account_id = account_id.strip()
-
-        # Build request payload
-        payload = {
-            "ChangeImmediately": change_immediately,
-            "NewCredentials": new_password
-        }
-
-        # Log operation (without sensitive data)
-        self.logger.info(f"Setting next password for account ID: {account_id} (change_immediately={change_immediately})")
-
+        """Set the next password for an account using ark-sdk-python"""
         try:
-            response = await self._make_api_request(
-                "POST",
-                f"Accounts/{account_id}/SetNextPassword/",
-                json=payload
+            # Create the set next credentials model with required accountId field
+            set_next_creds = ArkPCloudSetAccountNextCredentials(
+                accountId=account_id,
+                change_immediately=change_immediately,
+                new_credentials=new_password
             )
-            self.logger.info(f"Next password set successfully for account ID: {account_id}")
-            return response
+            
+            # Set the next password using SDK
+            result = self.accounts_service.set_account_next_credentials(
+                account_id=account_id,
+                set_account_next_credentials=set_next_creds
+            )
+            
+            self.logger.info(f"Successfully set next password for account ID: {account_id}")
+            return result.model_dump()
+            
         except Exception as e:
-            self.logger.error(f"Failed to set next password for account ID: {account_id} - {e}")
+            self.logger.error(f"Error setting next password for account ID {account_id} with ark-sdk-python: {e}")
             raise
 
-    async def verify_account_password(
-        self,
-        account_id: str,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """Verify the password for an existing account in CyberArk Privilege Cloud
-
-        Args:
-            account_id: The unique ID of the account to verify password for
-            **kwargs: Additional parameters (not used currently)
-
-        Returns:
-            Dict containing password verification response with status and timestamps
-
-        Raises:
-            ValueError: If account_id is missing or invalid
-            CyberArkAPIError: If the API request fails
-        """
-        # Validate required parameters
-        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
-            raise ValueError("account_id is required")
-
-        # Ensure account_id is a string
-        if not isinstance(account_id, str):
-            raise ValueError("account_id is required")
-
-        # Clean account_id
-        account_id = account_id.strip()
-
-        # Log operation (without sensitive data)
-        self.logger.info(f"Initiating password verification for account ID: {account_id}")
-
+    async def verify_account_password(self, account_id: str, **kwargs) -> Dict[str, Any]:
+        """Verify the password for an account using ark-sdk-python"""
         try:
-            response = await self._make_api_request(
-                "POST",
-                f"Accounts/{account_id}/Verify/",
-                json={}
+            # Create the verify credentials model with required account_id
+            verify_creds = ArkPCloudVerifyAccountCredentials(
+                account_id=account_id
             )
-            self.logger.info(f"Password verification completed successfully for account ID: {account_id}")
-            return response
+            
+            # Verify the account password using SDK
+            result = self.accounts_service.verify_account_credentials(
+                account_id=account_id,
+                verify_account_credentials=verify_creds
+            )
+            
+            self.logger.info(f"Successfully verified password for account ID: {account_id}")
+            return result.model_dump()
+            
         except Exception as e:
-            self.logger.error(f"Failed to verify password for account ID: {account_id} - {e}")
+            self.logger.error(f"Error verifying password for account ID {account_id} with ark-sdk-python: {e}")
             raise
 
-    async def reconcile_account_password(
-        self,
-        account_id: str,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """Reconcile the password for an existing account in CyberArk Privilege Cloud
-
-        Args:
-            account_id: The unique ID of the account to reconcile password for
-            **kwargs: Additional parameters (not used currently)
-
-        Returns:
-            Dict containing password reconciliation response with status and timestamps
-
-        Raises:
-            ValueError: If account_id is missing or invalid
-            CyberArkAPIError: If the API request fails
-        """
-        # Validate required parameters
-        if not account_id or (isinstance(account_id, str) and not account_id.strip()):
-            raise ValueError("account_id is required")
-
-        # Ensure account_id is a string
-        if not isinstance(account_id, str):
-            raise ValueError("account_id is required")
-
-        # Clean account_id
-        account_id = account_id.strip()
-
-        # Log operation (without sensitive data)
-        self.logger.info(f"Initiating password reconciliation for account ID: {account_id}")
-
+    async def reconcile_account_password(self, account_id: str, **kwargs) -> Dict[str, Any]:
+        """Reconcile the password for an account using ark-sdk-python"""
         try:
-            response = await self._make_api_request(
-                "POST",
-                f"Accounts/{account_id}/Reconcile/",
-                json={}
+            # Create the reconcile credentials model
+            reconcile_creds = ArkPCloudReconcileAccountCredentials(account_id=account_id)
+            
+            # Reconcile the account password using SDK
+            result = self.accounts_service.reconcile_account_credentials(
+                account_id=account_id,
+                reconcile_account_credentials=reconcile_creds
             )
-            self.logger.info(f"Password reconciliation completed successfully for account ID: {account_id}")
-            return response
+            
+            self.logger.info(f"Successfully reconciled password for account ID: {account_id}")
+            return result.model_dump()
+            
         except Exception as e:
-            self.logger.error(f"Failed to reconcile password for account ID: {account_id} - {e}")
+            self.logger.error(f"Error reconciling password for account ID {account_id} with ark-sdk-python: {e}")
             raise
 
-    # Safe Management Tools
-
+    # Safe Management - Using ark-sdk-python
     async def list_safes(
         self,
         search: Optional[str] = None,
@@ -555,44 +357,20 @@ class CyberArkMCPServer:
         extended_details: Optional[bool] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """
-        List all accessible safes from CyberArk Privilege Cloud.
-
-        Args:
-            search: Search term for safe names (URL encoded automatically)
-            offset: Offset of the first Safe returned (default: 0)
-            limit: Maximum number of Safes returned (default: 25)
-            sort: Sort order - "safeName asc" or "safeName desc" (default: safeName asc)
-            include_accounts: Whether to include accounts for each Safe (default: False)
-            extended_details: Whether to return all Safe details or only safeName (default: True)
-            **kwargs: Additional query parameters
-
-        Returns:
-            List of safe objects (excludes Internal Safes)
-        """
-        params = {}
-
-        if search:
-            params["search"] = search
-        if offset is not None:
-            params["offset"] = offset
-        if limit is not None:
-            params["limit"] = limit
-        if sort:
-            params["sort"] = sort
-        if include_accounts is not None:
-            params["includeAccounts"] = "true" if include_accounts else "false"
-        if extended_details is not None:
-            params["extendedDetails"] = "true" if extended_details else "false"
-
-        # Add any additional parameters
-        params.update(kwargs)
-
-        self.logger.info(f"Listing safes with parameters: {params}")
-        response = await self._make_api_request("GET", "Safes", params=params)
-
-        # API returns safes in 'value' field
-        return response.get("value", [])
+        """List all accessible safes using ark-sdk-python"""
+        try:
+            # Get safes using SDK
+            pages = list(self.safes_service.list_safes())
+            
+            # Convert SDK models to dicts and flatten pagination
+            safes = [safe.model_dump() for page in pages for safe in page.items]
+            
+            self.logger.info(f"Retrieved {len(safes)} safes using ark-sdk-python")
+            return safes
+            
+        except Exception as e:
+            self.logger.error(f"Error listing safes with ark-sdk-python: {e}")
+            raise
 
     async def get_safe_details(
         self,
@@ -601,59 +379,22 @@ class CyberArkMCPServer:
         use_cache: Optional[bool] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Get detailed information about a specific safe.
-
-        Args:
-            safe_name: The Safe name (URL encoding handled automatically by httpx)
-            include_accounts: Whether to include accounts for the Safe (default: False)
-            use_cache: Whether to retrieve from session cache (default: False)
-            **kwargs: Additional query parameters
-
-        Returns:
-            Safe object with detailed information
-
-        Note:
-            Safe name should be URL encoded for special characters.
-            For dots (.), add forward slash (/) at end of URL.
-        """
-        params = {}
-
-        if include_accounts is not None:
-            params["includeAccounts"] = "true" if include_accounts else "false"
-        if use_cache is not None:
-            params["useCache"] = "true" if use_cache else "false"
-
-        # Add any additional parameters
-        params.update(kwargs)
-
-        self.logger.info(f"Getting details for safe: {safe_name}")
-        if params:
-            self.logger.debug(f"Using query parameters: {params}")
-
-        return await self._make_api_request("GET", f"Safes/{safe_name}", params=params if params else None)
-
-    # Health and Status Methods
-
-    async def health_check(self) -> Dict[str, Any]:
-        """Perform a health check of the CyberArk connection"""
+        """Get detailed information about a specific safe using ark-sdk-python"""
         try:
-            # Try to list safes as a simple health check
-            safes = await self.list_safes()
-            return {
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "safes_accessible": len(safes)
-            }
+            # Create the get safe model (safe_name is used as safe_id in CyberArk)
+            get_safe = ArkPCloudGetSafe(safe_id=safe_name)
+            
+            # Get safe details using SDK
+            safe = self.safes_service.safe(get_safe=get_safe)
+            
+            self.logger.info(f"Retrieved safe details for: {safe_name} using ark-sdk-python")
+            return safe.model_dump()
+            
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "error": str(e)
-            }
+            self.logger.error(f"Error getting safe details for {safe_name} with ark-sdk-python: {e}")
+            raise
 
-    # Platform Management Tools
-
+    # Platform Management - Using ark-sdk-python
     async def list_platforms(
         self,
         search: Optional[str] = None,
@@ -661,169 +402,85 @@ class CyberArkMCPServer:
         system_type: Optional[str] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """List available platforms from CyberArk Privilege Cloud"""
-        params = {}
-
-        if search:
-            params["search"] = search
-        if active is not None:
-            params["active"] = "true" if active else "false"
-        if system_type:
-            params["systemType"] = system_type
-
-        # Add any additional filter parameters
-        params.update(kwargs)
-
-        self.logger.info(f"Listing platforms with filters: {params}")
-        response = await self._make_api_request("GET", "Platforms", params=params)
-
-        # CyberArk API returns platforms in 'Platforms' field (capitalized), fallback to 'value' for consistency
-        return response.get("Platforms", response.get("value", []))
+        """List available platforms using ark-sdk-python"""
+        try:
+            # Get platforms using SDK
+            platforms = self.platforms_service.list_platforms()
+            
+            # Convert SDK models to dicts
+            platforms_list = [platform.model_dump() for platform in platforms]
+            
+            self.logger.info(f"Retrieved {len(platforms_list)} platforms using ark-sdk-python")
+            return platforms_list
+            
+        except Exception as e:
+            self.logger.error(f"Error listing platforms with ark-sdk-python: {e}")
+            raise
 
     async def get_platform_details(self, platform_id: str) -> Dict[str, Any]:
-        """Get detailed platform configuration from Policy INI file.
-
-        This method retrieves comprehensive platform configuration including
-        credentials management policies, session management settings, privileged
-        access workflows, connection components, and all Policy INI properties.
-
-        Args:
-            platform_id (str): The unique identifier of the platform
-
-        Returns:
-            Dict[str, Any]: Complete platform configuration containing:
-                - Basic platform metadata (id, name, type, active status)
-                - Detailed policy settings from Policy INI file
-                - Credentials management configuration (66+ fields)
-                - Session management and recording policies
-                - Connection components and workflows
-                - UI and behavior settings
-
-        Raises:
-            CyberArkAPIError: When platform access fails
-                - 404: Platform not found
-                - 403: Insufficient privileges to access platform details
-                - 401: Authentication failure (handled with automatic retry)
-
-        Example:
-            >>> server = CyberArkMCPServer.from_environment()
-            >>> details = await server.get_platform_details("WinServerLocal")
-            >>> print(details["name"])  # "Windows Server Local"
-            >>> print(details["details"]["credentialsManagementPolicy"]["change"])  # "on"
-            >>> print(len(details["details"]))  # 66+ policy configuration fields
-
-        API Endpoint:
-            GET /PasswordVault/API/Platforms/{PlatformName}/
-
-        Note:
-            Requires Privilege Cloud Administrator role membership.
-            Returns detailed Policy INI configuration not available in list_platforms().
-        """
-        self.logger.info(f"Getting details for platform ID: {platform_id}")
-
-        # Enhanced input validation
-        if not platform_id or not isinstance(platform_id, str):
-            error_msg = f"Invalid platform_id provided: {platform_id!r}"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        # Sanitize platform_id for logging
-        safe_platform_id = platform_id.replace('\n', '').replace('\r', '')[:100]
-
+        """Get detailed platform configuration using ark-sdk-python"""
         try:
-            # Make API request to retrieve detailed platform configuration
-            response = await self._make_api_request("GET", f"Platforms/{platform_id}")
-
-            # Log successful retrieval with basic platform info
-            if "name" in response:
-                self.logger.debug(f"Retrieved platform details for '{response['name']}' (ID: {safe_platform_id})")
-            else:
-                self.logger.debug(f"Retrieved platform details for ID: {safe_platform_id}")
-
-            return response
-
-        except CyberArkAPIError as e:
-            # Enhanced error handling with specific guidance and troubleshooting context
-            if e.status_code == 404:
-                self.logger.warning(f"Platform '{safe_platform_id}' not found - verify platform exists and is accessible")
-                error_msg = f"Platform '{platform_id}' does not exist or is not accessible"
-                self.logger.debug(f"404 troubleshooting: Check platform list with list_platforms() to verify platform exists")
-                raise CyberArkAPIError(error_msg, 404)
-            elif e.status_code == 403:
-                self.logger.warning(f"Insufficient privileges to access platform '{safe_platform_id}' - requires admin role")
-                error_msg = (f"Access denied to platform '{platform_id}'. "
-                           "Requires Privilege Cloud Administrator role membership.")
-                self.logger.debug(f"403 troubleshooting: User needs 'Privilege Cloud Administrator' role in Identity Administration")
-                raise CyberArkAPIError(error_msg, 403)
-            elif e.status_code == 429:
-                self.logger.warning(f"Rate limiting encountered for platform '{safe_platform_id}' - consider retry with backoff")
-                error_msg = f"Rate limit exceeded while accessing platform '{platform_id}'. Please retry after a delay."
-                raise CyberArkAPIError(error_msg, 429)
-            else:
-                # Re-raise other API errors with enhanced context
-                self.logger.error(f"Failed to retrieve platform '{safe_platform_id}': HTTP {e.status_code} - {e}")
-                self.logger.debug(f"Full error context: {e}")
-                raise
+            # Create the get platform model
+            get_platform = ArkPCloudGetPlatform(platform_id=platform_id)
+            
+            # Get platform details using SDK
+            platform = self.platforms_service.platform(get_platform=get_platform)
+            
+            self.logger.info(f"Retrieved platform details for: {platform_id} using ark-sdk-python")
+            return platform.model_dump()
+            
         except Exception as e:
-            # Enhanced error handling for unexpected errors
-            self.logger.error(f"Unexpected error retrieving platform details for '{safe_platform_id}': {type(e).__name__}: {e}")
-            self.logger.debug(f"Unexpected error details", exc_info=True)
-            raise CyberArkAPIError(f"Unexpected error retrieving platform '{platform_id}': {e}")
+            self.logger.error(f"Error getting platform details for {platform_id} with ark-sdk-python: {e}")
+            raise
 
     async def import_platform_package(
-        self,
-        platform_package_file: Union[str, bytes],
-        **kwargs
+        self, platform_package_file: Union[str, bytes], **kwargs
     ) -> Dict[str, Any]:
-        """Import a platform package to CyberArk Privilege Cloud
+        """Import a platform package using ark-sdk-python"""
+        try:
+            import base64
+            import os
+            
+            # Handle file input - convert to base64 encoded bytes
+            if isinstance(platform_package_file, str):
+                # It's a file path
+                if not os.path.exists(platform_package_file):
+                    raise ValueError(f"Platform package file not found: {platform_package_file}")
 
-        Args:
-            platform_package_file: Either a file path (str) or file content (bytes) of the platform package ZIP file
-            **kwargs: Additional parameters
+                with open(platform_package_file, 'rb') as f:
+                    file_content = f.read()
+            elif isinstance(platform_package_file, bytes):
+                # It's already file content
+                file_content = platform_package_file
+            else:
+                raise ValueError("platform_package_file must be either a file path (str) or file content (bytes)")
 
-        Returns:
-            Dict containing the imported platform ID
+            # Check file size (20MB limit according to API docs)
+            max_size = 20 * 1024 * 1024  # 20MB in bytes
+            if len(file_content) > max_size:
+                raise ValueError(f"Platform package file is too large. Maximum size is 20MB, got {len(file_content)} bytes")
 
-        Raises:
-            CyberArkAPIError: If import fails
-            ValueError: If file is invalid or too large
-        """
-        import base64
-        import os
+            # Encode to base64
+            import_file_b64 = base64.b64encode(file_content).decode('utf-8')
 
-        # Handle file input - convert to base64 encoded bytes
-        if isinstance(platform_package_file, str):
-            # It's a file path
-            if not os.path.exists(platform_package_file):
-                raise ValueError(f"Platform package file not found: {platform_package_file}")
+            # Create the import platform model
+            import_platform = ArkPCloudImportPlatform(
+                import_file=import_file_b64
+            )
+            
+            # Import platform using SDK
+            result = self.platforms_service.import_platform(import_platform=import_platform)
+            
+            self.logger.info(f"Successfully imported platform package using ark-sdk-python ({len(file_content)} bytes)")
+            return result.model_dump()
+            
+        except Exception as e:
+            self.logger.error(f"Error importing platform package with ark-sdk-python: {e}")
+            raise
 
-            with open(platform_package_file, 'rb') as f:
-                file_content = f.read()
-        elif isinstance(platform_package_file, bytes):
-            # It's already file content
-            file_content = platform_package_file
-        else:
-            raise ValueError("platform_package_file must be either a file path (str) or file content (bytes)")
-
-        # Check file size (20MB limit according to API docs)
-        max_size = 20 * 1024 * 1024  # 20MB in bytes
-        if len(file_content) > max_size:
-            raise ValueError(f"Platform package file is too large. Maximum size is 20MB, got {len(file_content)} bytes")
-
-        # Encode to base64
-        import_file_b64 = base64.b64encode(file_content).decode('utf-8')
-
-        # Prepare request body
-        body = {
-            "ImportFile": import_file_b64
-        }
-
-        self.logger.info(f"Importing platform package ({len(file_content)} bytes)")
-        response = await self._make_api_request("POST", "Platforms/Import", json=body)
-
-        return response
-
-    async def get_complete_platform_info(self, platform_id: str, platform_basic: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get_complete_platform_info(
+        self, platform_id: str, platform_basic: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Combine data from Get Platforms List API and Get Platform Details API into complete platform object.
 
         This method provides a comprehensive view of platform configuration by merging:
@@ -843,13 +500,6 @@ class CyberArkMCPServer:
 
         Raises:
             CyberArkAPIError: When platform is not found (404) or access is denied
-
-        Example:
-            >>> server = CyberArkMCPServer.from_environment()
-            >>> info = await server.get_complete_platform_info("WinServerLocal")
-            >>> print(info["name"])  # "Windows Server Local"
-            >>> print(info["PasswordLength"])  # "12" (preserved as string from API)
-            >>> print(info["active"])  # True (from list API, takes precedence)
 
         Note:
             Gracefully degrades to basic platform info if details API fails.
@@ -913,40 +563,35 @@ class CyberArkMCPServer:
             result = self._merge_platform_data(result, platform_details)
             details_retrieved = True
 
-        except CyberArkAPIError as e:
-            # Enhanced graceful degradation with comprehensive logging
-            if e.status_code == 404:
-                self.logger.warning(f"Platform details not found for '{safe_platform_id}' (404) - using basic info only")
-                self.logger.debug(f"404 degradation: Platform exists in list but details API returned not found")
-            elif e.status_code == 403:
-                self.logger.warning(f"Insufficient permissions for platform details '{safe_platform_id}' (403) - using basic info only")
-                self.logger.debug(f"403 degradation: User lacks Privilege Cloud Administrator role for detailed platform access")
-            elif e.status_code == 429:
-                self.logger.warning(f"Rate limiting for platform details '{safe_platform_id}' (429) - using basic info only")
-                self.logger.debug(f"429 degradation: Consider implementing exponential backoff for high-volume requests")
-            else:
-                self.logger.warning(f"Platform details API error for '{safe_platform_id}' (HTTP {e.status_code}) - using basic info only")
-                self.logger.debug(f"API error degradation: {e}")
-
-            self.logger.info(f"Gracefully degrading to basic platform information for '{safe_platform_id}'")
-
         except Exception as e:
-            # Enhanced handling for unexpected errors
-            self.logger.error(f"Unexpected error retrieving platform details for '{safe_platform_id}': {type(e).__name__}: {e}")
-            self.logger.debug(f"Unexpected error details", exc_info=True)
-            self.logger.info(f"Gracefully degrading to basic platform information for '{safe_platform_id}' due to unexpected error")
+            # Enhanced graceful degradation with comprehensive logging
+            if hasattr(e, 'status_code'):
+                if e.status_code == 404:
+                    self.logger.warning(f"Platform details not found for '{safe_platform_id}' (404) - using basic info only")
+                    self.logger.debug(f"404 degradation: Platform exists in list but details API returned not found")
+                elif e.status_code == 403:
+                    self.logger.warning(f"Insufficient permissions for platform details '{safe_platform_id}' (403) - using basic info only")
+                    self.logger.debug(f"403 degradation: User lacks Privilege Cloud Administrator role for detailed platform access")
+                elif e.status_code == 429:
+                    self.logger.warning(f"Rate limiting for platform details '{safe_platform_id}' (429) - using basic info only")
+                    self.logger.debug(f"429 degradation: Consider implementing exponential backoff for high-volume requests")
+                else:
+                    self.logger.warning(f"Platform details API error for '{safe_platform_id}' (HTTP {e.status_code}) - using basic info only")
+                    self.logger.debug(f"API error degradation: {e}")
+            else:
+                self.logger.warning(f"Unexpected error getting platform details for '{safe_platform_id}' - using basic info only: {e}")
+                self.logger.debug(f"Unexpected error degradation", exc_info=True)
 
-        # Step 4: Log completion status
-        if details_retrieved:
-            self.logger.debug(f"Completed platform info retrieval for '{safe_platform_id}' with {len(result)} fields (including details)")
-        else:
-            self.logger.debug(f"Completed platform info retrieval for '{safe_platform_id}' with {len(result)} fields (basic info only)")
+        # Final result logging
+        field_count = len(result)
+        status = "with enhanced details" if details_retrieved else "basic info only"
+        self.logger.info(f"Returning complete platform info for '{safe_platform_id}' ({field_count} fields, {status})")
 
         return result
 
     async def list_platforms_with_details(self, **kwargs) -> List[Dict[str, Any]]:
         """Get all platforms with complete information using concurrent API calls.
-
+        
         This method provides optimized platform listing by fetching platform details
         concurrently to reduce overall API response time. It combines the list_platforms()
         API call with concurrent get_complete_platform_info() calls for each platform.
@@ -959,28 +604,23 @@ class CyberArkMCPServer:
             List[Dict[str, Any]]: List of complete platform configurations containing:
                 - All fields from list API (id, name, systemType, active, etc.)
                 - Detailed policy settings from details API when available
-                - Data type conversions applied (Yes/No -> boolean, string numbers -> int)
+                - Raw API values preserved exactly as returned by CyberArk APIs
                 - Graceful degradation for platforms where details API fails
 
         Raises:
             CyberArkAPIError: When platform list retrieval fails (propagated from list_platforms)
 
-        Example:
-            >>> server = CyberArkMCPServer.from_environment()
-            >>> platforms = await server.list_platforms_with_details()
-            >>> print(f"Retrieved {len(platforms)} platforms with details")
-            >>> platforms_with_search = await server.list_platforms_with_details(search="Windows")
-
         Performance Notes:
-            - Uses concurrent API calls with configurable limit (default: 10 concurrent requests)
+            - Uses concurrent API calls with configurable limit (default: 5 concurrent requests)
             - Implements graceful failure handling - continues if some platform details fail
             - Typically 3-5x faster than sequential API calls for large platform lists
             - Rate limiting protection through concurrent request batching
 
         Note:
             Falls back gracefully to basic platform info if individual platform details fail.
-            Implements exponential backoff for rate limiting scenarios.
         """
+        import asyncio
+        
         self.logger.info("Fetching platforms with detailed information using concurrent API calls")
 
         # Log the parameters being used
@@ -996,9 +636,6 @@ class CyberArkMCPServer:
             if not platforms_list:
                 self.logger.info("No platforms found, returning empty list")
                 return []
-            
-            # Note: Platforms API returns all platforms in single call (no pagination support)
-            # Enhanced processing may be slower but provides complete information
 
         except CyberArkAPIError:
             # Re-raise CyberArkAPIError as-is to preserve original error context
@@ -1030,28 +667,25 @@ class CyberArkMCPServer:
                     self.logger.debug(f"Successfully fetched details for platform '{safe_platform_id}'")
                     return complete_info
 
-                except CyberArkAPIError as e:
-                    # Enhanced error categorization for better troubleshooting
-                    if e.status_code == 404:
-                        self.logger.warning(f"Platform '{safe_platform_id}' not found (404) - skipping")
-                        self.logger.debug(f"404 skip: Platform may have been deleted or access restricted")
-                    elif e.status_code == 403:
-                        self.logger.warning(f"Insufficient permissions for platform '{safe_platform_id}' (403) - skipping")
-                        self.logger.debug(f"403 skip: User lacks admin role for platform details access")
-                    elif e.status_code == 429:
-                        self.logger.warning(f"Rate limiting for platform '{safe_platform_id}' (429) - skipping")
-                        self.logger.debug(f"429 skip: Consider reducing concurrent request limit or implementing backoff")
-                    else:
-                        self.logger.warning(f"API error for platform '{safe_platform_id}' (HTTP {e.status_code}) - skipping")
-                        self.logger.debug(f"API error skip: {e}")
-
-                    # Return None to indicate failure - will be filtered out
-                    return None
-
                 except Exception as e:
-                    # Enhanced handling for unexpected errors
-                    self.logger.error(f"Unexpected error fetching platform '{safe_platform_id}': {type(e).__name__}: {e}")
-                    self.logger.debug(f"Unexpected error details for platform '{safe_platform_id}'", exc_info=True)
+                    # Enhanced error categorization for better troubleshooting
+                    if hasattr(e, 'status_code'):
+                        if e.status_code == 404:
+                            self.logger.warning(f"Platform '{safe_platform_id}' not found (404) - skipping")
+                            self.logger.debug(f"404 skip: Platform may have been deleted or access restricted")
+                        elif e.status_code == 403:
+                            self.logger.warning(f"Insufficient permissions for platform '{safe_platform_id}' (403) - skipping")
+                            self.logger.debug(f"403 skip: User lacks admin role for platform details access")
+                        elif e.status_code == 429:
+                            self.logger.warning(f"Rate limiting for platform '{safe_platform_id}' (429) - skipping")
+                            self.logger.debug(f"429 skip: Consider reducing concurrent request limit or implementing backoff")
+                        else:
+                            self.logger.warning(f"API error for platform '{safe_platform_id}' (HTTP {e.status_code}) - skipping")
+                            self.logger.debug(f"API error skip: {e}")
+                    else:
+                        # Enhanced handling for unexpected errors
+                        self.logger.error(f"Unexpected error fetching platform '{safe_platform_id}': {type(e).__name__}: {e}")
+                        self.logger.debug(f"Unexpected error details for platform '{safe_platform_id}'", exc_info=True)
 
                     # Return None to indicate failure - will be filtered out
                     return None
@@ -1089,41 +723,53 @@ class CyberArkMCPServer:
                     safe_platform_id = str(platform_id).replace('\\n', '').replace('\\n', '')[:100]
                     self.logger.error(f"Exception in concurrent fetch for platform '{safe_platform_id}': {type(result).__name__}: {result}")
                     self.logger.debug(f"Exception details for platform '{safe_platform_id}'")
-                elif result is not None:
-                    successful_platforms.append(result)
-                else:
+                elif result is None:
                     failed_count += 1
+                    # Already logged in fetch_platform_details
+                else:
+                    successful_platforms.append(result)
 
-            # Step 5: Log comprehensive performance metrics and return results
-            success_rate = (len(successful_platforms) / len(platforms_list)) * 100 if platforms_list else 100
+            # Step 5: Enhanced completion logging with performance metrics
+            success_count = len(successful_platforms)
+            success_rate = (success_count / len(platforms_list)) * 100 if platforms_list else 0
+            avg_time_per_platform = execution_time / len(platforms_list) if platforms_list else 0
 
-            self.logger.info(
-                f"Concurrent platform fetch completed in {execution_time:.2f}s: "
-                f"{len(successful_platforms)} successful, {failed_count} failed "
-                f"({success_rate:.1f}% success rate)"
-            )
+            self.logger.info(f"Concurrent platform fetch completed: {success_count}/{len(platforms_list)} successful ({success_rate:.1f}%), {execution_time:.2f}s total, {avg_time_per_platform:.3f}s avg/platform")
 
             if failed_count > 0:
-                self.logger.warning(
-                    f"Some platforms failed to fetch details ({failed_count}/{len(platforms_list)}), "
-                    "continuing with available data"
-                )
-                if exception_count > 0:
-                    self.logger.warning(f"Encountered {exception_count} unexpected exceptions during concurrent fetch")
+                self.logger.warning(f"Platform fetch failures: {failed_count} platforms failed (including {exception_count} exceptions)")
+                self.logger.debug(f"Failed platforms will be excluded from results")
 
-            # Log performance insights
-            if execution_time > 5.0:
-                self.logger.info(f"Consider reducing concurrent request limit if experiencing timeouts or rate limiting")
-            elif execution_time < 1.0 and len(platforms_list) > 5:
-                self.logger.debug(f"Excellent performance - concurrent fetching is working optimally")
+            if success_count == 0:
+                self.logger.warning("No platforms successfully retrieved with details - all failed or were filtered out")
 
             return successful_platforms
 
         except Exception as e:
-            self.logger.error(f"Concurrent platform fetching failed: {type(e).__name__}: {e}")
-            self.logger.debug(f"Concurrent fetch failure details", exc_info=True)
-            raise CyberArkAPIError(f"Concurrent platform fetching failed: {e}")
+            # Enhanced error handling for unexpected concurrent execution errors
+            self.logger.error(f"Unexpected error during concurrent platform fetch: {type(e).__name__}: {e}")
+            self.logger.debug(f"Concurrent fetch error details", exc_info=True)
+            raise CyberArkAPIError(f"Unexpected error during concurrent platform fetch: {e}")
 
+    # Health check - Using SDK services
+    async def health_check(self) -> Dict[str, Any]:
+        """Perform a health check of the CyberArk connection using ark-sdk-python"""
+        try:
+            # Try to list platforms as a basic connectivity test
+            platforms = await self.list_platforms()
+            return {
+                "status": "healthy",
+                "message": "CyberArk connection successful",
+                "platform_count": len(platforms)
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy", 
+                "message": f"CyberArk connection failed: {e}",
+                "error": str(e)
+            }
+
+    # Platform data processing methods (migrated from PlatformDataHandler)
     def _flatten_platform_structure(self, platform_data: Dict[str, Any]) -> Dict[str, Any]:
         """Flatten nested platform structure from list API into a single level.
 

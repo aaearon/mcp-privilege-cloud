@@ -38,14 +38,10 @@ All tools require proper authentication configuration through environment variab
 
 ```bash
 # Required Environment Variables
-CYBERARK_IDENTITY_TENANT_ID=your-tenant-id    # Without .id.cyberark.cloud suffix
 CYBERARK_CLIENT_ID=service-account-username    # OAuth service account
 CYBERARK_CLIENT_SECRET=service-account-password
-CYBERARK_SUBDOMAIN=your-subdomain             # Without .privilegecloud.cyberark.cloud suffix
 
 # Optional Configuration
-CYBERARK_API_TIMEOUT=30        # API request timeout in seconds
-CYBERARK_MAX_RETRIES=3         # Maximum retry attempts  
 CYBERARK_LOG_LEVEL=INFO        # Logging level
 ```
 
@@ -743,10 +739,8 @@ for platform in active_platforms:
       "command": "uvx",
       "args": ["mcp-privilege-cloud"],
       "env": {
-        "CYBERARK_IDENTITY_TENANT_ID": "your-tenant-id",
         "CYBERARK_CLIENT_ID": "your-client-id",
-        "CYBERARK_CLIENT_SECRET": "your-client-secret",
-        "CYBERARK_SUBDOMAIN": "your-subdomain"
+        "CYBERARK_CLIENT_SECRET": "your-client-secret"
       }
     }
   }

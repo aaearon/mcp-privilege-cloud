@@ -27,6 +27,7 @@ from mcp_privilege_cloud.mcp_server import list_accounts, search_accounts, list_
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
 
+@pytest.mark.integration
 class TestMCPAccountTools:
     """Test MCP account management tools integration"""
 
@@ -40,28 +41,22 @@ class TestMCPAccountTools:
             "createdDateTime": "2025-06-09T10:30:00Z"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            mock_server = Mock()
-            mock_server.create_account = AsyncMock(return_value=expected_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.create_account.return_value = expected_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             result = await create_account(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure"
             )
             
             assert result == expected_response
+            mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
-                safe_name="IT-Infrastructure",
-                name=None,
-                address=None,
-                user_name=None,
-                secret=None,
-                secret_type=None,
-                platform_account_properties=None,
-                secret_management=None,
-                remote_machines_access=None
+                safe_name="IT-Infrastructure"
             )
 
     @pytest.mark.asyncio
@@ -81,11 +76,12 @@ class TestMCPAccountTools:
         account_platform_properties = {"LogonDomain": "EXAMPLE", "Port": "3389"}
         account_secret_mgmt = {"automaticManagementEnabled": True}
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            mock_server = Mock()
-            mock_server.create_account = AsyncMock(return_value=expected_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.create_account.return_value = expected_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             result = await create_account(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure",
@@ -99,6 +95,7 @@ class TestMCPAccountTools:
             )
             
             assert result == expected_response
+            mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure",
@@ -108,14 +105,13 @@ class TestMCPAccountTools:
                 secret="SecurePassword123!",
                 secret_type="password",
                 platform_account_properties=account_platform_properties,
-                secret_management=account_secret_mgmt,
-                remote_machines_access=None
+                secret_management=account_secret_mgmt
             )
 
     @pytest.mark.asyncio
     async def test_change_account_password_mcp_tool_cpm_managed(self):
         """Test change_account_password MCP tool for CPM-managed accounts"""
-        from src.mcp_privilege_cloud.mcp_server import change_account_password
+        from mcp_privilege_cloud.mcp_server import change_account_password
         
         account_id = "123_456_789"
         mock_response = {
@@ -124,11 +120,11 @@ class TestMCPAccountTools:
             "status": "Password change initiated successfully"
         }
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.change_account_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
+        # Mock get_server to avoid SDK authentication
+        mock_server = AsyncMock()
+        mock_server.change_account_password.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
             
             # Call the MCP tool
             result = await change_account_password(account_id=account_id)
@@ -140,8 +136,7 @@ class TestMCPAccountTools:
             
             # Verify server method was called correctly
             mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id,
-                new_password=None
+                account_id=account_id
             )
 
 
@@ -149,27 +144,24 @@ class TestMCPAccountTools:
     @pytest.mark.asyncio
     async def test_change_account_password_mcp_tool_error_handling(self):
         """Test change_account_password MCP tool error handling"""
-        from src.mcp_privilege_cloud.mcp_server import change_account_password
-        from src.mcp_privilege_cloud.server import CyberArkAPIError
+        from mcp_privilege_cloud.mcp_server import change_account_password
+        from mcp_privilege_cloud.server import CyberArkAPIError
         
         account_id = "invalid_account"
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.change_account_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock()
+        mock_server.change_account_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
             # Verify that the error is propagated
             with pytest.raises(CyberArkAPIError, match="Account not found"):
                 await change_account_password(account_id=account_id)
             
-            # Verify server method was called
+            # Verify server method was called correctly
             mock_server.change_account_password.assert_called_once_with(
-                account_id=account_id,
-                new_password=None
+                account_id=account_id
             )
 
     @pytest.mark.asyncio
@@ -184,12 +176,12 @@ class TestMCPAccountTools:
             "status": "Next password set successfully"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool
             result = await set_next_password(
                 account_id=account_id,
@@ -201,11 +193,11 @@ class TestMCPAccountTools:
             assert result["id"] == account_id
             assert "lastModifiedTime" in result
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password,
-                change_immediately=True
+                new_password=new_password
             )
 
     @pytest.mark.asyncio
@@ -220,12 +212,12 @@ class TestMCPAccountTools:
             "status": "Next password scheduled successfully"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool
             result = await set_next_password(
                 account_id=account_id,
@@ -237,7 +229,8 @@ class TestMCPAccountTools:
             assert result == mock_response
             assert result["id"] == account_id
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
                 new_password=new_password,
@@ -252,14 +245,12 @@ class TestMCPAccountTools:
         account_id = "invalid_account"
         new_password = "TestPassword123"
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Verify that the error is propagated
             with pytest.raises(CyberArkAPIError, match="Account not found"):
                 await set_next_password(
@@ -267,11 +258,11 @@ class TestMCPAccountTools:
                     new_password=new_password
                 )
             
-            # Verify server method was called
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password,
-                change_immediately=True
+                new_password=new_password
             )
 
     @pytest.mark.asyncio
@@ -286,14 +277,13 @@ class TestMCPAccountTools:
             "status": "Password verified successfully"
         }
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_server_class:
-            mock_server = AsyncMock()
-            mock_server.verify_account_password.return_value = mock_response
-            mock_server_class.from_environment.return_value = mock_server
-            
-            # Import and call the MCP tool function
-            from src.mcp_privilege_cloud.mcp_server import verify_account_password
-            
+        # Import the MCP tool function
+        from mcp_privilege_cloud.mcp_server import verify_account_password
+        
+        mock_server = AsyncMock()
+        mock_server.verify_account_password.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
             result = await verify_account_password(account_id=account_id)
             
             # Verify the result
@@ -310,14 +300,13 @@ class TestMCPAccountTools:
         """Test verify account password MCP tool error handling"""
         account_id = "invalid_account"
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_server_class:
-            mock_server = AsyncMock()
-            mock_server.verify_account_password.side_effect = Exception("Account not found")
-            mock_server_class.from_environment.return_value = mock_server
-            
-            # Import and call the MCP tool function
-            from src.mcp_privilege_cloud.mcp_server import verify_account_password
-            
+        # Import the MCP tool function
+        from mcp_privilege_cloud.mcp_server import verify_account_password
+        
+        mock_server = AsyncMock()
+        mock_server.verify_account_password.side_effect = Exception("Account not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
             with pytest.raises(Exception, match="Account not found"):
                 await verify_account_password(account_id=account_id)
             
@@ -327,7 +316,7 @@ class TestMCPAccountTools:
     @pytest.mark.asyncio
     async def test_reconcile_account_password_mcp_tool_success(self):
         """Test the reconcile_account_password MCP tool with successful reconciliation"""
-        from src.mcp_privilege_cloud.mcp_server import reconcile_account_password
+        from mcp_privilege_cloud.mcp_server import reconcile_account_password
         
         account_id = "test_account_123"
         
@@ -341,12 +330,12 @@ class TestMCPAccountTools:
             "safeName": "TestSafe"
         }
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance
-            mock_server = Mock()
-            mock_server.reconcile_account_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.reconcile_account_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool function
             result = await reconcile_account_password(account_id=account_id)
             
@@ -357,25 +346,24 @@ class TestMCPAccountTools:
             assert result["status"] == "Password reconciled successfully"
             assert result["lastReconciledDateTime"] == "2025-06-30T10:30:00Z"
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
 
     @pytest.mark.asyncio
     async def test_reconcile_account_password_mcp_tool_error_handling(self):
         """Test the reconcile_account_password MCP tool error handling"""
-        from src.mcp_privilege_cloud.mcp_server import reconcile_account_password
-        from src.mcp_privilege_cloud.server import CyberArkAPIError
+        from mcp_privilege_cloud.mcp_server import reconcile_account_password
+        from mcp_privilege_cloud.server import CyberArkAPIError
         
         account_id = "invalid_account"
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.reconcile_account_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.reconcile_account_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool function and expect error
             with pytest.raises(CyberArkAPIError) as exc_info:
                 await reconcile_account_password(account_id=account_id)
@@ -384,10 +372,12 @@ class TestMCPAccountTools:
             assert exc_info.value.status_code == 404
             assert "Account not found" in str(exc_info.value)
             
-            # Verify server method was called
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
 
 
+@pytest.mark.integration
 class TestMCPPlatformTools:
     """Test MCP platform management tools integration"""
 
@@ -395,10 +385,8 @@ class TestMCPPlatformTools:
     def platform_mock_env_vars(self):
         """Mock environment variables for platform tests"""
         return {
-            "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
             "CYBERARK_CLIENT_ID": "test-client",
-            "CYBERARK_CLIENT_SECRET": "test-secret",
-            "CYBERARK_SUBDOMAIN": "test-subdomain"
+            "CYBERARK_CLIENT_SECRET": "test-secret"
         }
 
     @pytest.mark.asyncio
@@ -407,26 +395,27 @@ class TestMCPPlatformTools:
         platform_file = "/tmp/test_platform.zip"
         mock_response = {"PlatformID": "ImportedPlatform123"}
         
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'import_platform_package', new_callable=AsyncMock) as mock_import:
-                mock_import.return_value = mock_response
-                
-                result = await import_platform_package(platform_file)
-                
-                assert result == mock_response
-                mock_import.assert_called_once_with(platform_file)
+        mock_server = AsyncMock()
+        mock_server.import_platform_package.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await import_platform_package(platform_file)
+            
+            assert result == mock_response
+            mock_server.import_platform_package.assert_called_once_with(platform_file)
 
     @pytest.mark.asyncio
     async def test_mcp_import_platform_package_error_handling(self, platform_mock_env_vars):
         """Test MCP import_platform_package tool handles errors properly"""
-        with patch.dict(os.environ, platform_mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'import_platform_package', new_callable=AsyncMock) as mock_import:
-                mock_import.side_effect = ValueError("Platform package file not found")
-                
-                with pytest.raises(ValueError, match="Platform package file not found"):
-                    await import_platform_package("/tmp/nonexistent.zip")
+        mock_server = AsyncMock()
+        mock_server.import_platform_package.side_effect = ValueError("Platform package file not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Platform package file not found"):
+                await import_platform_package("/tmp/nonexistent.zip")
 
 
+@pytest.mark.integration
 class TestMCPListingTools:
     """Test MCP listing tools that replaced resources"""
 
@@ -434,10 +423,8 @@ class TestMCPListingTools:
     def mock_env_vars(self):
         """Mock environment variables for tests."""
         return {
-            "CYBERARK_IDENTITY_TENANT_ID": "test-tenant",
             "CYBERARK_CLIENT_ID": "test-client-id",
-            "CYBERARK_CLIENT_SECRET": "test-secret",
-            "CYBERARK_SUBDOMAIN": "test-subdomain"
+            "CYBERARK_CLIENT_SECRET": "test-secret"
         }
 
     @pytest.mark.asyncio
@@ -454,14 +441,14 @@ class TestMCPListingTools:
             }
         ]
         
-        with patch.dict(os.environ, mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_accounts', new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = mock_accounts
-                
-                result = await list_accounts()
-                
-                assert result == mock_accounts
-                mock_list.assert_called_once()
+        mock_server = AsyncMock()
+        mock_server.list_accounts.return_value = mock_accounts
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await list_accounts()
+            
+            assert result == mock_accounts
+            mock_server.list_accounts.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_search_accounts_tool(self, mock_env_vars):
@@ -476,20 +463,17 @@ class TestMCPListingTools:
             }
         ]
         
-        with patch.dict(os.environ, mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'search_accounts', new_callable=AsyncMock) as mock_search:
-                mock_search.return_value = mock_accounts
-                
-                result = await search_accounts(query="admin", safe_name="IT-Infrastructure")
-                
-                assert result == mock_accounts
-                mock_search.assert_called_once_with(
-                    keywords="admin",
-                    safe_name="IT-Infrastructure",
-                    username=None,
-                    address=None,
-                    platform_id=None
-                )
+        mock_server = AsyncMock()
+        mock_server.search_accounts.return_value = mock_accounts
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await search_accounts(query="admin", safe_name="IT-Infrastructure")
+            
+            assert result == mock_accounts
+            mock_server.search_accounts.assert_called_once_with(
+                query="admin",
+                safe_name="IT-Infrastructure"
+            )
 
     @pytest.mark.asyncio
     async def test_list_safes_tool(self, mock_env_vars):
@@ -503,14 +487,14 @@ class TestMCPListingTools:
             }
         ]
         
-        with patch.dict(os.environ, mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_safes', new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = mock_safes
-                
-                result = await list_safes()
-                
-                assert result == mock_safes
-                mock_list.assert_called_once()
+        mock_server = AsyncMock()
+        mock_server.list_safes.return_value = mock_safes
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await list_safes()
+            
+            assert result == mock_safes
+            mock_server.list_safes.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_list_platforms_tool(self, mock_env_vars):
@@ -525,14 +509,14 @@ class TestMCPListingTools:
             }
         ]
         
-        with patch.dict(os.environ, mock_env_vars):
-            with patch.object(CyberArkMCPServer, 'list_platforms', new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = mock_platforms
-                
-                result = await list_platforms()
-                
-                assert result == mock_platforms
-                mock_list.assert_called_once()
+        mock_server = AsyncMock()
+        mock_server.list_platforms.return_value = mock_platforms
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await list_platforms()
+            
+            assert result == mock_platforms
+            mock_server.list_platforms.assert_called_once()
 
 
 

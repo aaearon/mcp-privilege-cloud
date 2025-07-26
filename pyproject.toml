@@ -38,6 +38,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "ark-sdk-python>=1.0.0",
 ]
 
 [project.optional-dependencies]

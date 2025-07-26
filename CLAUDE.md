@@ -6,9 +6,9 @@ This document provides essential context for AI assistants developing the CyberA
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **PLATFORM ENHANCEMENT COMPLETE** - Production ready with comprehensive platform management, concurrent optimization, and performance testing  
-**Last Updated**: July 3, 2025  
-**Recent Enhancement**: Fixed platform pagination issue - removed artificial 50-platform limit to return all available platforms (125 total). Enhanced concurrent processing with optimized timeouts and improved error handling for complete platform visibility.
+**Current Status**: ✅ **SDK MIGRATION COMPLETE** - Production ready with official ark-sdk-python integration, 13 MCP tools, and enhanced enterprise capabilities  
+**Last Updated**: July 25, 2025  
+**Recent Enhancement**: Migrated to official ark-sdk-python library, providing enhanced reliability, official CyberArk support, and future-proof API compatibility. Includes comprehensive platform management, concurrent optimization, and performance testing with 13 fully functional MCP tools.
 
 ## Architecture
 
@@ -16,14 +16,14 @@ For a complete overview of the system architecture, see [ARCHITECTURE.md](ARCHIT
 
 ## Available MCP Tools
 
-The server provides 10 MCP tools for CyberArk operations. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
+The server provides 13 MCP tools for CyberArk operations, built on the official ark-sdk-python library. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
 
-**Tool Categories**:
-- **Data Access Tools**: `list_accounts`, `search_accounts`, `list_safes`, `list_platforms`
+**Tool Categories**:  
+- **Data Access Tools**: `list_accounts`, `get_account_details`, `search_accounts`, `list_safes`, `get_safe_details`, `list_platforms`, `get_platform_details`
 - **Account Management Tools**: `create_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 - **Platform Management Tools**: `import_platform_package`
 
-> **Breaking Change**: Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
+> **SDK Migration**: All tools now use the official ark-sdk-python library for enhanced reliability and enterprise support. Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
 
 ## Enhanced Platform Data Combination
 
@@ -144,21 +144,19 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 
 ## Data Access Tools
 
-The server provides comprehensive data access tools for CyberArk operations with complete API data fidelity:
+The server provides comprehensive data access tools for CyberArk operations with complete API data fidelity through the official ark-sdk-python library:
 
-**Account Tools**: `list_accounts()`, `search_accounts()` - Access and search all privileged accounts
-**Safe Tools**: `list_safes()` - Access all safes with complete details  
-**Platform Tools**: `list_platforms()` - Access platform definitions with raw API data preserved exactly
+**Account Tools**: `list_accounts()`, `get_account_details()`, `search_accounts()` - Access and search all privileged accounts with SDK-powered reliability
+**Safe Tools**: `list_safes()`, `get_safe_details()` - Access all safes with complete details and enhanced error handling  
+**Platform Tools**: `list_platforms()`, `get_platform_details()` - Access platform definitions with raw API data preserved exactly
 
-*All tools return exact CyberArk API data with no field manipulation or transformations applied*
+*All tools return exact CyberArk API data with no field manipulation or transformations applied, powered by the official SDK*
 
 ## Configuration
 
 **Required Environment Variables**:
-- `CYBERARK_IDENTITY_TENANT_ID` - Tenant ID (without .id.cyberark.cloud suffix)
 - `CYBERARK_CLIENT_ID` - OAuth service account username  
 - `CYBERARK_CLIENT_SECRET` - Service account password
-- `CYBERARK_SUBDOMAIN` - Subdomain (without .privilegecloud.cyberark.cloud suffix)
 
 *See README.md for complete configuration details*
 
@@ -201,7 +199,7 @@ The server provides comprehensive data access tools for CyberArk operations with
 - **`python -m mcp_privilege_cloud`** - Standard Python module execution
 
 #### Legacy Entry Points (Deprecated)
-- **`run_server.py`** - Legacy multiplatform entry point (deprecated)
+- **`run_server.py`** - Legacy multiplatform entry point (removed in SDK migration)
 - **`python src/mcp_privilege_cloud/mcp_server.py`** - Legacy direct execution (deprecated)
 
 ## Testing Strategy
@@ -231,10 +229,10 @@ The server provides comprehensive data access tools for CyberArk operations with
 
 ## Integration Examples
 
-**Claude Desktop**: Connect via `uvx mcp-privilege-cloud` (recommended) or `python /path/to/run_server.py` (legacy)  
-**MCP Inspector**: Use `npx @modelcontextprotocol/inspector`
+**Claude Desktop**: Connect via `uvx mcp-privilege-cloud` (recommended) with official SDK integration  
+**MCP Inspector**: Use `npx @modelcontextprotocol/inspector` for enhanced SDK-powered tool testing
 
-*See README.md for complete integration configuration*
+*See README.md for complete integration configuration including SDK migration benefits*
 
 ## Next Development Priorities
 
