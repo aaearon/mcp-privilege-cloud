@@ -117,13 +117,13 @@ class TestAccountManagement:
         mock_page.items = mock_items
         
         mock_accounts_service = Mock()
-        mock_accounts_service.search_accounts.return_value = [mock_page]
+        mock_accounts_service.list_accounts.return_value = [mock_page]
         server.accounts_service = mock_accounts_service
         
-        result = await server.search_accounts(keywords="admin")
+        result = await server.search_accounts(query="admin")
         
         assert result == sample_accounts
-        mock_accounts_service.search_accounts.assert_called_once()
+        mock_accounts_service.list_accounts.assert_called_once()
 
     async def test_search_accounts_with_filters(self, server, sample_accounts):
         """Test account search with multiple filters"""
@@ -139,17 +139,17 @@ class TestAccountManagement:
         mock_page.items = mock_items
         
         mock_accounts_service = Mock()
-        mock_accounts_service.search_accounts.return_value = [mock_page]
+        mock_accounts_service.list_accounts.return_value = [mock_page]
         server.accounts_service = mock_accounts_service
         
         result = await server.search_accounts(
-            keywords="admin",
+            query="admin",
             safe_name="IT-Infrastructure",
             username="admin"
         )
         
         assert result == filtered_accounts
-        mock_accounts_service.search_accounts.assert_called_once()
+        mock_accounts_service.list_accounts.assert_called_once()
 
     async def test_get_account_details(self, server, sample_accounts):
         """Test getting account details by ID"""
@@ -173,9 +173,9 @@ class TestAccountManagement:
         """Test creating account with minimal required fields"""
         account_data = {
             "name": "test-account",
-            "platformId": "WindowsDomainAccount",
-            "safeName": "Test-Safe",
-            "userName": "testuser",
+            "platform_id": "WindowsDomainAccount",
+            "safe_name": "Test-Safe",
+            "user_name": "testuser",
             "secret": "password123"
         }
         
@@ -198,13 +198,13 @@ class TestAccountManagement:
         """Test creating account with all available fields"""
         account_data = {
             "name": "test-account-complete",
-            "platformId": "WindowsDomainAccount", 
-            "safeName": "Test-Safe",
-            "userName": "testuser",
+            "platform_id": "WindowsDomainAccount", 
+            "safe_name": "Test-Safe",
+            "user_name": "testuser",
             "secret": "password123",
             "address": "server.domain.com",
-            "platformAccountProperties": {"Port": "22"},
-            "secretManagement": {
+            "platform_account_properties": {"Port": "22"},
+            "secret_management": {
                 "automaticManagementEnabled": True,
                 "manualManagementReason": "test"
             }
@@ -443,10 +443,10 @@ class TestSafeManagement:
         mock_safe.model_dump.return_value = expected_safe
         
         mock_safes_service = Mock()
-        mock_safes_service.get_safe.return_value = mock_safe
+        mock_safes_service.safe.return_value = mock_safe
         server.safes_service = mock_safes_service
         
         result = await server.get_safe_details(safe_name)
         
         assert result == expected_safe
-        mock_safes_service.get_safe.assert_called_once()
+        mock_safes_service.safe.assert_called_once()

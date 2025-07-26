@@ -117,6 +117,21 @@ class CyberArkMCPServer:
             "get_platform_details",
             "import_platform_package"
         ]
+    
+    def clear_cache(self):
+        """Clear all cached services and authentication state. Used for testing."""
+        # Clear LRU cache for _get_service method
+        self._get_service.cache_clear()
+        
+        # Reset service instances
+        self._accounts_service = None
+        self._safes_service = None
+        self._platforms_service = None
+        
+        # Reset authentication state
+        if hasattr(self.sdk_authenticator, '_sdk_auth'):
+            self.sdk_authenticator._sdk_auth = None
+            self.sdk_authenticator._is_authenticated = False
 
     # Account Management - Using ark-sdk-python
     async def list_accounts(self, safe_name: Optional[str] = None, **kwargs) -> List[Dict[str, Any]]:
@@ -271,8 +286,9 @@ class CyberArkMCPServer:
     ) -> Dict[str, Any]:
         """Set the next password for an account using ark-sdk-python"""
         try:
-            # Create the set next credentials model
+            # Create the set next credentials model with required accountId field
             set_next_creds = ArkPCloudSetAccountNextCredentials(
+                accountId=account_id,
                 change_immediately=change_immediately,
                 new_credentials=new_password
             )
@@ -293,8 +309,10 @@ class CyberArkMCPServer:
     async def verify_account_password(self, account_id: str, **kwargs) -> Dict[str, Any]:
         """Verify the password for an account using ark-sdk-python"""
         try:
-            # Create the verify credentials model
-            verify_creds = ArkPCloudVerifyAccountCredentials()
+            # Create the verify credentials model with required account_id
+            verify_creds = ArkPCloudVerifyAccountCredentials(
+                account_id=account_id
+            )
             
             # Verify the account password using SDK
             result = self.accounts_service.verify_account_credentials(

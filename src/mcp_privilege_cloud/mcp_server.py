@@ -62,6 +62,11 @@ def get_server():
             raise
     return server
 
+def reset_server():
+    """Reset the global server instance. Used for testing to ensure clean state."""
+    global server
+    server = None
+
 def tool_wrapper(func):
     """Decorator to handle server interaction and error logging for MCP tools."""
     import functools
