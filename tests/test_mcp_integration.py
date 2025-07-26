@@ -41,17 +41,19 @@ class TestMCPAccountTools:
             "createdDateTime": "2025-06-09T10:30:00Z"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            mock_server = Mock()
-            mock_server.create_account = AsyncMock(return_value=expected_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.create_account.return_value = expected_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             result = await create_account(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure"
             )
             
             assert result == expected_response
+            mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure",
@@ -82,11 +84,12 @@ class TestMCPAccountTools:
         account_platform_properties = {"LogonDomain": "EXAMPLE", "Port": "3389"}
         account_secret_mgmt = {"automaticManagementEnabled": True}
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            mock_server = Mock()
-            mock_server.create_account = AsyncMock(return_value=expected_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.create_account.return_value = expected_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             result = await create_account(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure",
@@ -100,6 +103,7 @@ class TestMCPAccountTools:
             )
             
             assert result == expected_response
+            mock_get_server.assert_called_once()
             mock_server.create_account.assert_called_once_with(
                 platform_id="WinServerLocal",
                 safe_name="IT-Infrastructure",
@@ -125,11 +129,12 @@ class TestMCPAccountTools:
             "status": "Password change initiated successfully"
         }
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.change_account_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.change_account_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             
             # Call the MCP tool
             result = await change_account_password(account_id=account_id)
@@ -139,7 +144,8 @@ class TestMCPAccountTools:
             assert result["id"] == account_id
             assert "lastModifiedTime" in result
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.change_account_password.assert_called_once_with(
                 account_id=account_id,
                 new_password=None
