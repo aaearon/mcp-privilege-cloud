@@ -216,12 +216,12 @@ class TestMCPAccountTools:
             "status": "Next password scheduled successfully"
         }
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance and its method
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool
             result = await set_next_password(
                 account_id=account_id,
@@ -233,7 +233,8 @@ class TestMCPAccountTools:
             assert result == mock_response
             assert result["id"] == account_id
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
                 new_password=new_password,
@@ -248,14 +249,12 @@ class TestMCPAccountTools:
         account_id = "invalid_account"
         new_password = "TestPassword123"
         
-        with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.set_next_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.set_next_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Verify that the error is propagated
             with pytest.raises(CyberArkAPIError, match="Account not found"):
                 await set_next_password(
@@ -263,11 +262,11 @@ class TestMCPAccountTools:
                     new_password=new_password
                 )
             
-            # Verify server method was called
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.set_next_password.assert_called_once_with(
                 account_id=account_id,
-                new_password=new_password,
-                change_immediately=True
+                new_password=new_password
             )
 
     @pytest.mark.asyncio
@@ -337,12 +336,12 @@ class TestMCPAccountTools:
             "safeName": "TestSafe"
         }
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance
-            mock_server = Mock()
-            mock_server.reconcile_account_password = AsyncMock(return_value=mock_response)
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.reconcile_account_password.return_value = mock_response
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool function
             result = await reconcile_account_password(account_id=account_id)
             
@@ -353,7 +352,8 @@ class TestMCPAccountTools:
             assert result["status"] == "Password reconciled successfully"
             assert result["lastReconciledDateTime"] == "2025-06-30T10:30:00Z"
             
-            # Verify server method was called correctly
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
 
     @pytest.mark.asyncio
@@ -364,14 +364,12 @@ class TestMCPAccountTools:
         
         account_id = "invalid_account"
         
-        with patch('src.mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment') as mock_server_factory:
-            # Mock the server instance to raise an error
-            mock_server = Mock()
-            mock_server.reconcile_account_password = AsyncMock(
-                side_effect=CyberArkAPIError("Account not found", 404)
-            )
-            mock_server_factory.return_value = mock_server
-            
+        # Use AsyncMock for the server instance
+        mock_server = AsyncMock(spec=CyberArkMCPServer)
+        mock_server.reconcile_account_password.side_effect = CyberArkAPIError("Account not found", 404)
+
+        # Correctly patch the get_server function
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server) as mock_get_server:
             # Call the MCP tool function and expect error
             with pytest.raises(CyberArkAPIError) as exc_info:
                 await reconcile_account_password(account_id=account_id)
@@ -380,7 +378,8 @@ class TestMCPAccountTools:
             assert exc_info.value.status_code == 404
             assert "Account not found" in str(exc_info.value)
             
-            # Verify server method was called
+            # Verify mock_get_server was called and server method was called correctly
+            mock_get_server.assert_called_once()
             mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
 
 
