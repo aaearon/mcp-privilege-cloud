@@ -1,6 +1,6 @@
 # CyberArk Privilege Cloud MCP Server
 
-A Model Context Protocol (MCP) server for CyberArk Privilege Cloud integration using the official ark-sdk-python library. Enables AI assistants to securely manage privileged accounts through 13 comprehensive MCP tools.
+A Model Context Protocol (MCP) server for CyberArk Privilege Cloud integration using the official ark-sdk-python library. Features a **simplified architecture** with ~27% code reduction while maintaining full functionality. Enables AI assistants to securely manage privileged accounts through 13 comprehensive MCP tools.
 
 ## Features
 
@@ -9,6 +9,7 @@ A Model Context Protocol (MCP) server for CyberArk Privilege Cloud integration u
 - **Platform Management**: List platforms and import platform packages
 - **Official SDK**: Built on ark-sdk-python for enterprise reliability
 - **Comprehensive Tools**: 13 MCP tools with exact API data
+- **Simplified Architecture**: ~27% code reduction with centralized error handling and streamlined patterns
 
 ## Prerequisites
 

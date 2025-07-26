@@ -1,14 +1,102 @@
-# CyberArk Privilege Cloud MCP Server - Development Context
+# CyberArk Privilege Cloud MCP Server - AI Development Context
 
-This document provides essential context for AI assistants developing the CyberArk Privilege Cloud MCP Server.
+**CRITICAL FOR LLM**: This document provides essential development context specifically optimized for AI assistant code development. Read this document completely before making any code changes.
+
+## 🤖 LLM Development Guidelines
+
+**BEFORE CODING**:
+1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
+2. **Check current test status** - All changes must maintain 48/48 passing tests
+3. **Follow existing patterns** - Simplified architecture patterns are established and documented
+4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
+5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
+
+**CODING CONSTRAINTS**:
+- ❌ **Never break existing patterns** - Error handling decorator, tool execution, service initialization
+- ❌ **Never add boilerplate** - Simplified architecture eliminates repetitive code
+- ❌ **Never bypass SDK** - Direct HTTP requests to CyberArk APIs forbidden
+- ❌ **Never use outdated documentation** - Always use context7 MCP tools for current API/library docs
+- ✅ **Always preserve test coverage** - Every change verified by existing test suite
+- ✅ **Always use type hints** - Maintain existing type annotation patterns
+- ✅ **Always follow TDD** - Write failing tests first
+- ✅ **MANDATORY: Use context7 MCP tools** - Get up-to-date documentation for ANY library/API before coding
+
+## 📚 **MANDATORY: Context7 Documentation Usage**
+
+**🤖 CRITICAL FOR ALL LLM DEVELOPMENT**: Before working with ANY library or API, you MUST use context7 MCP server tools to get current documentation.
+
+### Required Context7 Usage Patterns
+
+**Before working with ark-sdk-python:**
+```
+Use context7 MCP tools to get latest ark-sdk-python documentation for:
+- ArkPCloudAccountsService methods and parameters
+- ArkPCloudSafesService API updates  
+- ArkPCloudPlatformsService changes
+- Authentication patterns and model classes
+
+Workflow: resolve-library-id → get-library-docs
+```
+
+**Before working with FastMCP:**
+```
+Use context7 MCP tools to get latest FastMCP documentation for:
+- @mcp.tool() decorator updates
+- Parameter validation patterns
+- Response formatting changes
+- Error handling best practices
+
+Workflow: resolve-library-id → get-library-docs
+```
+
+**Before working with any Python library:**
+```
+Use context7 MCP tools to get current documentation for:
+- asyncio patterns and best practices
+- aiohttp client usage
+- pytest testing frameworks
+- Type hints and annotation updates
+
+Workflow: resolve-library-id → get-library-docs
+```
+
+### Context7 MCP Tool Usage for This Project
+
+```
+# Use context7 MCP tools to get library documentation
+# Access through your MCP client (Claude Desktop, etc.)
+
+Use context7 resolve-library-id and get-library-docs tools:
+
+1. resolve-library-id: "ark-sdk-python" 
+   → get-library-docs with resolved ID
+
+2. resolve-library-id: "fastmcp"
+   → get-library-docs with resolved ID  
+
+3. resolve-library-id: "pytest"
+   → get-library-docs with resolved ID
+
+4. resolve-library-id: "aiohttp"
+   → get-library-docs with resolved ID
+```
+
+**🚨 WARNING**: Using outdated API documentation can lead to:
+- Deprecated method usage
+- Incorrect parameter passing
+- Security vulnerabilities
+- Test failures
+- Integration issues
+
+**✅ RULE**: Always use context7 MCP tools FIRST, then code using current patterns.
 
 ## Project Overview
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **SDK MIGRATION COMPLETE** - Production ready with official ark-sdk-python integration, 13 MCP tools, and enhanced enterprise capabilities  
-**Last Updated**: July 25, 2025  
-**Recent Enhancement**: Migrated to official ark-sdk-python library, providing enhanced reliability, official CyberArk support, and future-proof API compatibility. Includes comprehensive platform management, concurrent optimization, and performance testing with 13 fully functional MCP tools.
+**Current Status**: ✅ **SIMPLIFIED ARCHITECTURE COMPLETE** - Production ready with simplified codebase, official ark-sdk-python integration, 13 MCP tools, and enhanced maintainability  
+**Last Updated**: July 26, 2025  
+**Recent Enhancement**: Comprehensive code simplification achieving ~27% code reduction (from ~1,365 to ~1,000 lines) while maintaining all functionality. Eliminated redundant patterns, streamlined error handling, and improved maintainability. Built on official ark-sdk-python library with enhanced reliability and enterprise support.
 
 ## Architecture
 
@@ -152,6 +240,86 @@ The server provides comprehensive data access tools for CyberArk operations with
 
 *All tools return exact CyberArk API data with no field manipulation or transformations applied, powered by the official SDK*
 
+## 🏗️ Code Simplification Architecture ✅ **COMPLETED** 
+
+### Comprehensive Refactoring Results
+
+The codebase underwent a systematic simplification process achieving **~27% code reduction** (from ~1,365 to ~1,000 lines) while maintaining 100% functionality and test coverage.
+
+**🤖 FOR LLM**: These patterns are ESTABLISHED ARCHITECTURE. Do not recreate eliminated patterns. Follow the simplified patterns shown below for any new code.
+
+#### Phase 1: Tool Infrastructure Simplification
+**1.1: Eliminate Redundant Tool Decorator Pattern** ✅ **COMPLETED**
+- **Before**: ~270 lines of boilerplate tool wrapper decorators in `mcp_server.py`
+- **After**: Single `execute_tool()` function with consistent parameter passing
+- **Result**: Eliminated repetitive code while maintaining identical MCP tool behavior
+
+**1.2: Simplify Service Property Pattern** ✅ **COMPLETED** 
+- **Before**: Complex lazy-loaded service properties with nested initialization logic
+- **After**: Direct service initialization in constructor with graceful fallback for testing
+- **Result**: Simplified service management while preserving SDK integration patterns
+
+#### Phase 2: Core Logic Streamlining
+**2.1: Streamline Platform Data Processing** ✅ **COMPLETED**
+- **Before**: Complex nested data merging with redundant validation and transformation steps
+- **After**: Simplified `_flatten_platform_structure()` and `_merge_platform_data()` methods
+- **Result**: Maintained data integrity while reducing processing complexity
+
+**2.2: Consolidate Error Handling Patterns** ✅ **COMPLETED**
+- **Before**: ~70+ lines of repetitive try/catch blocks across all SDK methods
+- **After**: Centralized `@handle_sdk_errors(operation_name)` decorator
+- **Result**: Consistent error logging format with significantly reduced code duplication
+
+#### Architecture Benefits Achieved
+
+**Maintainability Improvements**:
+- **Single Point of Control**: Error handling, tool execution, and service management
+- **Reduced Duplication**: Eliminated repetitive patterns across multiple methods
+- **Enhanced Readability**: Core business logic more prominent without boilerplate
+- **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
+
+**Performance & Reliability**:
+- **Zero Functional Regression**: All 48 tests passing with identical behavior
+- **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
+- **Graceful Error Handling**: Centralized error management with consistent logging
+- **Backward Compatibility**: No breaking changes to MCP tool interfaces
+
+#### Implementation Patterns
+
+**🤖 MANDATORY PATTERN: Error Handling Decorator**
+```python
+# USE THIS PATTERN for all new SDK methods - DO NOT create manual try/catch blocks
+@handle_sdk_errors("describing the operation")
+async def your_new_method(self, param: str, **kwargs) -> Dict[str, Any]:
+    # Clean business logic without repetitive error handling
+    self._ensure_service_initialized('service_name')  # accounts_service, safes_service, platforms_service
+    # SDK operation here
+    result = self.service.sdk_method()
+    self.logger.info(f"Success message")
+    return result.model_dump()  # Always use .model_dump() for SDK responses
+```
+
+**🤖 MANDATORY PATTERN: Tool Execution**
+```python
+# DO NOT create individual tool wrappers - use this pattern in mcp_server.py
+@mcp.tool()
+async def your_new_tool(param: str) -> Dict[str, Any]:
+    """Tool description for MCP clients"""
+    return await execute_tool("method_name", param=param)
+```
+
+**🤖 FILE STRUCTURE GUIDE**:
+- `sdk_auth.py` - Authentication only, no business logic
+- `server.py` - Business logic with @handle_sdk_errors decorator
+- `mcp_server.py` - MCP tools using execute_tool() function
+- `exceptions.py` - Custom exceptions only
+
+### Testing Validation ✅ **VERIFIED**
+- **48/48 tests passing** - Zero functionality regression
+- **Test Coverage Maintained** - All simplification preserved existing test patterns
+- **Integration Tests Updated** - MCP tool parameter passing verified
+- **Performance Baseline** - No degradation in execution performance
+
 ## Configuration
 
 **Required Environment Variables**:
@@ -234,34 +402,60 @@ The server provides comprehensive data access tools for CyberArk operations with
 
 *See README.md for complete integration configuration including SDK migration benefits*
 
-## Next Development Priorities
+## 🎯 Next Development Priorities (LLM-Optimized)
 
-### 🔥 **Immediate Priority**
-1. **Password Management Tools** - Highest business value
-   - `get_password`, `change_password`, `verify_password`
-   - **API Endpoints**: `POST /PasswordVault/API/Accounts/{accountId}/Password/Retrieve`
-   - **Security**: Additional authentication, audit logging, secure token handling
+**🤖 CRITICAL**: Follow exact patterns below for new features. Do NOT recreate eliminated boilerplate.
 
-2. **~~Advanced Account Operations~~ ✅ PARTIALLY COMPLETED**
-   - ~~`create_account`~~ ✅ **IMPLEMENTED**
-   - `update_account`, `delete_account` (pending)
-   - **API Endpoints**: `PATCH /PasswordVault/API/Accounts/{accountId}`, `DELETE`
+### 🔥 **Immediate Priority** - Password Management Tools
 
-### 🚀 **Medium Priority**  
-3. **Enhanced Safe Management** - Complete safe lifecycle
-   - `create_safe`, `update_safe`, `list_safe_members`
-   - **API Endpoints**: `POST /PasswordVault/API/Safes`, `PUT /PasswordVault/API/Safes/{safeName}`
+**Implementation Template**:
+```python
+# 1. Add to server.py (follow existing create_account pattern):
+@handle_sdk_errors("retrieving account password")  
+async def get_account_password(self, account_id: str, **kwargs) -> Dict[str, Any]:
+    self._ensure_service_initialized('accounts_service')
+    # Use SDK: result = self.accounts_service.get_password(account_id=account_id)
+    # Add security logging: self.logger.warning(f"Password accessed for account: {account_id}")
+    return result.model_dump()
 
-4. **Session Management** - Monitoring and compliance
-   - `list_sessions`, `terminate_session`, `get_session_recordings`
-   - **API Endpoints**: `GET /PasswordVault/API/LiveSessions`
+# 2. Add to mcp_server.py (follow existing tool pattern):
+@mcp.tool()
+async def get_account_password(account_id: str) -> Dict[str, Any]:
+    """Retrieve password for specified account - high security operation"""
+    return await execute_tool("get_account_password", account_id=account_id)
 
-### 🔧 **Key Implementation Patterns**
+# 3. Add tests to test_account_operations.py (follow existing patterns)
+```
 
-1. **API Response Parsing** - Handle inconsistent field names (`value` vs `Platforms`)
-2. **Test-First Development** - TDD with comprehensive unit/integration tests
-3. **Security Implementation** - Enhanced security for password operations
-4. **Error Handling** - Robust error management for production use
+**Required Methods**: `get_password`, `update_account`, `delete_account`  
+**API Endpoints**: `POST /PasswordVault/API/Accounts/{accountId}/Password/Retrieve`  
+**Security**: Additional authentication, audit logging, secure token handling
+
+### 🚀 **Medium Priority** - Safe/Session Management
+
+**Follow same pattern above** for:
+- `create_safe`, `update_safe`, `list_safe_members` 
+- `list_sessions`, `terminate_session`, `get_session_recordings`
+
+### 🔧 **LLM Implementation Rules**
+
+1. **STEP 1: Use context7 FIRST** - Get current library documentation before any code changes
+2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
+3. **ALWAYS follow TDD** - Write failing test first, then implementation  
+4. **SDK-only operations** - Never create direct HTTP requests
+5. **Preserve test coverage** - All 48 tests must continue passing
+6. **Use existing models** - Leverage ark-sdk-python model classes
+
+**🔍 Mandatory Context7 Workflow**:
+```
+# Before implementing any new feature:
+1. Use context7 MCP tools to get latest SDK documentation:
+   - resolve-library-id: "ark-sdk-python"
+   - get-library-docs with the resolved ID
+2. Write failing test using current patterns
+3. Implement using up-to-date SDK methods  
+4. Verify all 48 tests still pass
+```
 
 ## References
 
