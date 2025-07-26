@@ -152,7 +152,7 @@ class CyberArkMCPServer:
 
     async def search_accounts(
         self,
-        keywords: Optional[str] = None,
+        query: Optional[str] = None,
         safe_name: Optional[str] = None,
         username: Optional[str] = None,
         address: Optional[str] = None,
@@ -169,8 +169,8 @@ class CyberArkMCPServer:
                 platform_id=platform_id
             )
             
-            # Add search keywords if provided
-            search_query = keywords
+            # Add search query if provided
+            search_query = query
             
             # Get accounts using SDK with filter and search
             pages = list(self.accounts_service.list_accounts(
@@ -312,7 +312,7 @@ class CyberArkMCPServer:
         """Reconcile the password for an account using ark-sdk-python"""
         try:
             # Create the reconcile credentials model
-            reconcile_creds = ArkPCloudReconcileAccountCredentials()
+            reconcile_creds = ArkPCloudReconcileAccountCredentials(account_id=account_id)
             
             # Reconcile the account password using SDK
             result = self.accounts_service.reconcile_account_credentials(
