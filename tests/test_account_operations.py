@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from src.mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
 
 
+@pytest.mark.integration
 class TestAccountManagement:
     """Test cases for account management operations using SDK"""
 
@@ -340,6 +341,7 @@ class TestAccountManagement:
             await server.list_accounts()
 
 
+@pytest.mark.integration
 class TestSafeManagement:
     """Test cases for safe management operations using SDK"""
 

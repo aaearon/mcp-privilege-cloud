@@ -27,6 +27,7 @@ from mcp_privilege_cloud.mcp_server import list_accounts, search_accounts, list_
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
 
+@pytest.mark.integration
 class TestMCPAccountTools:
     """Test MCP account management tools integration"""
 
@@ -388,6 +389,7 @@ class TestMCPAccountTools:
             mock_server.reconcile_account_password.assert_called_once_with(account_id=account_id)
 
 
+@pytest.mark.integration
 class TestMCPPlatformTools:
     """Test MCP platform management tools integration"""
 
@@ -425,6 +427,7 @@ class TestMCPPlatformTools:
                     await import_platform_package("/tmp/nonexistent.zip")
 
 
+@pytest.mark.integration
 class TestMCPListingTools:
     """Test MCP listing tools that replaced resources"""
 

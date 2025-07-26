@@ -12,6 +12,7 @@ from mcp_privilege_cloud.mcp_server import list_platforms
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
 
+@pytest.mark.integration
 class TestToolIntegration:
     """Test integration of tools with the CyberArk server."""
 
