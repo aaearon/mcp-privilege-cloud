@@ -16,13 +16,29 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Account management MCP tools
-from mcp_privilege_cloud.mcp_server import create_account, set_next_password
+from mcp_privilege_cloud.mcp_server import create_account, set_next_password, update_account, delete_account
 
 # Platform management MCP tools  
-from mcp_privilege_cloud.mcp_server import import_platform_package
+from mcp_privilege_cloud.mcp_server import (
+    import_platform_package,
+    export_platform,
+    duplicate_target_platform,
+    activate_target_platform,
+    deactivate_target_platform,
+    delete_target_platform
+)
 
 # New listing MCP tools that replaced resources
-from mcp_privilege_cloud.mcp_server import list_accounts, search_accounts, list_safes, list_platforms
+from mcp_privilege_cloud.mcp_server import list_accounts, search_accounts, list_safes, add_safe, list_platforms
+
+# Safe member management MCP tools
+from mcp_privilege_cloud.mcp_server import (
+    list_safe_members,
+    get_safe_member_details,
+    add_safe_member,
+    update_safe_member,
+    remove_safe_member
+)
 
 from mcp_privilege_cloud.server import CyberArkMCPServer
 
@@ -424,6 +440,190 @@ class TestMCPPlatformTools:
             with pytest.raises(ValueError, match="Platform package file not found"):
                 await import_platform_package("/tmp/nonexistent.zip")
 
+    @pytest.mark.asyncio
+    async def test_mcp_export_platform_tool(self, platform_mock_env_vars):
+        """Test the MCP export_platform tool"""
+        platform_id = "WinServerLocal"
+        output_folder = "/tmp/exports"
+        mock_response = {
+            "platform_id": platform_id,
+            "output_folder": output_folder,
+            "status": "exported"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.export_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await export_platform(platform_id, output_folder)
+            
+            assert result == mock_response
+            mock_server.export_platform.assert_called_once_with(
+                platform_id=platform_id, 
+                output_folder=output_folder
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_export_platform_error_handling(self, platform_mock_env_vars):
+        """Test MCP export_platform tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.export_platform.side_effect = ValueError("Platform not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Platform not found"):
+                await export_platform("NonexistentPlatform", "/tmp/exports")
+
+    @pytest.mark.asyncio
+    async def test_mcp_duplicate_target_platform_tool(self, platform_mock_env_vars):
+        """Test the MCP duplicate_target_platform tool"""
+        target_platform_id = 123
+        name = "Duplicated Platform"
+        description = "Test duplicate"
+        mock_response = {
+            "target_platform_id": 456,
+            "name": name,
+            "description": description,
+            "status": "duplicated"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.duplicate_target_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await duplicate_target_platform(target_platform_id, name, description)
+            
+            assert result == mock_response
+            mock_server.duplicate_target_platform.assert_called_once_with(
+                target_platform_id=target_platform_id,
+                name=name,
+                description=description
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_duplicate_target_platform_without_description(self, platform_mock_env_vars):
+        """Test the MCP duplicate_target_platform tool without description"""
+        target_platform_id = 123
+        name = "Duplicated Platform"
+        mock_response = {
+            "target_platform_id": 456,
+            "name": name,
+            "description": None,
+            "status": "duplicated"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.duplicate_target_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await duplicate_target_platform(target_platform_id, name)
+            
+            assert result == mock_response
+            mock_server.duplicate_target_platform.assert_called_once_with(
+                target_platform_id=target_platform_id,
+                name=name,
+                description=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_duplicate_target_platform_error_handling(self, platform_mock_env_vars):
+        """Test MCP duplicate_target_platform tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.duplicate_target_platform.side_effect = ValueError("Target platform not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Target platform not found"):
+                await duplicate_target_platform(999, "Test Platform")
+
+    @pytest.mark.asyncio
+    async def test_mcp_activate_target_platform_tool(self, platform_mock_env_vars):
+        """Test the MCP activate_target_platform tool"""
+        target_platform_id = 123
+        mock_response = {
+            "target_platform_id": target_platform_id,
+            "status": "activated"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.activate_target_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await activate_target_platform(target_platform_id)
+            
+            assert result == mock_response
+            mock_server.activate_target_platform.assert_called_once_with(
+                target_platform_id=target_platform_id
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_activate_target_platform_error_handling(self, platform_mock_env_vars):
+        """Test MCP activate_target_platform tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.activate_target_platform.side_effect = ValueError("Target platform not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Target platform not found"):
+                await activate_target_platform(999)
+
+    @pytest.mark.asyncio
+    async def test_mcp_deactivate_target_platform_tool(self, platform_mock_env_vars):
+        """Test the MCP deactivate_target_platform tool"""
+        target_platform_id = 123
+        mock_response = {
+            "target_platform_id": target_platform_id,
+            "status": "deactivated"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.deactivate_target_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await deactivate_target_platform(target_platform_id)
+            
+            assert result == mock_response
+            mock_server.deactivate_target_platform.assert_called_once_with(
+                target_platform_id=target_platform_id
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_deactivate_target_platform_error_handling(self, platform_mock_env_vars):
+        """Test MCP deactivate_target_platform tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.deactivate_target_platform.side_effect = ValueError("Target platform not found")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Target platform not found"):
+                await deactivate_target_platform(999)
+
+    @pytest.mark.asyncio
+    async def test_mcp_delete_target_platform_tool(self, platform_mock_env_vars):
+        """Test the MCP delete_target_platform tool"""
+        target_platform_id = 123
+        mock_response = {
+            "target_platform_id": target_platform_id,
+            "status": "deleted"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.delete_target_platform.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await delete_target_platform(target_platform_id)
+            
+            assert result == mock_response
+            mock_server.delete_target_platform.assert_called_once_with(
+                target_platform_id=target_platform_id
+            )
+
+    @pytest.mark.asyncio
+    async def test_mcp_delete_target_platform_error_handling(self, platform_mock_env_vars):
+        """Test MCP delete_target_platform tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.delete_target_platform.side_effect = ValueError("Target platform not found or has dependencies")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="Target platform not found or has dependencies"):
+                await delete_target_platform(999)
+
 
 @pytest.mark.integration
 class TestMCPListingTools:
@@ -510,6 +710,138 @@ class TestMCPListingTools:
             mock_server.list_safes.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_add_safe_tool(self, mock_env_vars):
+        """Test the add_safe MCP tool"""
+        safe_name = "TestSafe"
+        description = "Test safe description"
+        
+        mock_response = {
+            "safeName": safe_name,
+            "safeId": "123",
+            "description": description,
+            "location": "\\",
+            "creator": "admin"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.add_safe.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await add_safe(safe_name, description)
+            
+            assert result == mock_response
+            mock_server.add_safe.assert_called_once_with(safe_name=safe_name, description=description)
+
+    @pytest.mark.asyncio
+    async def test_add_safe_tool_minimal(self, mock_env_vars):
+        """Test the add_safe MCP tool with minimal parameters"""
+        safe_name = "MinimalTestSafe"
+        
+        mock_response = {
+            "safeName": safe_name,
+            "safeId": "124",
+            "description": "",
+            "location": "\\",
+            "creator": "admin"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.add_safe.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await add_safe(safe_name)
+            
+            assert result == mock_response
+            mock_server.add_safe.assert_called_once_with(safe_name=safe_name, description=None)
+
+    @pytest.mark.asyncio
+    async def test_update_safe_tool(self, mock_env_vars):
+        """Test the update_safe MCP tool"""
+        safe_id = "123"
+        safe_name = "UpdatedSafeName"
+        description = "Updated description"
+        
+        mock_response = {
+            "safeId": safe_id,
+            "safeName": safe_name,
+            "description": description,
+            "location": "\\",
+            "numberOfDaysRetention": 30
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.update_safe.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            from mcp_privilege_cloud.mcp_server import update_safe
+            result = await update_safe(safe_id, safe_name=safe_name, description=description)
+            
+            assert result == mock_response
+            mock_server.update_safe.assert_called_once_with(
+                safe_id=safe_id,
+                safe_name=safe_name,
+                description=description,
+                location=None,
+                number_of_days_retention=None,
+                number_of_versions_retention=None,
+                auto_purge_enabled=None,
+                olac_enabled=None,
+                managing_cpm=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_safe_tool_minimal(self, mock_env_vars):
+        """Test the update_safe MCP tool with minimal parameters"""
+        safe_id = "123"
+        
+        mock_response = {
+            "safeId": safe_id,
+            "safeName": "ExistingSafeName",
+            "description": "Existing description",
+            "location": "\\"
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.update_safe.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            from mcp_privilege_cloud.mcp_server import update_safe
+            result = await update_safe(safe_id)
+            
+            assert result == mock_response
+            mock_server.update_safe.assert_called_once_with(
+                safe_id=safe_id,
+                safe_name=None,
+                description=None,
+                location=None,
+                number_of_days_retention=None,
+                number_of_versions_retention=None,
+                auto_purge_enabled=None,
+                olac_enabled=None,
+                managing_cpm=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_delete_safe_tool(self, mock_env_vars):
+        """Test the delete_safe MCP tool"""
+        safe_id = "123"
+        
+        mock_response = {
+            "message": f"Safe {safe_id} deleted successfully",
+            "safe_id": safe_id
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.delete_safe.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            from mcp_privilege_cloud.mcp_server import delete_safe
+            result = await delete_safe(safe_id)
+            
+            assert result == mock_response
+            mock_server.delete_safe.assert_called_once_with(safe_id=safe_id)
+
+    @pytest.mark.asyncio
     async def test_list_platforms_tool(self, mock_env_vars):
         """Test the list_platforms MCP tool"""
         mock_platforms = [
@@ -530,3 +862,285 @@ class TestMCPListingTools:
             
             assert result == mock_platforms
             mock_server.list_platforms.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_account_tool(self, mock_env_vars):
+        """Test the update_account MCP tool"""
+        account_id = "123_456"
+        update_data = {
+            "name": "updated-account-name",
+            "address": "updated-server.domain.com",
+            "user_name": "updated_user",
+            "platform_account_properties": {"Port": "2222"}
+        }
+        
+        mock_response = {"id": account_id, **update_data, "updated": True}
+        
+        mock_server = AsyncMock()
+        mock_server.update_account.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await update_account(account_id=account_id, **update_data)
+            
+            assert result == mock_response
+            mock_server.update_account.assert_called_once_with(
+                account_id=account_id,
+                name=update_data["name"],
+                address=update_data["address"],
+                user_name=update_data["user_name"],
+                platform_account_properties=update_data["platform_account_properties"],
+                secret_management=None,
+                remote_machines_access=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_account_tool_minimal(self, mock_env_vars):
+        """Test the update_account MCP tool with minimal parameters"""
+        account_id = "123_456"
+        name = "minimal-update"
+        
+        mock_response = {"id": account_id, "name": name, "updated": True}
+        
+        mock_server = AsyncMock()
+        mock_server.update_account.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await update_account(account_id=account_id, name=name)
+            
+            assert result == mock_response
+            mock_server.update_account.assert_called_once_with(
+                account_id=account_id,
+                name=name,
+                address=None,
+                user_name=None,
+                platform_account_properties=None,
+                secret_management=None,
+                remote_machines_access=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_delete_account_tool(self, mock_env_vars):
+        """Test the delete_account MCP tool"""
+        account_id = "123_456"
+        
+        mock_response = {"id": account_id, "deleted": True, "status": "success"}
+        
+        mock_server = AsyncMock()
+        mock_server.delete_account.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await delete_account(account_id=account_id)
+            
+            assert result == mock_response
+            mock_server.delete_account.assert_called_once_with(account_id=account_id)
+
+    @pytest.mark.asyncio
+    async def test_update_account_tool_error_handling(self, mock_env_vars):
+        """Test update_account MCP tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.update_account.side_effect = ValueError("account_id is required")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="account_id is required"):
+                await update_account(account_id="", name="test")
+
+    @pytest.mark.asyncio
+    async def test_delete_account_tool_error_handling(self, mock_env_vars):
+        """Test delete_account MCP tool handles errors properly"""
+        mock_server = AsyncMock()
+        mock_server.delete_account.side_effect = ValueError("account_id is required")
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            with pytest.raises(ValueError, match="account_id is required"):
+                await delete_account(account_id="")
+
+
+@pytest.mark.integration
+class TestMCPSafeMemberTools:
+    """Test MCP safe member management tools"""
+
+    @pytest.fixture
+    def mock_env_vars(self):
+        """Mock required environment variables"""
+        with patch.dict('os.environ', {
+            'CYBERARK_CLIENT_ID': 'test-client',
+            'CYBERARK_CLIENT_SECRET': 'test-secret'
+        }):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_list_safe_members_tool(self, mock_env_vars):
+        """Test the list_safe_members MCP tool"""
+        safe_name = "IT-Infrastructure"
+        mock_members = [
+            {
+                "safeName": safe_name,
+                "memberName": "admin@domain.com",
+                "memberType": "User",
+                "permissionSet": "Full"
+            },
+            {
+                "safeName": safe_name,
+                "memberName": "ReadOnlyUser",
+                "memberType": "User", 
+                "permissionSet": "ReadOnly"
+            }
+        ]
+        
+        mock_server = AsyncMock()
+        mock_server.list_safe_members.return_value = mock_members
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await list_safe_members(safe_name=safe_name)
+            
+            assert result == mock_members
+            mock_server.list_safe_members.assert_called_once_with(
+                safe_name=safe_name,
+                search=None,
+                sort=None,
+                offset=None,
+                limit=None,
+                member_type=None
+            )
+
+    @pytest.mark.asyncio
+    async def test_add_safe_member_tool(self, mock_env_vars):
+        """Test the add_safe_member MCP tool"""
+        safe_name = "IT-Infrastructure"
+        member_name = "newuser@domain.com"
+        member_type = "User"
+        permission_set = "ReadOnly"
+        
+        mock_response = {
+            "safeName": safe_name,
+            "memberName": member_name,
+            "memberType": member_type,
+            "permissionSet": permission_set
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.add_safe_member.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await add_safe_member(
+                safe_name=safe_name,
+                member_name=member_name,
+                member_type=member_type,
+                permission_set=permission_set
+            )
+            
+            assert result == mock_response
+            mock_server.add_safe_member.assert_called_once_with(
+                safe_name=safe_name,
+                member_name=member_name,
+                member_type=member_type,
+                search_in=None,
+                membership_expiration_date=None,
+                permissions=None,
+                permission_set=permission_set
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_safe_member_tool(self, mock_env_vars):
+        """Test the update_safe_member MCP tool"""
+        safe_name = "IT-Infrastructure"
+        member_name = "user@domain.com"
+        permission_set = "AccountsManager"
+        
+        mock_response = {
+            "safeName": safe_name,
+            "memberName": member_name,
+            "permissionSet": permission_set,
+            "updated": True
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.update_safe_member.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await update_safe_member(
+                safe_name=safe_name,
+                member_name=member_name,
+                permission_set=permission_set
+            )
+            
+            assert result == mock_response
+            mock_server.update_safe_member.assert_called_once_with(
+                safe_name=safe_name,
+                member_name=member_name,
+                search_in=None,
+                membership_expiration_date=None,
+                permissions=None,
+                permission_set=permission_set
+            )
+
+    @pytest.mark.asyncio
+    async def test_remove_safe_member_tool(self, mock_env_vars):
+        """Test the remove_safe_member MCP tool"""
+        safe_name = "IT-Infrastructure"
+        member_name = "olduser@domain.com"
+        
+        mock_response = {
+            "message": f"Member {member_name} removed from safe {safe_name} successfully",
+            "safe_name": safe_name,
+            "member_name": member_name
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.remove_safe_member.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await remove_safe_member(safe_name=safe_name, member_name=member_name)
+            
+            assert result == mock_response
+            mock_server.remove_safe_member.assert_called_once_with(
+                safe_name=safe_name,
+                member_name=member_name
+            )
+
+    async def test_get_platform_statistics_tool(self, mock_env_vars):
+        """Test get_platform_statistics MCP tool integration"""
+        # Import the tool function
+        from mcp_privilege_cloud.mcp_server import get_platform_statistics
+        
+        mock_response = {
+            "platforms_count": 15,
+            "platforms_count_by_type": {
+                "regular": 12,
+                "rotational_group": 2,
+                "group": 1
+            }
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.get_platform_statistics.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await get_platform_statistics()
+            
+            assert result == mock_response
+            mock_server.get_platform_statistics.assert_called_once()
+
+    async def test_get_target_platform_statistics_tool(self, mock_env_vars):
+        """Test get_target_platform_statistics MCP tool integration"""
+        # Import the tool function
+        from mcp_privilege_cloud.mcp_server import get_target_platform_statistics
+        
+        mock_response = {
+            "target_platforms_count": 8,
+            "target_platforms_count_by_system_type": {
+                "Windows": 3,
+                "Unix": 2,
+                "Oracle": 2,
+                "Database": 1
+            }
+        }
+        
+        mock_server = AsyncMock()
+        mock_server.get_target_platform_statistics.return_value = mock_response
+        
+        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
+            result = await get_target_platform_statistics()
+            
+            assert result == mock_response
+            mock_server.get_target_platform_statistics.assert_called_once()

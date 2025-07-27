@@ -22,8 +22,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -31,7 +29,7 @@ classifiers = [
     "Topic :: System :: Systems Administration :: Authentication/Directory",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.0.0",
     "httpx>=0.27.0",
@@ -64,7 +62,7 @@ test = [
 "Documentation" = "https://github.com/aaearon/mcp-privilege-cloud#readme"
 
 [project.scripts]
-cyberark-mcp-server = "mcp_privilege_cloud:main"
+mcp-privilege-cloud = "mcp_privilege_cloud:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_privilege_cloud"]
@@ -133,7 +131,7 @@ directory = "htmlcov"
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 line-length = 88
 select = [
     "E",  # pycodestyle errors
@@ -159,7 +157,7 @@ known-first-party = ["mcp_privilege_cloud"]
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true

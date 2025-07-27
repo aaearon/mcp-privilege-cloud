@@ -94,7 +94,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **SIMPLIFIED ARCHITECTURE COMPLETE** - Production ready with simplified codebase, official ark-sdk-python integration, 13 MCP tools, and enhanced maintainability  
+**Current Status**: ✅ **SIMPLIFIED ARCHITECTURE COMPLETE** - Production ready with simplified codebase, official ark-sdk-python integration, 14 MCP tools, and enhanced maintainability  
 **Last Updated**: July 26, 2025  
 **Recent Enhancement**: Comprehensive code simplification achieving ~27% code reduction (from ~1,365 to ~1,000 lines) while maintaining all functionality. Eliminated redundant patterns, streamlined error handling, and improved maintainability. Built on official ark-sdk-python library with enhanced reliability and enterprise support.
 
@@ -104,11 +104,12 @@ For a complete overview of the system architecture, see [ARCHITECTURE.md](ARCHIT
 
 ## Available MCP Tools
 
-The server provides 13 MCP tools for CyberArk operations, built on the official ark-sdk-python library. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
+The server provides 14 MCP tools for CyberArk operations, built on the official ark-sdk-python library. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
 
 **Tool Categories**:  
 - **Data Access Tools**: `list_accounts`, `get_account_details`, `search_accounts`, `list_safes`, `get_safe_details`, `list_platforms`, `get_platform_details`
 - **Account Management Tools**: `create_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+- **Safe Management Tools**: `add_safe`
 - **Platform Management Tools**: `import_platform_package`
 
 > **SDK Migration**: All tools now use the official ark-sdk-python library for enhanced reliability and enterprise support. Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
@@ -209,20 +210,11 @@ active_platforms = await server.list_platforms_with_details(filter="Active eq tr
 
 #### Performance Characteristics
 
-**Baseline Performance Metrics** (from comprehensive performance testing):
-
-- **125 Platform Test**: 1.34s total time (10.7ms avg/platform) with 9.3x concurrency improvement
-- **Scalability**: Linear scaling maintained up to 100+ platforms
-- **Memory Usage**: 0.19 MB peak for 100 enhanced platforms (0.002 MB/platform)
-- **Enhanced vs Basic**: 10.9x overhead ratio (acceptable for detailed information retrieval)
-- **Error Handling**: 20% failure rate adds <0.3s overhead with graceful degradation
-
-**Technical Implementation**:
-- **Concurrency Limit**: 5 concurrent requests (configurable via semaphore)
-- **Batch Processing**: Automatically handles large platform lists (tested up to 125 platforms)
-- **Failure Isolation**: Individual platform failures don't affect overall operation
-- **Memory Optimization**: Enhanced platform objects are 4.9x larger but <3KB each
-- **Raw Data Preservation**: No field conversion overhead - original API data structure maintained
+**Key Performance Features**:
+- Concurrent API calls with rate limiting protection (5 concurrent requests)
+- Linear scaling maintained up to 100+ platforms
+- Graceful failure handling with individual platform isolation
+- Memory optimization with enhanced platform objects <3KB each
 
 #### Error Handling
 - **List API Errors**: Propagated immediately (authentication, authorization)
