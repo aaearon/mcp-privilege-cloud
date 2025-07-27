@@ -28,12 +28,8 @@ This comprehensive guide provides everything developers need to contribute to th
    git clone <repository-url>
    cd mcp-privilege-cloud
    
-   # Create virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
-   # Install dependencies
-   pip install -r requirements.txt
+   # Install dependencies with uv (modern approach)
+   uv sync
    ```
 
 2. **Configure environment**:
@@ -408,7 +404,7 @@ pip list | grep mcp
 rm -rf venv
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
 #### Import Errors
@@ -485,37 +481,37 @@ npx @modelcontextprotocol/inspector
 ```
 
 **Configuration in Browser:**
-- **Server Command**: `uvx mcp-privilege-cloud`
+- **Server Command**: `uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud`
 - **Environment Variables**: Add these two required variables:
   - `CYBERARK_CLIENT_ID`: your-client-id  
   - `CYBERARK_CLIENT_SECRET`: your-secret
-- **Expected Result**: Connection shows "13 tools available"
+- **Expected Result**: Connection shows "45 tools available"
 
 #### 2. Command Line Testing (Recommended for Automation)
 
 **Basic connectivity test:**
 ```bash
-npx @modelcontextprotocol/inspector -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx mcp-privilege-cloud
+npx @modelcontextprotocol/inspector -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
 
 **List available tools (should return 13):**
 ```bash
-npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx mcp-privilege-cloud --method tools/list
+npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/list
 ```
 
 **Test specific tool functionality:**
 ```bash
 # Test account listing
-npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx mcp-privilege-cloud --method tools/call --tool-name list_accounts
+npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name list_accounts
 
 # Test platform listing  
-npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx mcp-privilege-cloud --method tools/call --tool-name list_platforms
+npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name list_platforms
 ```
 
 ### Expected Behavior Patterns
 
 #### Successful Connection Indicators
-- ✅ **Tool Count**: `tools/list` returns exactly 13 tools
+- ✅ **Tool Count**: `tools/list` returns exactly 45 tools
 - ✅ **Resource Count**: `resources/list` returns empty array (correct - server uses tools, not resources)
 - ✅ **Authentication**: All tool calls require valid CyberArk credentials
 - ✅ **Response Format**: All tools return JSON with exact CyberArk API field names
@@ -540,13 +536,13 @@ import_platform_package
 #### Quick Diagnostic Commands
 ```bash
 # 1. Verify server responds
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/list
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/list
 
 # 2. Test with debug logging
-CYBERARK_LOG_LEVEL=DEBUG npx @modelcontextprotocol/inspector [env-vars] uvx mcp-privilege-cloud
+CYBERARK_LOG_LEVEL=DEBUG npx @modelcontextprotocol/inspector [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 
 # 3. Check specific tool
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/call --tool-name health_check
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name health_check
 ```
 
 #### Common Error Patterns and Solutions
@@ -577,20 +573,20 @@ When validating this MCP server, follow this systematic approach:
 #### Step 1: Basic Connectivity
 ```bash
 # Verify 13 tools are available
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/list
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/list
 ```
 
 #### Step 2: Authentication Test  
 ```bash
 # Test with simplest data access tool
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/call --tool-name list_platforms
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name list_platforms
 ```
 
 #### Step 3: Comprehensive Tool Testing
 ```bash
 # Test each tool category
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/call --tool-name list_safes
-npx @modelcontextprotocol/inspector --cli [env-vars] uvx mcp-privilege-cloud --method tools/call --tool-name list_accounts
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name list_safes
+npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/call --tool-name list_accounts
 ```
 
 #### Step 4: Validate Response Structure
@@ -609,7 +605,7 @@ npx @modelcontextprotocol/inspector -e VAR1=value1 -e VAR2=value2 [command]
 # Method 2: Export then run (alternative)
 export CYBERARK_CLIENT_ID=your-client-id
 export CYBERARK_CLIENT_SECRET=your-secret  
-npx @modelcontextprotocol/inspector uvx mcp-privilege-cloud
+npx @modelcontextprotocol/inspector uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
 
 ### MCP Inspector Issues
@@ -618,7 +614,7 @@ npx @modelcontextprotocol/inspector uvx mcp-privilege-cloud
 ```bash
 # Start server with debug logging
 export CYBERARK_LOG_LEVEL=DEBUG
-uvx mcp-privilege-cloud
+uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 
 # Test with different execution methods
 uv run mcp-privilege-cloud  # Development mode

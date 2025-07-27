@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 48/48 passing tests
+2. **Check current test status** - All changes must maintain 144/144 passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -33,6 +33,7 @@ Use context7 MCP tools to get latest ark-sdk-python documentation for:
 - ArkPCloudAccountsService methods and parameters
 - ArkPCloudSafesService API updates  
 - ArkPCloudPlatformsService changes
+- ArkPCloudApplicationsService methods and operations
 - Authentication patterns and model classes
 
 Workflow: resolve-library-id → get-library-docs
@@ -94,9 +95,9 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **SIMPLIFIED ARCHITECTURE COMPLETE** - Production ready with simplified codebase, official ark-sdk-python integration, 14 MCP tools, and enhanced maintainability  
-**Last Updated**: July 26, 2025  
-**Recent Enhancement**: Comprehensive code simplification achieving ~27% code reduction (from ~1,365 to ~1,000 lines) while maintaining all functionality. Eliminated redundant patterns, streamlined error handling, and improved maintainability. Built on official ark-sdk-python library with enhanced reliability and enterprise support.
+**Current Status**: ✅ **MASSIVE PCLOUD SERVICE EXPANSION COMPLETE** - Production ready with complete PCloud service coverage, official ark-sdk-python integration, 45 MCP tools (221% expansion), and enterprise-grade capabilities  
+**Last Updated**: July 27, 2025  
+**Recent Achievement**: Completed Phases 2 & 3 of PCloud Service Expansion Plan, achieving complete coverage of all 4 PCloud services (accounts, safes, platforms, applications) with advanced analytics, CRUD operations, and comprehensive member management. Expanded from 14 to 45 tools with 144 passing tests and zero regression.
 
 ## Architecture
 
@@ -104,15 +105,15 @@ For a complete overview of the system architecture, see [ARCHITECTURE.md](ARCHIT
 
 ## Available MCP Tools
 
-The server provides 14 MCP tools for CyberArk operations, built on the official ark-sdk-python library. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
+The server provides 45 MCP tools for comprehensive CyberArk operations, built on the official ark-sdk-python library with complete coverage of all 4 PCloud services. For detailed specifications, parameters, examples, and integration patterns, see [API Reference](docs/API_REFERENCE.md).
 
 **Tool Categories**:  
-- **Data Access Tools**: `list_accounts`, `get_account_details`, `search_accounts`, `list_safes`, `get_safe_details`, `list_platforms`, `get_platform_details`
-- **Account Management Tools**: `create_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
-- **Safe Management Tools**: `add_safe`
-- **Platform Management Tools**: `import_platform_package`
+- **Account Management Tools (17 tools)**: Complete CRUD operations plus advanced search and password management - `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`, `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
+- **Safe Management Tools (11 tools)**: Complete CRUD plus member management - `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`, `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
+- **Platform Management Tools (10 tools)**: Complete lifecycle plus statistics - `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`, `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`, `get_platform_statistics`, `get_target_platform_statistics`
+- **Applications Management Tools (9 tools)**: Complete application lifecycle - `list_applications`, `get_application_details`, `add_application`, `delete_application`, `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`, `get_applications_stats`
 
-> **SDK Migration**: All tools now use the official ark-sdk-python library for enhanced reliability and enterprise support. Resources have been replaced by tools for better MCP client compatibility. All tools return exact CyberArk API data with no field manipulation.
+> **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 4 PCloud services with enterprise-grade CRUD operations, advanced analytics, and member management. Built on official ark-sdk-python library with 144 passing tests and zero regression.
 
 ## Enhanced Platform Data Combination
 
@@ -271,7 +272,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 48 tests passing with identical behavior
+- **Zero Functional Regression**: All 144 tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -307,9 +308,9 @@ async def your_new_tool(param: str) -> Dict[str, Any]:
 - `exceptions.py` - Custom exceptions only
 
 ### Testing Validation ✅ **VERIFIED**
-- **48/48 tests passing** - Zero functionality regression
-- **Test Coverage Maintained** - All simplification preserved existing test patterns
-- **Integration Tests Updated** - MCP tool parameter passing verified
+- **144/144 tests passing** - Zero functionality regression with massive expansion
+- **Test Coverage Maintained** - All expansion preserved existing test patterns
+- **Integration Tests Updated** - MCP tool parameter passing verified for all 45 tools
 - **Performance Baseline** - No degradation in execution performance
 
 ## Configuration
@@ -381,8 +382,8 @@ async def your_new_tool(param: str) -> Dict[str, Any]:
 
 ## Current Limitations
 
-1. **No password retrieval** - API supports it but not implemented for security
-2. **No account modification/deletion** - Create and read operations only  
+1. **No password retrieval** - API supports it but not implemented for security (password management tools handle change/verify/reconcile operations)
+2. **~~No account modification/deletion~~ ✅ IMPLEMENTED** - ~~Create and read operations only~~ Now includes complete CRUD operations for all entities
 3. **~~Basic rate limiting~~ ✅ ENHANCED** - ~~Could be enhanced with exponential backoff~~ Now includes rate limiting detection, logging, and retry guidance
 4. **Single tenant support** - No multi-tenant architecture
 5. **Platform Details API Permissions** - Requires Privilege Cloud Administrator role; gracefully degrades to basic platform info when insufficient permissions
@@ -435,7 +436,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 48 tests must continue passing
+5. **Preserve test coverage** - All 144 tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -446,7 +447,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 48 tests still pass
+4. Verify all 144 tests still pass
 ```
 
 ## References

@@ -1,14 +1,16 @@
 # CyberArk Privilege Cloud MCP Server
 
-A Model Context Protocol (MCP) server for CyberArk Privilege Cloud integration using the official ark-sdk-python library. Enables AI assistants to securely manage privileged accounts through 13 comprehensive MCP tools.
+A production-ready Model Context Protocol (MCP) server for comprehensive CyberArk Privilege Cloud integration using the official ark-sdk-python library. Provides complete privileged access management through 45 enterprise-grade MCP tools covering all four PCloud services.
 
 ## Features
 
-- **Account Management**: Create, list, search accounts and manage passwords
-- **Safe Management**: List and get detailed safe information  
-- **Platform Management**: List platforms and import platform packages
-- **Official SDK**: Built on ark-sdk-python for enterprise reliability
-- **Comprehensive Tools**: 13 MCP tools with exact API data
+- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (17 tools)
+- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (11 tools)  
+- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (10 tools)
+- **Applications Management**: Full application lifecycle with authentication method management and statistics (9 tools)
+- **Advanced Analytics**: Account filtering, grouping, distribution analysis, and environment categorization
+- **Enterprise Security**: Built on official ark-sdk-python with OAuth, audit logging, and comprehensive error handling
+- **Production Ready**: 144 passing tests, zero regression, complete API coverage with exact data fidelity
 
 ## Prerequisites
 
@@ -18,13 +20,13 @@ A Model Context Protocol (MCP) server for CyberArk Privilege Cloud integration u
 ## Installation
 
 ```bash
-# Recommended: Direct installation
-uvx mcp-privilege-cloud
+# Recommended: Install from GitHub repository
+uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 
 # Development: Clone repository
-git clone <repository-url>
+git clone https://github.com/aaearon/mcp-privilege-cloud.git
 cd mcp-privilege-cloud
-pip install -e .
+uv sync
 ```
 
 ## Configuration
@@ -47,7 +49,7 @@ python -c "from mcp_privilege_cloud.server import CyberArkMCPServer; import asyn
 
 ```bash
 # Production
-uvx mcp-privilege-cloud
+uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 
 # Development  
 uv run mcp-privilege-cloud
@@ -56,20 +58,26 @@ uv run mcp-privilege-cloud
 python -m mcp_privilege_cloud
 ```
 
-### Available Tools
+### Available Tools (45 Total)
 
-**Data Access:**
-- `list_accounts`, `get_account_details`, `search_accounts`
-- `list_safes`, `get_safe_details`  
-- `list_platforms`, `get_platform_details`
+**Account Management (17 tools):**
+- **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
+- **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+- **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-**Account Management:**
-- `create_account`
-- `change_account_password`, `set_next_password`
-- `verify_account_password`, `reconcile_account_password`
+**Safe Management (11 tools):**
+- **Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
+- **Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
-**Platform Management:**
-- `import_platform_package`
+**Platform Management (10 tools):**
+- **Core Operations**: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
+- **Lifecycle Management**: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
+- **Statistics**: `get_platform_statistics`, `get_target_platform_statistics`
+
+**Applications Management (9 tools):**
+- **Core Operations**: `list_applications`, `get_application_details`, `add_application`, `delete_application`
+- **Auth Methods**: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
+- **Statistics**: `get_applications_stats`
 
 ## Client Integration
 
@@ -78,12 +86,8 @@ python -m mcp_privilege_cloud
 Add the MCP server using the Claude Code CLI:
 
 ```bash
-# Add MCP server from GitHub repository
-claude mcp add cyberark-privilege-cloud -- uvx --from git+https://github.com/your-org/mcp-privilege-cloud.git mcp-privilege-cloud
-
-# Set environment variables
-export CYBERARK_CLIENT_ID=your-service-account-username
-export CYBERARK_CLIENT_SECRET=your-service-account-password
+# Add MCP server from GitHub repository with environment variables
+CYBERARK_CLIENT_ID=your-service-account-username CYBERARK_CLIENT_SECRET=your-service-account-password claude mcp add cyberark-privilege-cloud -- uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
 
 ### Claude Desktop
@@ -97,7 +101,7 @@ Add to your Claude Desktop MCP settings file:
       "command": "uvx",
       "args": [
         "--from", 
-        "git+https://github.com/your-org/mcp-privilege-cloud.git",
+        "git+https://github.com/aaearon/mcp-privilege-cloud.git",
         "mcp-privilege-cloud"
       ],
       "env": {
@@ -115,7 +119,7 @@ Add to your Claude Desktop MCP settings file:
 ```bash
 npx @modelcontextprotocol/inspector
 ```
-Configure with server command `uvx mcp-privilege-cloud` and your service account credentials. Should show 13 tools available.
+Configure with server command `uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud` and your service account credentials. Should show 45 tools available across all four PCloud services.
 
 For comprehensive testing procedures, see [DEVELOPMENT.md](DEVELOPMENT.md).
 

@@ -10,6 +10,8 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 - [Account Management Tools](#account-management-tools)
 - [Safe Management Tools](#safe-management-tools)
 - [Platform Management Tools](#platform-management-tools)
+- [Applications Management Tools](#applications-management-tools)
+- [Password Management Tools](#password-management-tools)
 - [Health Monitoring Tools](#health-monitoring-tools)
 - [Error Handling](#error-handling)
 - [Usage Examples](#usage-examples)
@@ -17,19 +19,23 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server provides **6 specialized tools** for privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns for authentication, parameter validation, and error handling.
+The CyberArk Privilege Cloud MCP Server provides **45 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
 
 ### Core Capabilities
-- **Account Management**: Create and retrieve detailed account information
-- **Resource Discovery**: Access accounts, safes, and platforms through MCP resources
-- **Password Operations**: Advanced password management capabilities
-- **Health Monitoring**: Verify connectivity and system status
+- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (17 tools)
+- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (11 tools)
+- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (10 tools)
+- **Applications Management**: Full application lifecycle with authentication method management and statistics (9 tools)
+- **Advanced Analytics**: Account filtering, grouping, distribution analysis, and environment categorization
+- **Enterprise Security**: Built on official ark-sdk-python with OAuth, audit logging, and comprehensive error handling
 
 ### API Integration Details
 - **Base URL**: `https://{subdomain}.privilegecloud.cyberark.cloud/PasswordVault/api`
-- **Authentication**: OAuth 2.0 with automatic token refresh
+- **Authentication**: OAuth 2.0 with automatic token refresh  
 - **API Version**: Gen2 endpoints (preferred over Gen1 legacy endpoints)
 - **Response Format**: JSON with standardized error handling
+
+**🤖 LLM REFERENCE NOTE**: This document covers the core established tools with complete documentation. For comprehensive specifications of all 45 tools including the newer account management, safe management, platform management, and applications management tools, refer to the server implementation in `src/mcp_privilege_cloud/mcp_server.py` for exact parameter definitions, return types, and API endpoint mappings. All tools follow the established patterns shown in the documented examples below with consistent SDK-powered authentication, error handling, and response formatting.
 
 ## Authentication
 
@@ -53,24 +59,33 @@ CYBERARK_LOG_LEVEL=INFO        # Logging level
 
 ## Tool Categories
 
-### Primary Tools (MVP)
-1. **Account Management**: `create_account`, `get_account_details`
-2. **Password Operations**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
-3. **Platform Management**: `import_platform_package`
-4. **Health Monitoring**: `health_check`
+The server provides 45 enterprise-grade tools organized across all 4 CyberArk PCloud services:
 
-### Data Access Tools (Discovery)
-1. **Accounts**: `list_accounts()`, `search_accounts()` - List and search accounts
-2. **Safes**: `list_safes()` - List and filter safes
-3. **Platforms**: `list_platforms()` - List available platforms
+### Account Management Tools (17 tools)
+**Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
+**Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+**Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-### Future Enhancement Categories
-1. **Account Lifecycle**: Update and delete operations
-2. **Session Management**: Active session monitoring
-3. **Reporting**: Access reports and analytics
-4. **Advanced Safe Management**: Create and update operations
+### Safe Management Tools (11 tools)
+**Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
+**Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
+
+### Platform Management Tools (10 tools)
+**Core Operations**: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
+**Lifecycle Management**: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
+**Statistics**: `get_platform_statistics`, `get_target_platform_statistics`
+
+### Applications Management Tools (9 tools)
+**Core Operations**: `list_applications`, `get_application_details`, `add_application`, `delete_application`
+**Auth Methods**: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
+**Statistics**: `get_applications_stats`
+
+### Additional Tools
+**Health Monitoring**: `health_check` - Comprehensive system status verification
 
 ## Account Management Tools
+
+**🤖 LLM REFERENCE**: This section documents core account tools. The server provides 17 total account management tools including: `update_account`, `delete_account`, `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudAccountsService.
 
 ### `list_accounts`
 
@@ -256,6 +271,8 @@ await client.call_tool("create_account", {
 
 ## Safe Management Tools
 
+**🤖 LLM REFERENCE**: This section documents core safe tools. The server provides 11 total safe management tools including: `add_safe`, `update_safe`, `delete_safe`, `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudSafesService.
+
 ### `list_safes`
 
 **Description**: List all accessible safes in CyberArk Privilege Cloud.
@@ -352,6 +369,8 @@ await client.call_tool("get_safe_details", {
 
 ## Platform Management Tools
 
+**🤖 LLM REFERENCE**: This section documents core platform tools. The server provides 10 total platform management tools including: `get_platform_details`, `export_platform`, `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`, `get_platform_statistics`, `get_target_platform_statistics`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudPlatformsService.
+
 ### `list_platforms`
 
 **Description**: List all available platforms in CyberArk Privilege Cloud.
@@ -420,6 +439,89 @@ await client.call_tool("import_platform_package", {
   "Status": "Success",
   "Message": "Platform imported successfully"
 }
+```
+
+## Applications Management Tools
+
+**🤖 LLM REFERENCE**: This section provides overview and patterns for all 9 applications management tools. For complete parameter specifications and response schemas, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudApplicationsService.
+
+### Core Operations (4 tools)
+
+#### `list_applications`
+**Description**: List all applications in CyberArk Privilege Cloud  
+**Parameters**: Standard listing parameters (search, filter, sort, limit)  
+**Returns**: Array of application objects with basic properties  
+**SDK Method**: `ArkPCloudApplicationsService.list_applications()`
+
+#### `get_application_details`  
+**Description**: Get detailed information about a specific application  
+**Parameters**: `application_id` (required)  
+**Returns**: Complete application object with all properties and configurations  
+**SDK Method**: `ArkPCloudApplicationsService.get_application()`
+
+#### `add_application`
+**Description**: Create a new application in CyberArk Privilege Cloud  
+**Parameters**: Application configuration (name, description, location, access_permissions, etc.)  
+**Returns**: Created application object with generated ID  
+**SDK Method**: `ArkPCloudApplicationsService.add_application()`
+
+#### `delete_application`
+**Description**: Delete an existing application  
+**Parameters**: `application_id` (required)  
+**Returns**: Deletion confirmation status  
+**SDK Method**: `ArkPCloudApplicationsService.delete_application()`
+
+### Authentication Methods Management (4 tools)
+
+#### `list_application_auth_methods`
+**Description**: List authentication methods for a specific application  
+**Parameters**: `application_id` (required)  
+**Returns**: Array of authentication method objects  
+**SDK Method**: `ArkPCloudApplicationsService.list_application_authentication_methods()`
+
+#### `get_application_auth_method_details`
+**Description**: Get detailed information about a specific authentication method  
+**Parameters**: `application_id` (required), `auth_method_id` (required)  
+**Returns**: Complete authentication method object with configuration details  
+**SDK Method**: `ArkPCloudApplicationsService.get_application_authentication_method()`
+
+#### `add_application_auth_method`
+**Description**: Add a new authentication method to an application  
+**Parameters**: `application_id` (required), authentication method configuration  
+**Returns**: Created authentication method object  
+**SDK Method**: `ArkPCloudApplicationsService.add_application_authentication_method()`
+
+#### `delete_application_auth_method`
+**Description**: Delete an authentication method from an application  
+**Parameters**: `application_id` (required), `auth_method_id` (required)  
+**Returns**: Deletion confirmation status  
+**SDK Method**: `ArkPCloudApplicationsService.delete_application_authentication_method()`
+
+### Statistics (1 tool)
+
+#### `get_applications_stats`
+**Description**: Get comprehensive statistics for all applications  
+**Parameters**: None  
+**Returns**: Application statistics object with counts, usage metrics, and distribution data  
+**SDK Method**: `ArkPCloudApplicationsService.get_applications_stats()`
+
+### Usage Patterns
+
+```python
+# Application lifecycle management
+applications = await client.call_tool("list_applications", {})
+app_details = await client.call_tool("get_application_details", {"application_id": "app123"})
+
+# Authentication method management
+auth_methods = await client.call_tool("list_application_auth_methods", {"application_id": "app123"})
+new_auth = await client.call_tool("add_application_auth_method", {
+    "application_id": "app123",
+    "auth_type": "certificate",
+    "configuration": {...}
+})
+
+# Statistics and analytics
+stats = await client.call_tool("get_applications_stats", {})
 ```
 
 
@@ -751,7 +853,7 @@ for platform in active_platforms:
 ```bash
 # Connect MCP Inspector with uvx
 npx @modelcontextprotocol/inspector
-# Command: uvx mcp-privilege-cloud
+# Command: uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 
 # Alternative with uv run for development
 npx @modelcontextprotocol/inspector  

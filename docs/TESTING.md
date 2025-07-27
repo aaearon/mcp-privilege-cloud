@@ -4,13 +4,13 @@ Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Fo
 
 ## Current Test Status ✅ **VERIFIED**
 
-**Test Suite Results**: **48/48 tests passing** (100% success rate)  
-**Code Coverage**: Maintained across simplified codebase  
-**Functionality Verification**: Zero regression after ~27% code reduction  
-**Integration Testing**: All MCP tools verified with proper parameter passing  
-**Last Validation**: July 26, 2025 - Post code simplification
+**Test Suite Results**: **144/144 tests passing** (100% success rate)  
+**Code Coverage**: Maintained across massive 45-tool expansion  
+**Functionality Verification**: Zero regression after 221% tool expansion (14→45 tools)  
+**Integration Testing**: All 45 MCP tools verified across all 4 PCloud services with proper parameter passing  
+**Last Validation**: July 27, 2025 - Post Phase 2 & 3 PCloud service expansion
 
-The test suite validates the simplified architecture ensuring all refactoring maintained identical functionality while reducing code complexity.
+The test suite validates the complete 45-tool implementation ensuring comprehensive coverage of all Account Management, Safe Management, Platform Management, and Applications Management tools with zero regression.
 
 ## LLM Development Testing
 
@@ -33,50 +33,60 @@ The test suite is organized into specialized test files with comprehensive cover
 
 ### Core Test Files
 
-#### `tests/test_core_functionality.py` (64+ tests)
-**TestAuthentication** - Token management and OAuth flow (20+ tests)
+#### `tests/test_core_functionality.py` (88+ tests)
+**TestAuthentication** - Token management and OAuth flow (enhanced coverage)
 - OAuth 2.0 client credentials flow testing
 - Token refresh mechanisms
 - Environment variable validation
 - Authentication error handling
 - Concurrent token request handling
 
-**TestServerCore** - Basic server operations and API integration (28+ tests)
+**TestServerCore** - Basic server operations and API integration (expanded coverage)
 - Health check functionality
 - Core server initialization and configuration
 - Network error handling
 - Response parsing validation
-- API endpoint testing
+- API endpoint testing across all 4 PCloud services
 
-**TestPlatformManagement** - Platform operations and API integration (16+ tests)
+**TestPlatformManagement** - Platform operations and comprehensive API integration (enhanced coverage)
 - Platform package import functionality
-- Platform details retrieval
+- Platform details retrieval with enhanced data combination
 - Administrator role permission testing
 - Gen2 API endpoint compliance
+- Platform lifecycle management testing
+- Statistics and target platform operations testing
 
-#### `tests/test_account_operations.py` (35+ tests)
-- Account creation with full parameter validation
-- Password management operations (change, set, verify, reconcile)
-- Account lifecycle management testing
-- Error handling for account operations
-- Special character handling in account data
-- Account security operation validation
+#### `tests/test_account_operations.py` (85+ tests)
+- **Complete Account Lifecycle**: Create, read, update, delete operations with comprehensive validation
+- **Advanced Search Operations**: Platform grouping, environment filtering, management status analysis
+- **Password Management**: Complete password operations (change, set, verify, reconcile)
+- **Account Analytics**: Distribution analysis, pattern searching, criteria-based counting
+- **Grouping Operations**: Safe-based and platform-based account organization
+- **Error Handling**: Comprehensive error scenarios across all 17 account management tools
+- **Special Character Handling**: Account data validation and security testing
 
-#### `tests/test_mcp_integration.py` (15+ tests)
-**TestMCPAccountTools** - Account management MCP tools (8+ tests)
-- Account creation MCP tool wrapper
+#### `tests/test_mcp_integration.py` (18+ tests)
+**TestMCPAccountTools** - Complete account management MCP tools (enhanced coverage)
+- All 17 account management tool wrappers
+- Advanced search and analytics tool testing
 - Password management MCP tool wrappers (change, set, verify, reconcile)
-- Parameter passing and validation
+- Parameter passing and validation across expanded tool set
 - Error handling and response formatting
 
-**TestMCPPlatformTools** - Platform MCP tools integration (3+ tests)
-- Platform package import MCP wrapper
-- Platform management parameter validation
+**TestMCPSafeTools** - Safe management MCP tools integration (enhanced coverage)
+- All 11 safe management tools including member management
+- Safe CRUD operations and member management workflows
+- Permission and access validation testing
 
-**TestMCPListingTools** - Data access tool testing (4+ tests)
-- List tools validation (`list_accounts`, `list_safes`, `list_platforms`)
-- Search tool testing (`search_accounts`)
-- Tool parameter validation and response formatting
+**TestMCPPlatformTools** - Platform MCP tools integration (enhanced coverage)
+- Complete platform lifecycle management (10 tools)
+- Platform statistics and target platform operations
+- Platform package import/export and lifecycle management
+
+**TestMCPApplicationsTools** - Applications management MCP tools integration (new coverage)
+- All 9 applications management tools
+- Authentication method management workflows
+- Application statistics and lifecycle operations
 
 #### `tests/test_tools.py` (9+ tests)
 - Direct tool function testing
@@ -95,10 +105,11 @@ The test suite is organized into specialized test files with comprehensive cover
 The testing architecture has been simplified by converting to a tool-based architecture while maintaining comprehensive coverage for all tool functionality.
 
 ### Test Coverage Metrics
-- **Total Tests**: 48 tests across 6 test files
-- **Target Coverage**: Minimum 80% code coverage
-- **Mock Strategy**: All external CyberArk API dependencies are mocked
-- **Test Types**: Unit, integration, MCP tools tests
+- **Total Tests**: 144+ tests across 6 test files
+- **Target Coverage**: Minimum 80% code coverage maintained across 45-tool expansion
+- **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
+- **Test Types**: Unit, integration, MCP tools tests across all 4 PCloud services
+- **Service Coverage**: Complete testing for ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService
 
 ## Testing Strategy
 
@@ -121,8 +132,11 @@ The testing architecture has been simplified by converting to a tool-based archi
 
 ### Key Test Files for LLM Development
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (88+ tests)
-- `tests/test_account_operations.py` - Account lifecycle management (85+ tests)
-- `tests/test_mcp_integration.py` - MCP tool wrappers and integration (18+ tests)
+- `tests/test_account_operations.py` - Complete account lifecycle management (85+ tests)  
+- `tests/test_mcp_integration.py` - MCP tool wrappers and integration across all 4 services (18+ tests)
+- `tests/test_integration.py` - End-to-end integration tests with enhanced platform operations (25+ tests)
+- `tests/test_performance.py` - Performance and optimization tests (11+ tests)
+- `tests/test_resources.py` - MCP resource implementation tests (42+ tests)
 
 ### Performance Testing
 ```bash

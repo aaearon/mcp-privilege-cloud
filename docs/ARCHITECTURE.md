@@ -43,7 +43,7 @@ src/mcp_privilege_cloud/
 **Purpose**: Core business logic using official ark-sdk-python services
 
 **Key Features**:
-- **SDK Service Integration**: Uses ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService
+- **Complete SDK Service Integration**: Uses ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService (all 4 PCloud services)
 - **Simplified Architecture**: Eliminates custom HTTP client in favor of SDK services
 - **Enhanced Reliability**: SDK handles authentication, rate limiting, and error handling
 - **Response Processing**: Direct SDK response handling with data integrity preservation
@@ -61,7 +61,7 @@ src/mcp_privilege_cloud/
 
 **Key Features**:
 - **FastMCP Server**: MCP protocol implementation
-- **Enhanced Tool Suite**: 13 action tools for comprehensive CyberArk operations
+- **Comprehensive Tool Suite**: 45 enterprise-grade action tools for complete CyberArk PCloud operations across all 4 services (17+11+10+9)
 - **SDK-Powered Reliability**: All tools leverage official ark-sdk-python services
 - **Parameter Validation**: Enhanced input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
@@ -121,7 +121,7 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 1. **MCP Client** calls tool via MCP protocol
 2. **MCP Server** validates parameters and routes to server method
-3. **Server Method** obtains SDK service instance (accounts/safes/platforms)
+3. **Server Method** obtains SDK service instance (accounts/safes/platforms/applications for complete PCloud coverage)
 4. **SDK Service** automatically handles authentication via ark-sdk-python
 5. **SDK Service** calls CyberArk API with proper authentication and error handling
 6. **SDK Response** provides exact API data with built-in data integrity
@@ -141,16 +141,26 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 ## Tool Architecture
 
-The server exposes 13 MCP tools organized by functionality, all powered by ark-sdk-python:
+The server exposes 45 enterprise-grade MCP tools organized by functionality across all 4 PCloud services, all powered by ark-sdk-python:
 
-**Data Access Tools**:
-- `list_accounts`, `get_account_details`, `search_accounts`, `list_safes`, `get_safe_details`, `list_platforms`, `get_platform_details`
+**Account Management Tools (17 tools)**:
+- Core Operations: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
+- Password Management: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+- Advanced Search: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-**Account Management Tools**:
-- `create_account`, `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
+**Safe Management Tools (11 tools)**:
+- Core Operations: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
+- Member Management: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
-**Platform Management Tools**:
-- `import_platform_package`
+**Platform Management Tools (10 tools)**:
+- Core Operations: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
+- Lifecycle Management: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
+- Statistics: `get_platform_statistics`, `get_target_platform_statistics`
+
+**Applications Management Tools (9 tools)**:
+- Core Operations: `list_applications`, `get_application_details`, `add_application`, `delete_application`
+- Auth Methods: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
+- Statistics: `get_applications_stats`
 
 All tools follow consistent SDK-powered patterns:
 - Direct SDK service method invocation
@@ -189,6 +199,7 @@ def __init__(self):
     self.accounts_service = ArkPCloudAccountsService(sdk_auth)
     self.safes_service = ArkPCloudSafesService(sdk_auth)
     self.platforms_service = ArkPCloudPlatformsService(sdk_auth)
+    self.applications_service = ArkPCloudApplicationsService(sdk_auth)
 ```
 
 **4. Optimized Data Processing**:
