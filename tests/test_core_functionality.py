@@ -232,3 +232,395 @@ class TestServerCore:
         server_instance.platforms_service.list_platforms.assert_called_once()
         assert len(result) == 1
         assert result[0]["id"] == "TestPlatform"
+
+    @pytest.mark.asyncio
+    async def test_server_export_platform_integration(self, server_instance):
+        """Test server export_platform method integration with SDK"""
+        platform_id = "WinServerLocal"
+        output_folder = "/tmp/exports"
+        
+        # Mock the platforms service export_platform method
+        server_instance.platforms_service.export_platform.return_value = None
+        
+        result = await server_instance.export_platform(platform_id, output_folder)
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.export_platform.assert_called_once()
+        call_args = server_instance.platforms_service.export_platform.call_args[1]
+        assert call_args['export_platform'].platform_id == platform_id
+        assert call_args['export_platform'].output_folder == output_folder
+        
+        # Verify return format
+        assert result['platform_id'] == platform_id
+        assert result['output_folder'] == output_folder
+        assert result['status'] == "exported"
+
+    @pytest.mark.asyncio
+    async def test_server_duplicate_target_platform_integration(self, server_instance):
+        """Test server duplicate_target_platform method integration with SDK"""
+        target_platform_id = 123
+        name = "Duplicated Platform"
+        description = "Test duplicate"
+        
+        # Mock the platforms service to return duplicated platform info
+        mock_duplicated = Mock()
+        mock_duplicated.model_dump.return_value = {
+            "target_platform_id": 456,
+            "name": name,
+            "description": description,
+            "status": "duplicated"
+        }
+        server_instance.platforms_service.duplicate_target_platform.return_value = mock_duplicated
+        
+        result = await server_instance.duplicate_target_platform(target_platform_id, name, description)
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.duplicate_target_platform.assert_called_once()
+        call_args = server_instance.platforms_service.duplicate_target_platform.call_args[1]
+        assert call_args['duplicate_target_platform'].target_platform_id == target_platform_id
+        assert call_args['duplicate_target_platform'].name == name
+        assert call_args['duplicate_target_platform'].description == description
+        
+        # Verify return format
+        assert result['target_platform_id'] == 456
+        assert result['name'] == name
+        assert result['description'] == description
+
+    @pytest.mark.asyncio
+    async def test_server_activate_target_platform_integration(self, server_instance):
+        """Test server activate_target_platform method integration with SDK"""
+        target_platform_id = 123
+        
+        # Mock the platforms service activate method
+        server_instance.platforms_service.activate_target_platform.return_value = None
+        
+        result = await server_instance.activate_target_platform(target_platform_id)
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.activate_target_platform.assert_called_once()
+        call_args = server_instance.platforms_service.activate_target_platform.call_args[1]
+        assert call_args['activate_target_platform'].target_platform_id == target_platform_id
+        
+        # Verify return format
+        assert result['target_platform_id'] == target_platform_id
+        assert result['status'] == "activated"
+
+    @pytest.mark.asyncio
+    async def test_server_deactivate_target_platform_integration(self, server_instance):
+        """Test server deactivate_target_platform method integration with SDK"""
+        target_platform_id = 123
+        
+        # Mock the platforms service deactivate method
+        server_instance.platforms_service.deactivate_target_platform.return_value = None
+        
+        result = await server_instance.deactivate_target_platform(target_platform_id)
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.deactivate_target_platform.assert_called_once()
+        call_args = server_instance.platforms_service.deactivate_target_platform.call_args[1]
+        assert call_args['deactivate_target_platform'].target_platform_id == target_platform_id
+        
+        # Verify return format
+        assert result['target_platform_id'] == target_platform_id
+        assert result['status'] == "deactivated"
+
+    @pytest.mark.asyncio
+    async def test_server_delete_target_platform_integration(self, server_instance):
+        """Test server delete_target_platform method integration with SDK"""
+        target_platform_id = 123
+        
+        # Mock the platforms service delete method
+        server_instance.platforms_service.delete_target_platform.return_value = None
+        
+        result = await server_instance.delete_target_platform(target_platform_id)
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.delete_target_platform.assert_called_once()
+        call_args = server_instance.platforms_service.delete_target_platform.call_args[1]
+        assert call_args['delete_target_platform'].target_platform_id == target_platform_id
+        
+        # Verify return format
+        assert result['target_platform_id'] == target_platform_id
+        assert result['status'] == "deleted"
+
+    async def test_server_get_platform_statistics_integration(self, server_instance):
+        """Test server get_platform_statistics method integration with SDK"""
+        # Mock platforms_stats response with proper pydantic model structure
+        from unittest.mock import MagicMock
+        
+        mock_stats = MagicMock()
+        mock_stats.model_dump.return_value = {
+            'platforms_count': 15,
+            'platforms_count_by_type': {
+                'regular': 12,
+                'rotational_group': 2,
+                'group': 1
+            }
+        }
+        
+        # Mock the platforms service stats method
+        server_instance.platforms_service.platforms_stats.return_value = mock_stats
+        
+        result = await server_instance.get_platform_statistics()
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.platforms_stats.assert_called_once()
+        
+        # Verify return format
+        assert result['platforms_count'] == 15
+        assert result['platforms_count_by_type']['regular'] == 12
+        assert result['platforms_count_by_type']['rotational_group'] == 2
+        assert result['platforms_count_by_type']['group'] == 1
+
+    async def test_server_get_target_platform_statistics_integration(self, server_instance):
+        """Test server get_target_platform_statistics method integration with SDK"""
+        # Mock target_platforms_stats response with proper pydantic model structure
+        from unittest.mock import MagicMock
+        
+        mock_stats = MagicMock()
+        mock_stats.model_dump.return_value = {
+            'target_platforms_count': 8,
+            'target_platforms_count_by_system_type': {
+                'Windows': 3,
+                'Unix': 2,
+                'Oracle': 2,
+                'Database': 1
+            }
+        }
+        
+        # Mock the platforms service stats method
+        server_instance.platforms_service.target_platforms_stats.return_value = mock_stats
+        
+        result = await server_instance.get_target_platform_statistics()
+        
+        # Verify the service was called correctly
+        server_instance.platforms_service.target_platforms_stats.assert_called_once()
+        
+        # Verify return format
+        assert result['target_platforms_count'] == 8
+        assert result['target_platforms_count_by_system_type']['Windows'] == 3
+        assert result['target_platforms_count_by_system_type']['Unix'] == 2
+        assert result['target_platforms_count_by_system_type']['Oracle'] == 2
+
+
+class TestSessionManagement:
+    """Test cases for Session Monitoring functionality using ArkSMService"""
+
+    @pytest.fixture
+    def server_with_sm_service(self):
+        """Create server instance with mocked SM service for testing"""
+        # Mock environment variables needed for SDK authentication
+        with patch.dict('os.environ', {
+            'CYBERARK_CLIENT_ID': 'test-client',
+            'CYBERARK_CLIENT_SECRET': 'test-secret'
+        }):
+            # Mock the SDK components to prevent actual authentication during tests
+            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+                mock_sdk_auth = Mock()
+                mock_sdk_auth.get_authenticated_client.return_value = Mock()
+                mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
+                
+                # Create server with simplified constructor
+                server = CyberArkMCPServer()
+                
+                # Mock the SDK services
+                server.sdk_authenticator = mock_sdk_auth
+                server.accounts_service = Mock()
+                server.safes_service = Mock()
+                server.platforms_service = Mock()
+                
+                # Mock the SM service that we'll add
+                server.sm_service = Mock()
+                
+                return server
+
+    async def test_list_sessions_basic(self, server_with_sm_service):
+        """Test list_sessions method basic functionality"""
+        server_instance = server_with_sm_service
+        
+        # Mock sessions response
+        from unittest.mock import MagicMock
+        
+        mock_page = MagicMock()
+        mock_session = MagicMock()
+        mock_session.model_dump.return_value = {
+            'session_id': '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d',
+            'protocol': 'SSH',
+            'start_time': '2024-01-15T10:30:00Z',
+            'duration': '00:15:30',
+            'user': 'admin@example.com',
+            'target': '10.0.0.100'
+        }
+        mock_page.items = [mock_session]
+        
+        # Mock the sm service list_sessions_by method
+        server_instance.sm_service.list_sessions_by.return_value = [mock_page]
+        
+        result = await server_instance.list_sessions()
+        
+        # Verify the service was called correctly
+        server_instance.sm_service.list_sessions_by.assert_called_once()
+        
+        # Verify return format
+        assert len(result) == 1
+        assert result[0]['session_id'] == '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
+        assert result[0]['protocol'] == 'SSH'
+
+    async def test_list_sessions_with_filter(self, server_with_sm_service):
+        """Test list_sessions_by_filter method with advanced filtering"""
+        server_instance = server_with_sm_service
+        
+        # Mock filtered sessions response
+        from unittest.mock import MagicMock
+        
+        mock_page = MagicMock()
+        mock_session1 = MagicMock()
+        mock_session1.model_dump.return_value = {
+            'session_id': '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d',
+            'protocol': 'SSH',
+            'start_time': '2024-01-15T10:30:00Z',
+            'duration': '00:15:30'
+        }
+        mock_session2 = MagicMock()
+        mock_session2.model_dump.return_value = {
+            'session_id': '7f73cdc9-de92-53c9-bd83-2f17cg0d507e',
+            'protocol': 'RDP',
+            'start_time': '2024-01-15T11:00:00Z',
+            'duration': '00:22:45'
+        }
+        mock_page.items = [mock_session1, mock_session2]
+        
+        # Mock the sm service list_sessions_by method
+        server_instance.sm_service.list_sessions_by.return_value = [mock_page]
+        
+        filter_query = 'startTime ge 2024-01-15T08:00:00Z AND protocol IN SSH,RDP'
+        result = await server_instance.list_sessions_by_filter(search=filter_query)
+        
+        # Verify the service was called with correct filter
+        server_instance.sm_service.list_sessions_by.assert_called_once()
+        
+        # Verify return format
+        assert len(result) == 2
+        assert result[0]['protocol'] == 'SSH'
+        assert result[1]['protocol'] == 'RDP'
+
+    async def test_get_session_details(self, server_with_sm_service):
+        """Test get_session_details method"""
+        server_instance = server_with_sm_service
+        
+        # Mock session details response
+        from unittest.mock import MagicMock
+        
+        mock_session = MagicMock()
+        mock_session.model_dump.return_value = {
+            'session_id': '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d',
+            'protocol': 'SSH',
+            'start_time': '2024-01-15T10:30:00Z',
+            'end_time': '2024-01-15T10:45:30Z',
+            'duration': '00:15:30',
+            'user': 'admin@example.com',
+            'target': '10.0.0.100',
+            'account_name': 'root',
+            'safe_name': 'Unix-Servers'
+        }
+        
+        # Mock the sm service session method
+        server_instance.sm_service.session.return_value = mock_session
+        
+        session_id = '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
+        result = await server_instance.get_session_details(session_id=session_id)
+        
+        # Verify the service was called correctly
+        server_instance.sm_service.session.assert_called_once()
+        
+        # Verify return format
+        assert result['session_id'] == '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
+        assert result['protocol'] == 'SSH'
+        assert result['user'] == 'admin@example.com'
+        assert result['target'] == '10.0.0.100'
+
+    async def test_list_session_activities(self, server_with_sm_service):
+        """Test list_session_activities method"""
+        server_instance = server_with_sm_service
+        
+        # Mock session activities response
+        from unittest.mock import MagicMock
+        
+        mock_page = MagicMock()
+        mock_activity1 = MagicMock()
+        mock_activity1.model_dump.return_value = {
+            'activity_id': 'act-001',
+            'timestamp': '2024-01-15T10:31:00Z',
+            'command': 'ls -la',
+            'result': 'SUCCESS'
+        }
+        mock_activity2 = MagicMock()
+        mock_activity2.model_dump.return_value = {
+            'activity_id': 'act-002',
+            'timestamp': '2024-01-15T10:32:00Z',
+            'command': 'cat /etc/passwd',
+            'result': 'SUCCESS'
+        }
+        mock_page.items = [mock_activity1, mock_activity2]
+        
+        # Mock the sm service list_session_activities method
+        server_instance.sm_service.list_session_activities.return_value = [mock_page]
+        
+        session_id = '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
+        result = await server_instance.list_session_activities(session_id=session_id)
+        
+        # Verify the service was called correctly
+        server_instance.sm_service.list_session_activities.assert_called_once()
+        
+        # Verify return format
+        assert len(result) == 2
+        assert result[0]['command'] == 'ls -la'
+        assert result[1]['command'] == 'cat /etc/passwd'
+
+    async def test_count_sessions(self, server_with_sm_service):
+        """Test count_sessions method"""
+        server_instance = server_with_sm_service
+        
+        # Mock session count response
+        server_instance.sm_service.count_sessions_by.return_value = 42
+        
+        result = await server_instance.count_sessions()
+        
+        # Verify the service was called correctly
+        server_instance.sm_service.count_sessions_by.assert_called_once()
+        
+        # Verify return format
+        assert result['count'] == 42
+
+    async def test_get_session_statistics(self, server_with_sm_service):
+        """Test get_session_statistics method"""
+        server_instance = server_with_sm_service
+        
+        # Mock session statistics response
+        from unittest.mock import MagicMock
+        
+        mock_stats = MagicMock()
+        mock_stats.model_dump.return_value = {
+            'total_sessions': 150,
+            'active_sessions': 5,
+            'protocols': {
+                'SSH': 80,
+                'RDP': 50,
+                'Database': 20
+            },
+            'average_session_duration': '00:25:30',
+            'period': 'last_30_days'
+        }
+        
+        # Mock the sm service sessions_stats method
+        server_instance.sm_service.sessions_stats.return_value = mock_stats
+        
+        result = await server_instance.get_session_statistics()
+        
+        # Verify the service was called correctly
+        server_instance.sm_service.sessions_stats.assert_called_once()
+        
+        # Verify return format
+        assert result['total_sessions'] == 150
+        assert result['active_sessions'] == 5
+        assert result['protocols']['SSH'] == 80
