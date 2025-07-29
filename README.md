@@ -1,16 +1,17 @@
 # CyberArk Privilege Cloud MCP Server
 
-A production-ready Model Context Protocol (MCP) server for comprehensive CyberArk Privilege Cloud integration using the official ark-sdk-python library. Provides complete privileged access management through 45 enterprise-grade MCP tools covering all four PCloud services.
+A production-ready Model Context Protocol (MCP) server for comprehensive CyberArk Privilege Cloud integration using the official ark-sdk-python library. Provides complete privileged access management through 53 enterprise-grade MCP tools covering all CyberArk PCloud services with session monitoring capabilities.
 
 ## Features
 
-- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (17 tools)
+- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (18 tools)
 - **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (11 tools)  
-- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (10 tools)
+- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (12 tools)
 - **Applications Management**: Full application lifecycle with authentication method management and statistics (9 tools)
+- **Session Monitoring**: Real-time session tracking, activity monitoring, and analytics (6 tools)
 - **Advanced Analytics**: Account filtering, grouping, distribution analysis, and environment categorization
 - **Enterprise Security**: Built on official ark-sdk-python with OAuth, audit logging, and comprehensive error handling
-- **Production Ready**: 144 passing tests, zero regression, complete API coverage with exact data fidelity
+- **Production Ready**: 160+ passing tests, zero regression, complete API coverage with exact data fidelity
 
 ## Prerequisites
 
@@ -58,9 +59,9 @@ uv run mcp-privilege-cloud
 python -m mcp_privilege_cloud
 ```
 
-### Available Tools (45 Total)
+### Available Tools (53 Total)
 
-**Account Management (17 tools):**
+**Account Management (18 tools):**
 - **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
 - **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 - **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
@@ -69,7 +70,7 @@ python -m mcp_privilege_cloud
 - **Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
 - **Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
-**Platform Management (10 tools):**
+**Platform Management (12 tools):**
 - **Core Operations**: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
 - **Lifecycle Management**: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
 - **Statistics**: `get_platform_statistics`, `get_target_platform_statistics`
@@ -78,6 +79,10 @@ python -m mcp_privilege_cloud
 - **Core Operations**: `list_applications`, `get_application_details`, `add_application`, `delete_application`
 - **Auth Methods**: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
 - **Statistics**: `get_applications_stats`
+
+**Session Monitoring (6 tools):**
+- **Session Management**: `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `count_sessions`
+- **Activity Tracking**: `list_session_activities`, `get_session_statistics`
 
 ## Client Integration
 
@@ -119,7 +124,7 @@ Add to your Claude Desktop MCP settings file:
 ```bash
 npx @modelcontextprotocol/inspector
 ```
-Configure with server command `uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud` and your service account credentials. Should show 45 tools available across all four PCloud services.
+Configure with server command `uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud` and your service account credentials. Should show 53 tools available across all CyberArk PCloud services including session monitoring.
 
 For comprehensive testing procedures, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
@@ -146,7 +151,7 @@ npm install @modelcontextprotocol/inspector
 
 # Test with the single-file testing script
 python test_mcp_cli.py health_check      # Server health check
-python test_mcp_cli.py list_tools        # List all 45 tools
+python test_mcp_cli.py list_tools        # List all 53 tools
 python test_mcp_cli.py call_tool list_accounts  # Test specific tool
 python test_mcp_cli.py generate_report   # Full test report
 
@@ -188,8 +193,8 @@ python -c "from mcp_privilege_cloud.server import CyberArkMCPServer; import asyn
 
 ## License
 
-[Add appropriate license information]
+MIT License - see LICENSE file for details.
 
 ## Support
 
-[Add support contact information]
+For issues and feature requests, please use the [GitHub Issues](https://github.com/aaearon/mcp-privilege-cloud/issues) page.

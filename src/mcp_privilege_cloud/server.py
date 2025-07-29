@@ -1332,15 +1332,22 @@ class CyberArkMCPServer:
         system_type: Optional[str] = None,
         **kwargs
     ) -> Any:
-        """List available platforms using ark-sdk-python"""
+        """List available platforms using ark-sdk-python with proper pagination handling"""
         self._ensure_service_initialized('platforms_service')
         
-        # Get platforms using SDK in executor
-        platforms = await self._run_in_executor(
-            self.platforms_service.list_platforms
-        )
+        # Get platforms using SDK in executor with pagination handling
+        def get_all_platforms():
+            """Get all platforms from all pages"""
+            all_platforms = []
+            # The SDK returns a page iterator, we need to iterate through all pages
+            for page in self.platforms_service.list_platforms():
+                for platform in page:
+                    all_platforms.append(platform)
+            return all_platforms
         
-        self.logger.info(f"Retrieved {len(platforms)} platforms using ark-sdk-python")
+        platforms = await self._run_in_executor(get_all_platforms)
+        
+        self.logger.info(f"Retrieved {len(platforms)} platforms using ark-sdk-python (all pages)")
         
         # Convert to dict format to avoid Pydantic validation issues
         # The SDK model may have stricter validation than the actual API responses
