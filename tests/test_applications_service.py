@@ -364,8 +364,17 @@ class TestApplicationsStatistics:
         # Test
         result = await mock_server.get_applications_stats()
         
-        # Verify - server method returns Pydantic model, not dictionary
-        assert result == mock_stats
+        # Verify - this method specifically returns dictionary due to validation issues
+        expected_dict = {
+            'count': 25,
+            'disabled_apps': 3,
+            'auth_types_count': {
+                'certificate': 15,
+                'hash': 8,
+                'path': 2
+            }
+        }
+        assert result == expected_dict
         mock_apps_service.applications_stats.assert_called_once()
 
 
