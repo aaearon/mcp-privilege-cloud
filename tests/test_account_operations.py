@@ -80,7 +80,9 @@ class TestAccountManagement:
         
         result = await server.list_accounts()
         
-        assert result == sample_accounts
+        # Convert Pydantic models to dicts for comparison
+        result_dicts = [item.model_dump() for item in result]
+        assert result_dicts == sample_accounts
         mock_service.list_accounts.assert_called_once_with(accounts_filter=None)
 
     async def test_list_accounts_with_safe_filter(self, server, sample_accounts):
@@ -90,7 +92,9 @@ class TestAccountManagement:
         
         result = await server.list_accounts(safe_name="IT-Infrastructure")
         
-        assert result == filtered_accounts
+        # Convert Pydantic models to dicts for comparison
+        result_dicts = [item.model_dump() for item in result]
+        assert result_dicts == filtered_accounts
         # Verify that a filter was passed
         mock_service.list_accounts.assert_called_once()
         call_args = mock_service.list_accounts.call_args

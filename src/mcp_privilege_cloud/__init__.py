@@ -31,6 +31,8 @@ def main() -> NoReturn:
         from .mcp_server import main as server_main
         logger.info("Starting CyberArk Privilege Cloud MCP Server via main entry point")
         server_main()
+        # This should not be reached in normal operation since server_main() should run indefinitely
+        sys.exit(0)
     except ImportError as e:
         logger.error(f"Failed to import MCP server module: {e}")
         sys.exit(1)

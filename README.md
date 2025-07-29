@@ -125,6 +125,7 @@ For comprehensive testing procedures, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Testing
 
+### Unit/Integration Tests
 ```bash
 # Run all tests
 uv run pytest
@@ -135,6 +136,28 @@ uv run pytest --cov=mcp_privilege_cloud
 # Integration tests
 uv run pytest -m integration
 ```
+
+### MCP Inspector CLI Testing
+For programmatic testing and LLM-driven validation:
+
+```bash
+# Install inspector (one-time setup)
+npm install @modelcontextprotocol/inspector
+
+# Test with the single-file testing script
+python test_mcp_cli.py health_check      # Server health check
+python test_mcp_cli.py list_tools        # List all 45 tools
+python test_mcp_cli.py call_tool list_accounts  # Test specific tool
+python test_mcp_cli.py generate_report   # Full test report
+
+# Python API for LLMs
+from test_mcp_cli import MCPTester
+tester = MCPTester()
+tools = tester.list_tools()              # Get all tools
+health = tester.test_server_health()     # Health check
+```
+
+The `test_mcp_cli.py` script provides a single-file solution for programmatic MCP server testing, designed for LLM integration and ad-hoc validation.
 
 ## Troubleshooting
 

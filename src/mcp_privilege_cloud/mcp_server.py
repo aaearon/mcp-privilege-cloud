@@ -9,7 +9,10 @@ through the Model Context Protocol (MCP).
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
+
+# Import BaseModel for Pydantic model detection
+from pydantic import BaseModel
 
 from mcp.server.fastmcp import FastMCP
 
@@ -48,9 +51,9 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("CyberArk Privilege Cloud MCP Server")
 
 # Server instance will be created lazily by tools
-server = None
+server: Optional[CyberArkMCPServer] = None
 
-def get_server():
+def get_server() -> CyberArkMCPServer:
     """Get or create the server instance lazily."""
     global server
     if server is None:
@@ -62,19 +65,44 @@ def get_server():
             raise
     return server
 
-def reset_server():
+def reset_server() -> None:
     """Reset the global server instance. Used for testing to ensure clean state."""
     global server
     server = None
 
-async def execute_tool(tool_name: str, *args, **kwargs):
-    """Execute a CyberArk tool by calling the corresponding server method."""
+def _convert_to_dict(obj: Any) -> Any:
+    """Convert Pydantic models to dictionaries for MCP boundary.
+    
+    This function handles the conversion at the MCP boundary layer,
+    ensuring clients receive JSON-compatible dictionaries while
+    internal business logic works with Pydantic models.
+    """
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    elif isinstance(obj, list):
+        return [_convert_to_dict(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: _convert_to_dict(value) for key, value in obj.items()}
+    else:
+        return obj
+
+
+async def execute_tool(tool_name: str, *args: Any, **kwargs: Any) -> Any:
+    """Execute a CyberArk tool by calling the corresponding server method.
+    
+    This function serves as the MCP boundary layer, converting Pydantic models
+    returned by server methods to dictionaries for MCP client consumption.
+    """
     try:
         server_instance = get_server()
         server_method = getattr(server_instance, tool_name)
         result = await server_method(*args, **kwargs)
+        
+        # Convert Pydantic models to dictionaries at MCP boundary
+        converted_result = _convert_to_dict(result)
+        
         logger.info(f"Successfully executed tool: {tool_name}")
-        return result
+        return converted_result
     except Exception as e:
         logger.error(f"Error executing tool '{tool_name}': {e}")
         raise
@@ -92,7 +120,7 @@ async def create_account(
     platform_account_properties: Optional[Dict[str, Any]] = None,
     secret_management: Optional[Dict[str, Any]] = None,
     remote_machines_access: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+) -> Any:
     """
     Create a new privileged account in CyberArk Privilege Cloud.
     
@@ -123,7 +151,7 @@ async def create_account(
 async def change_account_password(
     account_id: str,
     new_password: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Any:
     """
     Change the password for an existing account in CyberArk Privilege Cloud.
     
@@ -150,7 +178,7 @@ async def set_next_password(
     account_id: str,
     new_password: str,
     change_immediately: bool = True
-) -> Dict[str, Any]:
+) -> Any:
     """
     Set the next password for an existing account in CyberArk Privilege Cloud.
     
@@ -175,7 +203,7 @@ async def set_next_password(
 @mcp.tool()
 async def verify_account_password(
     account_id: str
-) -> Dict[str, Any]:
+) -> Any:
     """
     Verify the password for an existing account in CyberArk Privilege Cloud.
     
@@ -199,7 +227,7 @@ async def verify_account_password(
 @mcp.tool()
 async def reconcile_account_password(
     account_id: str
-) -> Dict[str, Any]:
+) -> Any:
     """
     Reconcile the password for an existing account in CyberArk Privilege Cloud.
     
@@ -230,7 +258,7 @@ async def update_account(
     platform_account_properties: Optional[Dict[str, Any]] = None,
     secret_management: Optional[Dict[str, Any]] = None,
     remote_machines_access: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+) -> Any:
     """
     Update an existing account in CyberArk Privilege Cloud.
     
@@ -266,7 +294,7 @@ async def update_account(
 @mcp.tool()
 async def delete_account(
     account_id: str
-) -> Dict[str, Any]:
+) -> Any:
     """
     Delete an existing account from CyberArk Privilege Cloud.
     
@@ -308,7 +336,7 @@ async def delete_account(
 @mcp.tool()
 async def import_platform_package(
     platform_package_file: str
-) -> Dict[str, Any]:
+) -> Any:
     """
     Import a platform package ZIP file to CyberArk Privilege Cloud to add new platform types.
     
@@ -336,7 +364,7 @@ async def import_platform_package(
 async def export_platform(
     platform_id: str,
     output_folder: str
-) -> Dict[str, Any]:
+) -> Any:
     """
     Export a platform configuration package from CyberArk Privilege Cloud.
     
@@ -364,8 +392,8 @@ async def export_platform(
 async def duplicate_target_platform(
     target_platform_id: int,
     name: str,
-    description: str = None
-) -> Dict[str, Any]:
+    description: Optional[str] = None
+) -> Any:
     """
     Duplicate/clone an existing target platform in CyberArk Privilege Cloud.
     
@@ -393,7 +421,7 @@ async def duplicate_target_platform(
 @mcp.tool()
 async def activate_target_platform(
     target_platform_id: int
-) -> Dict[str, Any]:
+) -> Any:
     """
     Activate/enable a target platform in CyberArk Privilege Cloud.
     
@@ -419,7 +447,7 @@ async def activate_target_platform(
 @mcp.tool()
 async def deactivate_target_platform(
     target_platform_id: int
-) -> Dict[str, Any]:
+) -> Any:
     """
     Deactivate/disable a target platform in CyberArk Privilege Cloud.
     
@@ -446,7 +474,7 @@ async def deactivate_target_platform(
 @mcp.tool()
 async def delete_target_platform(
     target_platform_id: int
-) -> Dict[str, Any]:
+) -> Any:
     """
     Delete a target platform from CyberArk Privilege Cloud.
     
@@ -470,7 +498,7 @@ async def delete_target_platform(
     return await execute_tool("delete_target_platform", target_platform_id=target_platform_id)
 
 @mcp.tool()
-async def get_platform_statistics() -> Dict[str, Any]:
+async def get_platform_statistics() -> Any:
     """
     Calculate comprehensive platform statistics from CyberArk Privilege Cloud.
     
@@ -499,7 +527,7 @@ async def get_platform_statistics() -> Dict[str, Any]:
     return await execute_tool("get_platform_statistics")
 
 @mcp.tool()
-async def get_target_platform_statistics() -> Dict[str, Any]:
+async def get_target_platform_statistics() -> Any:
     """
     Calculate comprehensive target platform statistics from CyberArk Privilege Cloud.
     
@@ -531,7 +559,7 @@ async def get_target_platform_statistics() -> Dict[str, Any]:
 
 # Data access tools - return raw API data
 @mcp.tool()
-async def get_account_details(account_id: str) -> Dict[str, Any]:
+async def get_account_details(account_id: str) -> Any:
     """Get detailed information about a specific account in CyberArk Privilege Cloud.
     
     Args:
@@ -543,7 +571,7 @@ async def get_account_details(account_id: str) -> Dict[str, Any]:
     return await execute_tool("get_account_details", account_id=account_id)
 
 @mcp.tool()
-async def list_accounts() -> List[Dict[str, Any]]:
+async def list_accounts() -> Any:
     """List all accessible accounts in CyberArk Privilege Cloud.
     
     Returns:
@@ -558,7 +586,7 @@ async def search_accounts(
     username: Optional[str] = None,
     address: Optional[str] = None,
     platform_id: Optional[str] = None
-) -> List[Dict[str, Any]]:
+) -> Any:
     """Search for accounts with various criteria.
     
     Args:
@@ -576,7 +604,7 @@ async def search_accounts(
 
 # Advanced Account Search and Filtering Tools
 @mcp.tool()
-async def filter_accounts_by_platform_group(platform_group: str) -> List[Dict[str, Any]]:
+async def filter_accounts_by_platform_group(platform_group: str) -> Any:
     """Filter accounts by platform type grouping (Windows, Linux, Database, etc.).
     
     Args:
@@ -588,7 +616,7 @@ async def filter_accounts_by_platform_group(platform_group: str) -> List[Dict[st
     return await execute_tool("filter_accounts_by_platform_group", platform_group=platform_group)
 
 @mcp.tool()
-async def filter_accounts_by_environment(environment: str) -> List[Dict[str, Any]]:
+async def filter_accounts_by_environment(environment: str) -> Any:
     """Filter accounts by environment (production, staging, development, etc.).
     
     Args:
@@ -600,7 +628,7 @@ async def filter_accounts_by_environment(environment: str) -> List[Dict[str, Any
     return await execute_tool("filter_accounts_by_environment", environment=environment)
 
 @mcp.tool()
-async def filter_accounts_by_management_status(auto_managed: bool = True) -> List[Dict[str, Any]]:
+async def filter_accounts_by_management_status(auto_managed: bool = True) -> Any:
     """Filter accounts by automatic password management status.
     
     Args:
@@ -612,7 +640,7 @@ async def filter_accounts_by_management_status(auto_managed: bool = True) -> Lis
     return await execute_tool("filter_accounts_by_management_status", auto_managed=auto_managed)
 
 @mcp.tool()
-async def group_accounts_by_safe() -> Dict[str, List[Dict[str, Any]]]:
+async def group_accounts_by_safe() -> Any:
     """Group all accounts by their safe name.
     
     Returns:
@@ -621,7 +649,7 @@ async def group_accounts_by_safe() -> Dict[str, List[Dict[str, Any]]]:
     return await execute_tool("group_accounts_by_safe")
 
 @mcp.tool()
-async def group_accounts_by_platform() -> Dict[str, List[Dict[str, Any]]]:
+async def group_accounts_by_platform() -> Any:
     """Group all accounts by their platform type.
     
     Returns:
@@ -630,7 +658,7 @@ async def group_accounts_by_platform() -> Dict[str, List[Dict[str, Any]]]:
     return await execute_tool("group_accounts_by_platform")
 
 @mcp.tool()
-async def analyze_account_distribution() -> Dict[str, Any]:
+async def analyze_account_distribution() -> Any:
     """Analyze distribution of accounts across safes, platforms, and environments.
     
     Returns:
@@ -644,7 +672,7 @@ async def search_accounts_by_pattern(
     address_pattern: Optional[str] = None, 
     environment: Optional[str] = None,
     platform_group: Optional[str] = None
-) -> List[Dict[str, Any]]:
+) -> Any:
     """Search accounts using multiple pattern criteria.
     
     Args:
@@ -663,7 +691,7 @@ async def search_accounts_by_pattern(
                              platform_group=platform_group)
 
 @mcp.tool()
-async def count_accounts_by_criteria() -> Dict[str, Any]:
+async def count_accounts_by_criteria() -> Any:
     """Count accounts by various criteria (platform, safe, management status).
     
     Returns:
@@ -672,7 +700,7 @@ async def count_accounts_by_criteria() -> Dict[str, Any]:
     return await execute_tool("count_accounts_by_criteria")
 
 @mcp.tool()
-async def get_safe_details(safe_name: str) -> Dict[str, Any]:
+async def get_safe_details(safe_name: str) -> Any:
     """Get detailed information about a specific safe in CyberArk Privilege Cloud.
     
     Args:
@@ -684,7 +712,7 @@ async def get_safe_details(safe_name: str) -> Dict[str, Any]:
     return await execute_tool("get_safe_details", safe_name=safe_name)
 
 @mcp.tool()
-async def list_safes() -> List[Dict[str, Any]]:
+async def list_safes() -> Any:
     """List all accessible safes in CyberArk Privilege Cloud.
     
     Returns:
@@ -696,7 +724,7 @@ async def list_safes() -> List[Dict[str, Any]]:
 async def add_safe(
     safe_name: str,
     description: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Add a new safe to CyberArk Privilege Cloud.
     
     Args:
@@ -719,7 +747,7 @@ async def update_safe(
     auto_purge_enabled: Optional[bool] = None,
     olac_enabled: Optional[bool] = None,
     managing_cpm: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Update properties of an existing safe in CyberArk Privilege Cloud.
     
     Args:
@@ -750,7 +778,7 @@ async def update_safe(
     )
 
 @mcp.tool()
-async def delete_safe(safe_id: str) -> Dict[str, Any]:
+async def delete_safe(safe_id: str) -> Any:
     """Delete a safe from CyberArk Privilege Cloud.
     
     WARNING: This action permanently removes the safe and all its contents.
@@ -774,7 +802,7 @@ async def list_safe_members(
     offset: Optional[int] = None,
     limit: Optional[int] = None,
     member_type: Optional[str] = None
-) -> List[Dict[str, Any]]:
+) -> Any:
     """List all members of a specific safe with their permissions.
     
     Args:
@@ -803,7 +831,7 @@ async def list_safe_members(
     )
 
 @mcp.tool()
-async def get_safe_member_details(safe_name: str, member_name: str) -> Dict[str, Any]:
+async def get_safe_member_details(safe_name: str, member_name: str) -> Any:
     """Get detailed information about a specific safe member.
     
     Args:
@@ -827,7 +855,7 @@ async def add_safe_member(
     membership_expiration_date: Optional[str] = None,
     permissions: Optional[Dict[str, Any]] = None,
     permission_set: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Add a new member to a safe with specified permissions.
     
     Args:
@@ -867,7 +895,7 @@ async def update_safe_member(
     membership_expiration_date: Optional[str] = None,
     permissions: Optional[Dict[str, Any]] = None,
     permission_set: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Any:
     """Update permissions for an existing safe member.
     
     Args:
@@ -896,7 +924,7 @@ async def update_safe_member(
     )
 
 @mcp.tool()
-async def remove_safe_member(safe_name: str, member_name: str) -> Dict[str, Any]:
+async def remove_safe_member(safe_name: str, member_name: str) -> Any:
     """Remove a member from a safe.
     
     Args:
@@ -915,7 +943,7 @@ async def remove_safe_member(safe_name: str, member_name: str) -> Dict[str, Any]
 
 
 @mcp.tool()
-async def get_platform_details(platform_id: str) -> Dict[str, Any]:
+async def get_platform_details(platform_id: str) -> Any:
     """Get detailed information about a specific platform in CyberArk Privilege Cloud.
     
     Args:
@@ -927,7 +955,7 @@ async def get_platform_details(platform_id: str) -> Dict[str, Any]:
     return await execute_tool("get_platform_details", platform_id=platform_id)
 
 @mcp.tool()
-async def list_platforms() -> List[Dict[str, Any]]:
+async def list_platforms() -> Any:
     """List all available platforms in CyberArk Privilege Cloud.
     
     Returns:
@@ -944,7 +972,7 @@ async def list_applications(
     only_enabled: Optional[bool] = None,
     business_owner_name: Optional[str] = None,
     business_owner_email: Optional[str] = None
-) -> List[Dict[str, Any]]:
+) -> Any:
     """List applications from CyberArk Privilege Cloud.
     
     Args:
@@ -956,7 +984,7 @@ async def list_applications(
     Returns:
         List of application objects with their exact API fields
     """
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if location is not None:
         kwargs['location'] = location
     if only_enabled is not None:
@@ -970,7 +998,7 @@ async def list_applications(
 
 
 @mcp.tool()
-async def get_application_details(app_id: str) -> Dict[str, Any]:
+async def get_application_details(app_id: str) -> Any:
     """Get detailed information about a specific application.
     
     Args:
@@ -995,7 +1023,7 @@ async def add_application(
     business_owner_last_name: str = "",
     business_owner_email: str = "",
     business_owner_phone: str = ""
-) -> Dict[str, Any]:
+) -> Any:
     """Add a new application to CyberArk Privilege Cloud.
     
     Args:
@@ -1031,7 +1059,7 @@ async def add_application(
 
 
 @mcp.tool()
-async def delete_application(app_id: str) -> Dict[str, Any]:
+async def delete_application(app_id: str) -> Any:
     """Delete an application from CyberArk Privilege Cloud.
     
     Args:
@@ -1047,7 +1075,7 @@ async def delete_application(app_id: str) -> Dict[str, Any]:
 async def list_application_auth_methods(
     app_id: str,
     auth_types: Optional[List[str]] = None
-) -> List[Dict[str, Any]]:
+) -> Any:
     """List authentication methods for a specific application.
     
     Args:
@@ -1057,7 +1085,7 @@ async def list_application_auth_methods(
     Returns:
         List of authentication method objects for the application
     """
-    kwargs = {"app_id": app_id}
+    kwargs: Dict[str, Any] = {"app_id": app_id}
     if auth_types is not None:
         kwargs['auth_types'] = auth_types
     
@@ -1065,7 +1093,7 @@ async def list_application_auth_methods(
 
 
 @mcp.tool()
-async def get_application_auth_method_details(app_id: str, auth_id: str) -> Dict[str, Any]:
+async def get_application_auth_method_details(app_id: str, auth_id: str) -> Any:
     """Get detailed information about a specific application authentication method.
     
     Args:
@@ -1081,7 +1109,7 @@ async def get_application_auth_method_details(app_id: str, auth_id: str) -> Dict
 @mcp.tool()
 async def add_application_auth_method(
     app_id: str,
-    auth_type: str,
+    auth_type: Literal["certificate", "hash", "path", "machineAddress", "osUser"],
     auth_value: str = "",
     is_folder: bool = False,
     allow_internal_scripts: bool = False,
@@ -1090,30 +1118,110 @@ async def add_application_auth_method(
     image: str = "",
     env_var_name: str = "",
     env_var_value: str = "",
-    subject: str = "",
-    issuer: str = "",
-    subject_alternative_name: str = ""
-) -> Dict[str, Any]:
+    subject: Optional[List[Dict[str, str]]] = None,
+    issuer: Optional[List[Dict[str, str]]] = None,
+    subject_alternative_name: Optional[List[Dict[str, str]]] = None
+) -> Any:
     """Add an authentication method to an application.
+    
+    AUTHENTICATION TYPES & USAGE:
+    
+    🔐 CERTIFICATE AUTHENTICATION (auth_type="certificate"):
+        Use for: SSL/TLS certificates, client certificates, certificate thumbprints
+        Required: app_id, auth_type, subject
+        Optional: issuer, subject_alternative_name, auth_value
+        
+        Certificate field keys:
+        - Subject/Issuer: CN (Common Name), O (Organization), OU (Organizational Unit), 
+                         C (Country), ST (State), L (Locality), emailAddress
+        - Subject Alt Names: DNS (domain names), IP (IP addresses), email, URI
+        
+        Example - Web application SSL certificate:
+        subject=[{"key": "CN", "value": "webapp.company.com"}]
+        issuer=[{"key": "CN", "value": "Corporate Root CA"}]
+        subject_alternative_name=[
+            {"key": "DNS", "value": "webapp.company.com"},
+            {"key": "DNS", "value": "www.webapp.company.com"}
+        ]
+    
+    🔑 HASH AUTHENTICATION (auth_type="hash"):
+        Use for: API keys, hash-based tokens, computed hashes
+        Required: app_id, auth_type, auth_value
+        Certificate fields: Not used (leave as None)
+        
+        Example - API service hash:
+        auth_value="sha256:abc123def456..."
+    
+    📁 PATH AUTHENTICATION (auth_type="path"):
+        Use for: File-based authentication, executable paths
+        Required: app_id, auth_type, auth_value
+        Certificate fields: Not used (leave as None)
+        
+        Example - Application executable:
+        auth_value="C:\\Program Files\\MyApp\\app.exe"
+    
+    🌐 MACHINE ADDRESS (auth_type="machineAddress"):
+        Use for: IP-based authentication, hostname restrictions
+        Required: app_id, auth_type, auth_value
+        Certificate fields: Not used (leave as None)
+        
+        Example - Server restriction:
+        auth_value="192.168.1.100" or auth_value="server.company.com"
+    
+    👤 OS USER (auth_type="osUser"):
+        Use for: Operating system user authentication
+        Required: app_id, auth_type, auth_value
+        Certificate fields: Not used (leave as None)
+        
+        Example - Windows service account:
+        auth_value="DOMAIN\\ServiceAccount"
+    
+    COMMON PATTERNS:
+    
+    # Multi-domain certificate with organization details
+    subject=[
+        {"key": "CN", "value": "api.company.com"},
+        {"key": "O", "value": "My Company Inc"},
+        {"key": "C", "value": "US"}
+    ]
+    
+    # Certificate with multiple alternative names
+    subject_alternative_name=[
+        {"key": "DNS", "value": "api.company.com"},
+        {"key": "DNS", "value": "api-backup.company.com"},
+        {"key": "IP", "value": "10.0.1.50"},
+        {"key": "email", "value": "admin@company.com"}
+    ]
     
     Args:
         app_id: The unique identifier of the application
-        auth_type: Type of authentication method
-        auth_value: Value for the authentication method
-        is_folder: Whether this is a folder-based authentication
-        allow_internal_scripts: Whether to allow internal scripts
-        comment: Comment for the authentication method
-        namespace: Namespace for the authentication method
-        image: Image for the authentication method
-        env_var_name: Environment variable name
-        env_var_value: Environment variable value
-        subject: Subject for certificate-based authentication
-        issuer: Issuer for certificate-based authentication
-        subject_alternative_name: Subject alternative name for certificates
+        auth_type: Authentication method type (certificate, hash, path, machineAddress, osUser)
+        auth_value: Authentication value (required for non-certificate types)
+        is_folder: Whether this applies to a folder rather than specific executable
+        allow_internal_scripts: Whether to allow CyberArk internal scripts
+        comment: Description/comment for this authentication method
+        namespace: Kubernetes namespace (for containerized applications)
+        image: Container image name (for containerized applications)
+        env_var_name: Environment variable name (for dynamic configurations)
+        env_var_value: Environment variable value (for dynamic configurations)
+        subject: Certificate subject fields (for certificate auth only)
+        issuer: Certificate issuer fields (for certificate auth only)
+        subject_alternative_name: Certificate SAN fields (for certificate auth only)
     
     Returns:
-        Created authentication method object
+        Dict containing the created authentication method with ID and configuration
+        
+    Raises:
+        ValueError: If certificate auth_type is used without subject parameter
+        ValueError: If non-certificate auth_type is used without auth_value
     """
+    # Validate parameter combinations
+    if auth_type == "certificate" and not subject:
+        raise ValueError("Certificate authentication requires 'subject' parameter with at least CN field")
+    
+    if auth_type in ["hash", "path", "machineAddress", "osUser"] and not auth_value:
+        raise ValueError(f"Authentication type '{auth_type}' requires 'auth_value' parameter")
+    
     return await execute_tool(
         "add_application_auth_method",
         app_id=app_id,
@@ -1133,7 +1241,7 @@ async def add_application_auth_method(
 
 
 @mcp.tool()
-async def delete_application_auth_method(app_id: str, auth_id: str) -> Dict[str, Any]:
+async def delete_application_auth_method(app_id: str, auth_id: str) -> Any:
     """Delete an authentication method from an application.
     
     Args:
@@ -1147,7 +1255,7 @@ async def delete_application_auth_method(app_id: str, auth_id: str) -> Dict[str,
 
 
 @mcp.tool()
-async def get_applications_stats() -> Dict[str, Any]:
+async def get_applications_stats() -> Any:
     """Get comprehensive statistics about applications in CyberArk Privilege Cloud.
     
     Returns:
@@ -1161,7 +1269,7 @@ async def get_applications_stats() -> Dict[str, Any]:
 # Session Monitoring Tools using ArkSMService
 
 @mcp.tool()
-async def list_sessions() -> List[Dict[str, Any]]:
+async def list_sessions() -> Any:
     """List recent privileged sessions from CyberArk Session Monitoring.
     
     Returns all sessions from the last 24 hours with session details including
@@ -1174,7 +1282,7 @@ async def list_sessions() -> List[Dict[str, Any]]:
 
 
 @mcp.tool()
-async def list_sessions_by_filter(search: Optional[str] = None) -> List[Dict[str, Any]]:
+async def list_sessions_by_filter(search: Optional[str] = None) -> Any:
     """List privileged sessions with advanced filtering from CyberArk Session Monitoring.
     
     Supports advanced filtering using CyberArk session query syntax:
@@ -1193,7 +1301,7 @@ async def list_sessions_by_filter(search: Optional[str] = None) -> List[Dict[str
 
 
 @mcp.tool()
-async def get_session_details(session_id: str) -> Dict[str, Any]:
+async def get_session_details(session_id: str) -> Any:
     """Get detailed information about a specific privileged session.
     
     Retrieves comprehensive session information including protocol details,
@@ -1209,7 +1317,7 @@ async def get_session_details(session_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def list_session_activities(session_id: str) -> List[Dict[str, Any]]:
+async def list_session_activities(session_id: str) -> Any:
     """List all activities performed within a specific privileged session.
     
     Retrieves chronological log of commands, actions, and operations
@@ -1225,7 +1333,7 @@ async def list_session_activities(session_id: str) -> List[Dict[str, Any]]:
 
 
 @mcp.tool()
-async def count_sessions(search: Optional[str] = None) -> Dict[str, Any]:
+async def count_sessions(search: Optional[str] = None) -> Any:
     """Count privileged sessions with optional filtering.
     
     Provides session counts for analysis and reporting. Supports the same
@@ -1241,7 +1349,7 @@ async def count_sessions(search: Optional[str] = None) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def get_session_statistics() -> Dict[str, Any]:
+async def get_session_statistics() -> Any:
     """Get general session statistics and analytics.
     
     Provides high-level session metrics including total sessions,
@@ -1254,7 +1362,7 @@ async def get_session_statistics() -> Dict[str, Any]:
     return await execute_tool("get_session_statistics")
 
 
-def main():
+def main() -> None:
     """Main entry point for the MCP server"""
     logger.info("Starting CyberArk Privilege Cloud MCP Server")
     # Environment validation is handled by server initialization above
