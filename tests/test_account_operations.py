@@ -1105,7 +1105,7 @@ class TestSafeMemberManagement:
         member_name = "admin@domain.com"
         expected_member = sample_safe_members[0]
         
-        # Mock the safes service for get safe member
+        # Mock the safes service for get safe member - server method returns Pydantic model
         mock_member = Mock()
         mock_member.model_dump.return_value = expected_member
         
@@ -1115,7 +1115,8 @@ class TestSafeMemberManagement:
         
         result = await server.get_safe_member_details(safe_name, member_name)
         
-        assert result == expected_member
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.safe_member.assert_called_once()
 
     async def test_add_safe_member_with_permission_set(self, server):
@@ -1150,7 +1151,8 @@ class TestSafeMemberManagement:
             permission_set=permission_set
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.add_safe_member.assert_called_once()
 
     async def test_add_safe_member_with_custom_permissions(self, server):
@@ -1190,7 +1192,8 @@ class TestSafeMemberManagement:
             permissions=custom_permissions
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.add_safe_member.assert_called_once()
 
     async def test_update_safe_member_permissions(self, server):
@@ -1237,7 +1240,8 @@ class TestSafeMemberManagement:
             permission_set=new_permission_set
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.update_safe_member.assert_called_once()
 
     async def test_remove_safe_member(self, server):

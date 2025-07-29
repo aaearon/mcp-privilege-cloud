@@ -171,8 +171,8 @@ class TestApplicationsOperations:
         # Test
         result = await mock_server.get_application_details('test-app')
         
-        # Verify
-        assert result['app_id'] == 'test-app'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_app
         mock_get_app_class.assert_called_once_with(app_id='test-app')
         mock_apps_service.application.assert_called_once_with(mock_get_app)
     
@@ -203,8 +203,8 @@ class TestApplicationsOperations:
             location='new-location'
         )
         
-        # Verify
-        assert result['app_id'] == 'new-app'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_app
         mock_add_app_class.assert_called_once()
         mock_apps_service.add_application.assert_called_once_with(mock_add_app)
     
@@ -256,9 +256,9 @@ class TestApplicationAuthMethods:
         # Test
         result = await mock_server.list_application_auth_methods('test-app')
         
-        # Verify
+        # Verify - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 1
-        assert result[0]['auth_id'] == 'auth1'
+        assert result[0] == mock_auth_method
         mock_list_auth_class.assert_called_once_with(app_id='test-app')
         mock_apps_service.list_application_auth_methods.assert_called_once_with(mock_list_auth)
     
@@ -309,8 +309,8 @@ class TestApplicationAuthMethods:
             auth_value='new-cert'
         )
         
-        # Verify
-        assert result['auth_id'] == 'new-auth'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_auth_method
         mock_add_auth_class.assert_called_once()
         mock_apps_service.add_application_auth_method.assert_called_once_with(mock_add_auth)
     
