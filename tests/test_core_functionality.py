@@ -1,8 +1,8 @@
 import pytest
 import os
 from unittest.mock import Mock, patch
-from src.mcp_privilege_cloud.exceptions import AuthenticationError
-from src.mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
+from mcp_privilege_cloud.exceptions import AuthenticationError
+from mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
 
 
 class TestAuthentication:
@@ -17,7 +17,7 @@ class TestAuthentication:
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -48,7 +48,7 @@ class TestAuthentication:
             'CYBERARK_CLIENT_ID': 'test-client',
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 # Mock the entire authentication chain
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
@@ -101,7 +101,7 @@ class TestServerCore:
             'CYBERARK_CLIENT_SECRET': server_mock_config['client_secret']
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -128,7 +128,7 @@ class TestServerCore:
         }
         
         with patch.dict(os.environ, env_vars):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 # Mock the entire authentication chain to avoid service initialization errors
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
@@ -214,7 +214,8 @@ class TestServerCore:
         # Verify the service was called and results returned
         server_instance.accounts_service.list_accounts.assert_called_once()
         assert len(result) == 1
-        assert result[0]["id"] == "test1"
+        # Server method returns list of Pydantic models, not dictionaries
+        assert result[0] == mock_account
 
     @pytest.mark.asyncio
     async def test_server_platforms_service_integration(self, server_instance):
@@ -281,10 +282,8 @@ class TestServerCore:
         assert call_args['duplicate_target_platform'].name == name
         assert call_args['duplicate_target_platform'].description == description
         
-        # Verify return format
-        assert result['target_platform_id'] == 456
-        assert result['name'] == name
-        assert result['description'] == description
+        # Verify return format - server method returns Pydantic model, not dictionary
+        assert result == mock_duplicated
 
     @pytest.mark.asyncio
     async def test_server_activate_target_platform_integration(self, server_instance):
@@ -366,11 +365,8 @@ class TestServerCore:
         # Verify the service was called correctly
         server_instance.platforms_service.platforms_stats.assert_called_once()
         
-        # Verify return format
-        assert result['platforms_count'] == 15
-        assert result['platforms_count_by_type']['regular'] == 12
-        assert result['platforms_count_by_type']['rotational_group'] == 2
-        assert result['platforms_count_by_type']['group'] == 1
+        # Verify return format - server method returns Pydantic model, not dictionary
+        assert result == mock_stats
 
     async def test_server_get_target_platform_statistics_integration(self, server_instance):
         """Test server get_target_platform_statistics method integration with SDK"""
@@ -396,11 +392,8 @@ class TestServerCore:
         # Verify the service was called correctly
         server_instance.platforms_service.target_platforms_stats.assert_called_once()
         
-        # Verify return format
-        assert result['target_platforms_count'] == 8
-        assert result['target_platforms_count_by_system_type']['Windows'] == 3
-        assert result['target_platforms_count_by_system_type']['Unix'] == 2
-        assert result['target_platforms_count_by_system_type']['Oracle'] == 2
+        # Verify return format - server method returns Pydantic model, not dictionary
+        assert result == mock_stats
 
 
 class TestSessionManagement:
@@ -415,7 +408,7 @@ class TestSessionManagement:
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -461,10 +454,9 @@ class TestSessionManagement:
         # Verify the service was called correctly
         server_instance.sm_service.list_sessions_by.assert_called_once()
         
-        # Verify return format
+        # Verify return format - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 1
-        assert result[0]['session_id'] == '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
-        assert result[0]['protocol'] == 'SSH'
+        assert result[0] == mock_session
 
     async def test_list_sessions_with_filter(self, server_with_sm_service):
         """Test list_sessions_by_filter method with advanced filtering"""
@@ -499,10 +491,10 @@ class TestSessionManagement:
         # Verify the service was called with correct filter
         server_instance.sm_service.list_sessions_by.assert_called_once()
         
-        # Verify return format
+        # Verify return format - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 2
-        assert result[0]['protocol'] == 'SSH'
-        assert result[1]['protocol'] == 'RDP'
+        assert result[0] == mock_session1
+        assert result[1] == mock_session2
 
     async def test_get_session_details(self, server_with_sm_service):
         """Test get_session_details method"""
@@ -533,11 +525,8 @@ class TestSessionManagement:
         # Verify the service was called correctly
         server_instance.sm_service.session.assert_called_once()
         
-        # Verify return format
-        assert result['session_id'] == '5e62bdb8-cd81-42b8-ac72-1e06bf9c496d'
-        assert result['protocol'] == 'SSH'
-        assert result['user'] == 'admin@example.com'
-        assert result['target'] == '10.0.0.100'
+        # Verify return format - server method returns Pydantic model, not dictionary
+        assert result == mock_session
 
     async def test_list_session_activities(self, server_with_sm_service):
         """Test list_session_activities method"""
@@ -572,10 +561,10 @@ class TestSessionManagement:
         # Verify the service was called correctly
         server_instance.sm_service.list_session_activities.assert_called_once()
         
-        # Verify return format
+        # Verify return format - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 2
-        assert result[0]['command'] == 'ls -la'
-        assert result[1]['command'] == 'cat /etc/passwd'
+        assert result[0] == mock_activity1
+        assert result[1] == mock_activity2
 
     async def test_count_sessions(self, server_with_sm_service):
         """Test count_sessions method"""
@@ -620,7 +609,5 @@ class TestSessionManagement:
         # Verify the service was called correctly
         server_instance.sm_service.sessions_stats.assert_called_once()
         
-        # Verify return format
-        assert result['total_sessions'] == 150
-        assert result['active_sessions'] == 5
-        assert result['protocols']['SSH'] == 80
+        # Verify return format - server method returns Pydantic model, not dictionary
+        assert result == mock_stats

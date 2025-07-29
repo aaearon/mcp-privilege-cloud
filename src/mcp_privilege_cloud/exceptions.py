@@ -17,16 +17,19 @@ try:
     _SDK_AVAILABLE = True
 except ImportError:
     # Fallback classes if SDK not available
-    class ArkServiceException(Exception):
-        pass
-    
-    class ArkPCloudException(Exception):
-        pass
-    
-    class ArkAuthException(Exception):
-        pass
-    
     _SDK_AVAILABLE = False
+    
+    class ArkServiceException(Exception):  # type: ignore[no-redef]
+        """Fallback class when SDK is not available"""
+        pass
+    
+    class ArkPCloudException(Exception):  # type: ignore[no-redef]
+        """Fallback class when SDK is not available"""
+        pass
+    
+    class ArkAuthException(Exception):  # type: ignore[no-redef]
+        """Fallback class when SDK is not available"""
+        pass
 
 
 class CyberArkAPIError(Exception):
@@ -45,16 +48,15 @@ class AuthenticationError(Exception):
 # SDK exception compatibility functions
 def is_sdk_exception(exception: Exception) -> bool:
     """Check if an exception is from ark-sdk-python"""
-    if not _SDK_AVAILABLE:
-        return False
-    
+    # Always check for our exception types (either real SDK or fallback classes)
     return isinstance(exception, (ArkServiceException, ArkPCloudException, ArkAuthException))
 
 
 def convert_sdk_exception(exception: Exception) -> CyberArkAPIError:
     """Convert SDK exception to legacy CyberArkAPIError for backward compatibility"""
     if isinstance(exception, ArkAuthException):
-        return AuthenticationError(str(exception))
+        # AuthenticationError inherits from Exception but needs to return CyberArkAPIError
+        return CyberArkAPIError(f"Authentication failed: {str(exception)}")
     elif isinstance(exception, (ArkServiceException, ArkPCloudException)):
         # Try to extract status code if available
         status_code = getattr(exception, 'status_code', None) or getattr(exception, 'response_code', None)

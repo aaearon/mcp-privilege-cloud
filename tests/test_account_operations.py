@@ -80,7 +80,9 @@ class TestAccountManagement:
         
         result = await server.list_accounts()
         
-        assert result == sample_accounts
+        # Convert Pydantic models to dicts for comparison
+        result_dicts = [item.model_dump() for item in result]
+        assert result_dicts == sample_accounts
         mock_service.list_accounts.assert_called_once_with(accounts_filter=None)
 
     async def test_list_accounts_with_safe_filter(self, server, sample_accounts):
@@ -90,7 +92,9 @@ class TestAccountManagement:
         
         result = await server.list_accounts(safe_name="IT-Infrastructure")
         
-        assert result == filtered_accounts
+        # Convert Pydantic models to dicts for comparison
+        result_dicts = [item.model_dump() for item in result]
+        assert result_dicts == filtered_accounts
         # Verify that a filter was passed
         mock_service.list_accounts.assert_called_once()
         call_args = mock_service.list_accounts.call_args
@@ -1067,7 +1071,8 @@ class TestSafeMemberManagement:
         
         result = await server.list_safe_members(safe_name)
         
-        assert result == sample_safe_members
+        # Server method returns list of Pydantic models, not dictionaries
+        assert result == mock_items
         mock_safes_service.list_safe_members.assert_called_once()
 
     async def test_list_safe_members_with_filters(self, server, sample_safe_members):
@@ -1092,7 +1097,8 @@ class TestSafeMemberManagement:
         
         result = await server.list_safe_members(safe_name, member_type=member_type)
         
-        assert result == filtered_members
+        # Server method returns list of Pydantic models, not dictionaries
+        assert result == mock_items
         mock_safes_service.list_safe_members_by.assert_called_once()
 
     async def test_get_safe_member_details(self, server, sample_safe_members):
@@ -1101,7 +1107,7 @@ class TestSafeMemberManagement:
         member_name = "admin@domain.com"
         expected_member = sample_safe_members[0]
         
-        # Mock the safes service for get safe member
+        # Mock the safes service for get safe member - server method returns Pydantic model
         mock_member = Mock()
         mock_member.model_dump.return_value = expected_member
         
@@ -1111,7 +1117,8 @@ class TestSafeMemberManagement:
         
         result = await server.get_safe_member_details(safe_name, member_name)
         
-        assert result == expected_member
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.safe_member.assert_called_once()
 
     async def test_add_safe_member_with_permission_set(self, server):
@@ -1146,7 +1153,8 @@ class TestSafeMemberManagement:
             permission_set=permission_set
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.add_safe_member.assert_called_once()
 
     async def test_add_safe_member_with_custom_permissions(self, server):
@@ -1186,7 +1194,8 @@ class TestSafeMemberManagement:
             permissions=custom_permissions
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.add_safe_member.assert_called_once()
 
     async def test_update_safe_member_permissions(self, server):
@@ -1233,7 +1242,8 @@ class TestSafeMemberManagement:
             permission_set=new_permission_set
         )
         
-        assert result == expected_response
+        # Server method returns Pydantic model, not dictionary
+        assert result == mock_member
         mock_safes_service.update_safe_member.assert_called_once()
 
     async def test_remove_safe_member(self, server):

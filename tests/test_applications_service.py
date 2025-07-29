@@ -8,14 +8,14 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch, call
 from typing import Dict, Any, List
 
-from mcp_privilege_cloud.server import CyberArkMCPServer
-from mcp_privilege_cloud.exceptions import CyberArkAPIError
+from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from src.mcp_privilege_cloud.exceptions import CyberArkAPIError
 
 
 @pytest.fixture
 def mock_server():
     """Create a mock server instance"""
-    with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_auth:
+    with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_auth:
         mock_sdk_auth = Mock()
         mock_auth.from_environment.return_value.get_authenticated_client.return_value = mock_sdk_auth
         
@@ -56,7 +56,7 @@ class TestApplicationsServiceIntegration:
         # Verify total count increased 
         assert len(available_tools) >= 40, f"Expected at least 40 tools, got {len(available_tools)}"
     
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     def test_ensure_applications_service_initialized(self, mock_apps_service_class, mock_server):
         """Test applications service initialization"""
         mock_apps_service = Mock()
@@ -69,11 +69,11 @@ class TestApplicationsServiceIntegration:
         assert mock_server.applications_service is not None
         mock_apps_service_class.assert_called_once()
     
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudAccountsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudSafesService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudPlatformsService')
-    @patch('mcp_privilege_cloud.server.ArkSMService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudAccountsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudSafesService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudPlatformsService')
+    @patch('src.mcp_privilege_cloud.server.ArkSMService')
     def test_reinitialize_services_includes_applications(self, mock_sm_service, mock_platforms_service, 
                                                         mock_safes_service, mock_accounts_service, 
                                                         mock_apps_service_class, mock_server):
@@ -95,7 +95,7 @@ class TestApplicationsOperations:
     """Test applications management operations"""
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     async def test_list_applications_success(self, mock_apps_service_class, mock_server):
         """Test successful application listing"""
         # Setup mock
@@ -129,8 +129,8 @@ class TestApplicationsOperations:
         mock_apps_service.list_applications.assert_called_once()
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsFilter')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsFilter')
     async def test_list_applications_with_filter(self, mock_filter_class, mock_apps_service_class, mock_server):
         """Test application listing with filters"""
         # Setup mock
@@ -149,8 +149,8 @@ class TestApplicationsOperations:
         mock_apps_service.list_applications_by.assert_called_once_with(mock_filter)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudGetApplication')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudGetApplication')
     async def test_get_application_details_success(self, mock_get_app_class, mock_apps_service_class, mock_server):
         """Test successful application details retrieval"""
         # Setup mock
@@ -171,14 +171,14 @@ class TestApplicationsOperations:
         # Test
         result = await mock_server.get_application_details('test-app')
         
-        # Verify
-        assert result['app_id'] == 'test-app'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_app
         mock_get_app_class.assert_called_once_with(app_id='test-app')
         mock_apps_service.application.assert_called_once_with(mock_get_app)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudAddApplication')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudAddApplication')
     async def test_add_application_success(self, mock_add_app_class, mock_apps_service_class, mock_server):
         """Test successful application creation"""
         # Setup mock
@@ -203,14 +203,14 @@ class TestApplicationsOperations:
             location='new-location'
         )
         
-        # Verify
-        assert result['app_id'] == 'new-app'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_app
         mock_add_app_class.assert_called_once()
         mock_apps_service.add_application.assert_called_once_with(mock_add_app)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudDeleteApplication')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudDeleteApplication')
     async def test_delete_application_success(self, mock_delete_app_class, mock_apps_service_class, mock_server):
         """Test successful application deletion"""
         # Setup mock
@@ -234,8 +234,8 @@ class TestApplicationAuthMethods:
     """Test application authentication methods operations"""
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudListApplicationAuthMethods')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudListApplicationAuthMethods')
     async def test_list_application_auth_methods(self, mock_list_auth_class, mock_apps_service_class, mock_server):
         """Test listing application authentication methods"""
         # Setup mock
@@ -256,15 +256,15 @@ class TestApplicationAuthMethods:
         # Test
         result = await mock_server.list_application_auth_methods('test-app')
         
-        # Verify
+        # Verify - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 1
-        assert result[0]['auth_id'] == 'auth1'
+        assert result[0] == mock_auth_method
         mock_list_auth_class.assert_called_once_with(app_id='test-app')
         mock_apps_service.list_application_auth_methods.assert_called_once_with(mock_list_auth)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationAuthMethodsFilter')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationAuthMethodsFilter')
     async def test_list_application_auth_methods_with_filter(self, mock_filter_class, mock_apps_service_class, mock_server):
         """Test listing application auth methods with filter"""
         # Setup mock
@@ -283,8 +283,8 @@ class TestApplicationAuthMethods:
         mock_apps_service.list_application_auth_methods_by.assert_called_once_with(mock_filter)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudAddApplicationAuthMethod')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudAddApplicationAuthMethod')
     async def test_add_application_auth_method(self, mock_add_auth_class, mock_apps_service_class, mock_server):
         """Test adding application authentication method"""
         # Setup mock
@@ -309,14 +309,14 @@ class TestApplicationAuthMethods:
             auth_value='new-cert'
         )
         
-        # Verify
-        assert result['auth_id'] == 'new-auth'
+        # Verify - server method returns Pydantic model, not dictionary
+        assert result == mock_auth_method
         mock_add_auth_class.assert_called_once()
         mock_apps_service.add_application_auth_method.assert_called_once_with(mock_add_auth)
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('mcp_privilege_cloud.server.ArkPCloudDeleteApplicationAuthMethod')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudDeleteApplicationAuthMethod')
     async def test_delete_application_auth_method(self, mock_delete_auth_class, mock_apps_service_class, mock_server):
         """Test deleting application authentication method"""
         # Setup mock
@@ -341,7 +341,7 @@ class TestApplicationsStatistics:
     """Test applications statistics operations"""
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     async def test_get_applications_stats(self, mock_apps_service_class, mock_server):
         """Test getting applications statistics"""
         # Setup mock
@@ -364,10 +364,17 @@ class TestApplicationsStatistics:
         # Test
         result = await mock_server.get_applications_stats()
         
-        # Verify
-        assert result['count'] == 25
-        assert result['disabled_apps'] == 3
-        assert 'auth_types_count' in result
+        # Verify - this method specifically returns dictionary due to validation issues
+        expected_dict = {
+            'count': 25,
+            'disabled_apps': 3,
+            'auth_types_count': {
+                'certificate': 15,
+                'hash': 8,
+                'path': 2
+            }
+        }
+        assert result == expected_dict
         mock_apps_service.applications_stats.assert_called_once()
 
 
@@ -375,7 +382,7 @@ class TestApplicationsErrorHandling:
     """Test error handling for applications operations"""
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     async def test_list_applications_error(self, mock_apps_service_class, mock_server):
         """Test error handling in list applications"""
         # Setup mock to raise exception
@@ -389,7 +396,7 @@ class TestApplicationsErrorHandling:
             await mock_server.list_applications()
     
     @pytest.mark.asyncio
-    @patch('mcp_privilege_cloud.server.ArkPCloudApplicationsService')
+    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     async def test_get_application_details_error(self, mock_apps_service_class, mock_server):
         """Test error handling in get application details"""
         # Setup mock to raise exception

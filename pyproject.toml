@@ -162,17 +162,30 @@ check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
+disallow_untyped_calls = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
 strict_optional = true
 show_error_codes = true
+warn_unreachable = true
+disallow_any_unimported = true
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
+disallow_subclassing_any = true
 
 [[tool.mypy.overrides]]
 module = [
     "mcp.*",
     "httpx.*",
     "pytest.*",
+    "ark_sdk_python.*",
 ]
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.0",
+]
