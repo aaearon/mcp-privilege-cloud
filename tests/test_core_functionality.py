@@ -187,8 +187,9 @@ class TestServerCore:
         mock_platform = Mock()
         mock_platform.model_dump.return_value = {"id": "TestPlatform", "name": "Test Platform"}
         
-        # Platforms service returns a direct list of platform objects
-        server_instance.platforms_service.list_platforms.return_value = [mock_platform]
+        # Platforms service returns a page iterator with platform objects
+        mock_page = [mock_platform]
+        server_instance.platforms_service.list_platforms.return_value = [mock_page]
         
         result = await server_instance.health_check()
         
@@ -220,12 +221,13 @@ class TestServerCore:
     @pytest.mark.asyncio
     async def test_server_platforms_service_integration(self, server_instance):
         """Test server platforms service integration with SDK"""
-        # Mock the platforms service to return test data in SDK format (direct list, not pages)
+        # Mock the platforms service to return test data in SDK format (page iterator)
         mock_platform = Mock()
         mock_platform.model_dump.return_value = {"id": "TestPlatform", "name": "Test Platform"}
         
-        # Platforms service returns a direct list of platform objects
-        server_instance.platforms_service.list_platforms.return_value = [mock_platform]
+        # Platforms service returns a page iterator with platform objects
+        mock_page = [mock_platform]
+        server_instance.platforms_service.list_platforms.return_value = [mock_page]
         
         result = await server_instance.list_platforms()
         
