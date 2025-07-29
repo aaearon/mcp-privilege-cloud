@@ -1,8 +1,8 @@
 import pytest
 import os
 from unittest.mock import Mock, patch
-from src.mcp_privilege_cloud.exceptions import AuthenticationError
-from src.mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
+from mcp_privilege_cloud.exceptions import AuthenticationError
+from mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
 
 
 class TestAuthentication:
@@ -17,7 +17,7 @@ class TestAuthentication:
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -48,7 +48,7 @@ class TestAuthentication:
             'CYBERARK_CLIENT_ID': 'test-client',
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 # Mock the entire authentication chain
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
@@ -101,7 +101,7 @@ class TestServerCore:
             'CYBERARK_CLIENT_SECRET': server_mock_config['client_secret']
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -128,7 +128,7 @@ class TestServerCore:
         }
         
         with patch.dict(os.environ, env_vars):
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 # Mock the entire authentication chain to avoid service initialization errors
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.side_effect = TypeError("Mock error")
@@ -408,7 +408,7 @@ class TestSessionManagement:
             'CYBERARK_CLIENT_SECRET': 'test-secret'
         }):
             # Mock the SDK components to prevent actual authentication during tests
-            with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
+            with patch('mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_sdk_auth_class:
                 mock_sdk_auth = Mock()
                 mock_sdk_auth.get_authenticated_client.return_value = Mock()
                 mock_sdk_auth_class.from_environment.return_value = mock_sdk_auth
@@ -493,8 +493,8 @@ class TestSessionManagement:
         
         # Verify return format - server method returns list of Pydantic models, not dictionaries
         assert len(result) == 2
-        assert result[0] == mock_ssh_session
-        assert result[1] == mock_rdp_session
+        assert result[0] == mock_session1
+        assert result[1] == mock_session2
 
     async def test_get_session_details(self, server_with_sm_service):
         """Test get_session_details method"""
