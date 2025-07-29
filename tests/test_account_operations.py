@@ -1071,7 +1071,8 @@ class TestSafeMemberManagement:
         
         result = await server.list_safe_members(safe_name)
         
-        assert result == sample_safe_members
+        # Server method returns list of Pydantic models, not dictionaries
+        assert result == mock_items
         mock_safes_service.list_safe_members.assert_called_once()
 
     async def test_list_safe_members_with_filters(self, server, sample_safe_members):
@@ -1096,7 +1097,8 @@ class TestSafeMemberManagement:
         
         result = await server.list_safe_members(safe_name, member_type=member_type)
         
-        assert result == filtered_members
+        # Server method returns list of Pydantic models, not dictionaries
+        assert result == mock_items
         mock_safes_service.list_safe_members_by.assert_called_once()
 
     async def test_get_safe_member_details(self, server, sample_safe_members):
