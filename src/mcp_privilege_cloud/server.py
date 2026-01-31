@@ -307,7 +307,7 @@ class CyberArkMCPServer:
     
     async def _run_in_executor(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Run synchronous SDK calls in ThreadPoolExecutor to avoid blocking the event loop."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
     def _build_api_url(self, service_name: str, endpoint: str) -> str:
@@ -518,6 +518,8 @@ class CyberArkMCPServer:
         **kwargs
     ) -> BaseModel:
         """Create a new privileged account using ark-sdk-python"""
+        self._ensure_service_initialized('accounts_service')
+
         # Handle required fields for SDK model
         if name is None:
             # If name is not provided, generate a default based on address and user_name
@@ -559,6 +561,8 @@ class CyberArkMCPServer:
     @handle_sdk_errors("changing account password")
     async def change_account_password(self, account_id: str, **kwargs) -> BaseModel:
         """Initiate CPM-managed password change using ark-sdk-python"""
+        self._ensure_service_initialized('accounts_service')
+
         # Create the change credentials model
         change_creds = ArkPCloudChangeAccountCredentials(
             account_id=account_id,
@@ -578,6 +582,8 @@ class CyberArkMCPServer:
         self, account_id: str, new_password: str, change_immediately: bool = True, **kwargs
     ) -> BaseModel:
         """Set the next password for an account using ark-sdk-python"""
+        self._ensure_service_initialized('accounts_service')
+
         # Create the set next credentials model with required accountId field
         set_next_creds = ArkPCloudSetAccountNextCredentials(
             accountId=account_id,
@@ -596,6 +602,8 @@ class CyberArkMCPServer:
     @handle_sdk_errors("verifying account password")
     async def verify_account_password(self, account_id: str, **kwargs) -> BaseModel:
         """Verify the password for an account using ark-sdk-python"""
+        self._ensure_service_initialized('accounts_service')
+
         # Create the verify credentials model with required account_id
         verify_creds = ArkPCloudVerifyAccountCredentials(
             account_id=account_id
@@ -612,6 +620,8 @@ class CyberArkMCPServer:
     @handle_sdk_errors("reconciling account password")
     async def reconcile_account_password(self, account_id: str, **kwargs) -> BaseModel:
         """Reconcile the password for an account using ark-sdk-python"""
+        self._ensure_service_initialized('accounts_service')
+
         # Create the reconcile credentials model
         reconcile_creds = ArkPCloudReconcileAccountCredentials(account_id=account_id)
         
@@ -743,9 +753,11 @@ class CyberArkMCPServer:
     async def filter_accounts_by_management_status(self, auto_managed: bool = True, **kwargs) -> List[BaseModel]:
         """Filter accounts by automatic password management status"""
         self._ensure_service_initialized('accounts_service')
-        
-        # Get all accounts
-        pages = list(self.accounts_service.list_accounts())
+
+        # Get all accounts in executor
+        pages = await self._run_in_executor(
+            lambda: list(self.accounts_service.list_accounts())
+        )
         all_accounts = [acc for page in pages for acc in page.items]
         
         # Filter by management status - handle nested Pydantic model attributes
@@ -996,6 +1008,8 @@ class CyberArkMCPServer:
         **kwargs
     ) -> BaseModel:
         """Get detailed information about a specific safe using ark-sdk-python"""
+        self._ensure_service_initialized('safes_service')
+
         # Create the get safe model (safe_name is used as safe_id in CyberArk)
         get_safe = ArkPCloudGetSafe(safe_id=safe_name)
         
@@ -1068,10 +1082,12 @@ class CyberArkMCPServer:
             update_data['managing_cpm'] = managing_cpm
             
         update_safe = ArkPCloudUpdateSafe(**update_data)
-        
-        # Update the safe using SDK
-        updated_safe = self.safes_service.update_safe(update_safe=update_safe)
-        
+
+        # Update the safe using SDK in executor
+        updated_safe = await self._run_in_executor(
+            lambda: self.safes_service.update_safe(update_safe=update_safe)
+        )
+
         self.logger.info(f"Successfully updated safe: {safe_id}")
         return updated_safe
 
@@ -1086,10 +1102,12 @@ class CyberArkMCPServer:
         
         # Create the delete safe model
         delete_safe = ArkPCloudDeleteSafe(safe_id=safe_id)
-        
-        # Delete the safe using SDK (returns None)
-        self.safes_service.delete_safe(delete_safe=delete_safe)
-        
+
+        # Delete the safe using SDK in executor (returns None)
+        await self._run_in_executor(
+            lambda: self.safes_service.delete_safe(delete_safe=delete_safe)
+        )
+
         self.logger.info(f"Successfully deleted safe: {safe_id}")
         return {"message": f"Safe {safe_id} deleted successfully", "safe_id": safe_id}
 
@@ -1126,11 +1144,15 @@ class CyberArkMCPServer:
                 limit=limit,
                 member_type=member_type_enum
             )
-            pages = list(self.safes_service.list_safe_members_by(filters))
+            pages = await self._run_in_executor(
+                lambda: list(self.safes_service.list_safe_members_by(filters))
+            )
         else:
             # Use basic list
             list_members = ArkPCloudListSafeMembers(safe_id=safe_name)
-            pages = list(self.safes_service.list_safe_members(list_members))
+            pages = await self._run_in_executor(
+                lambda: list(self.safes_service.list_safe_members(list_members))
+            )
         
         # Flatten pagination and return Pydantic models
         members = [member for page in pages for member in page.items]
@@ -1145,10 +1167,12 @@ class CyberArkMCPServer:
         
         # Create the get safe member model
         get_member = ArkPCloudGetSafeMember(safe_id=safe_name, member_name=member_name)
-        
-        # Get safe member details using SDK
-        member = self.safes_service.safe_member(get_member)
-        
+
+        # Get safe member details using SDK in executor
+        member = await self._run_in_executor(
+            lambda: self.safes_service.safe_member(get_member)
+        )
+
         self.logger.info(f"Retrieved safe member details for: {member_name} in safe: {safe_name} using ark-sdk-python")
         return member
 
@@ -1225,10 +1249,12 @@ class CyberArkMCPServer:
             permissions=permissions_model,
             permission_set=permission_set_enum
         )
-        
-        # Add the safe member using SDK
-        created_member = self.safes_service.add_safe_member(add_member)
-        
+
+        # Add the safe member using SDK in executor
+        created_member = await self._run_in_executor(
+            lambda: self.safes_service.add_safe_member(add_member)
+        )
+
         self.logger.info(f"Successfully added member {member_name} to safe: {safe_name}")
         return created_member
 
@@ -1293,10 +1319,12 @@ class CyberArkMCPServer:
             permissions=permissions_model,
             permission_set=permission_set_enum
         )
-        
-        # Update the safe member using SDK
-        updated_member = self.safes_service.update_safe_member(update_member)
-        
+
+        # Update the safe member using SDK in executor
+        updated_member = await self._run_in_executor(
+            lambda: self.safes_service.update_safe_member(update_member)
+        )
+
         self.logger.info(f"Successfully updated member {member_name} in safe: {safe_name}")
         return updated_member
 
@@ -1312,10 +1340,12 @@ class CyberArkMCPServer:
         
         # Create the delete safe member model
         delete_member = ArkPCloudDeleteSafeMember(safe_id=safe_name, member_name=member_name)
-        
-        # Delete the safe member using SDK (returns None)
-        self.safes_service.delete_safe_member(delete_member)
-        
+
+        # Delete the safe member using SDK in executor (returns None)
+        await self._run_in_executor(
+            lambda: self.safes_service.delete_safe_member(delete_member)
+        )
+
         self.logger.info(f"Successfully removed member {member_name} from safe: {safe_name}")
         return {
             "message": f"Member {member_name} removed from safe {safe_name} successfully",
@@ -1356,6 +1386,8 @@ class CyberArkMCPServer:
     @handle_sdk_errors("getting platform details")
     async def get_platform_details(self, platform_id: str) -> Dict[str, Any]:
         """Get detailed platform configuration using ark-sdk-python"""
+        self._ensure_service_initialized('platforms_service')
+
         # Create the get platform model
         get_platform = ArkPCloudGetPlatform(platform_id=platform_id)
         
@@ -1404,9 +1436,11 @@ class CyberArkMCPServer:
             import_file=import_file_b64
         )
         
-        # Import platform using SDK
-        result = self.platforms_service.import_platform(import_platform=import_platform)
-        
+        # Import platform using SDK in executor
+        result = await self._run_in_executor(
+            lambda: self.platforms_service.import_platform(import_platform=import_platform)
+        )
+
         self.logger.info(f"Successfully imported platform package using ark-sdk-python ({len(file_content)} bytes)")
         return result
 
@@ -1513,9 +1547,11 @@ class CyberArkMCPServer:
             output_folder=output_folder
         )
         
-        # Export the platform using SDK
-        self.platforms_service.export_platform(export_platform=export_platform)
-        
+        # Export the platform using SDK in executor
+        await self._run_in_executor(
+            lambda: self.platforms_service.export_platform(export_platform=export_platform)
+        )
+
         self.logger.info(f"Platform exported successfully: {platform_id} to {output_folder}")
         return {
             "platform_id": platform_id,
@@ -1541,11 +1577,13 @@ class CyberArkMCPServer:
             description=description
         )
         
-        # Duplicate the target platform using SDK
-        duplicated_platform = self.platforms_service.duplicate_target_platform(
-            duplicate_target_platform=duplicate_platform
+        # Duplicate the target platform using SDK in executor
+        duplicated_platform = await self._run_in_executor(
+            lambda: self.platforms_service.duplicate_target_platform(
+                duplicate_target_platform=duplicate_platform
+            )
         )
-        
+
         self.logger.info(f"Target platform duplicated successfully: {target_platform_id} -> {name}")
         return duplicated_platform
 
@@ -1559,11 +1597,13 @@ class CyberArkMCPServer:
             target_platform_id=target_platform_id
         )
         
-        # Activate the target platform using SDK
-        self.platforms_service.activate_target_platform(
-            activate_target_platform=activate_platform
+        # Activate the target platform using SDK in executor
+        await self._run_in_executor(
+            lambda: self.platforms_service.activate_target_platform(
+                activate_target_platform=activate_platform
+            )
         )
-        
+
         self.logger.info(f"Target platform activated successfully: {target_platform_id}")
         return {
             "target_platform_id": target_platform_id,
@@ -1580,11 +1620,13 @@ class CyberArkMCPServer:
             target_platform_id=target_platform_id
         )
         
-        # Deactivate the target platform using SDK
-        self.platforms_service.deactivate_target_platform(
-            deactivate_target_platform=deactivate_platform
+        # Deactivate the target platform using SDK in executor
+        await self._run_in_executor(
+            lambda: self.platforms_service.deactivate_target_platform(
+                deactivate_target_platform=deactivate_platform
+            )
         )
-        
+
         self.logger.info(f"Target platform deactivated successfully: {target_platform_id}")
         return {
             "target_platform_id": target_platform_id,
@@ -1601,11 +1643,13 @@ class CyberArkMCPServer:
             target_platform_id=target_platform_id
         )
         
-        # Delete the target platform using SDK
-        self.platforms_service.delete_target_platform(
-            delete_target_platform=delete_platform
+        # Delete the target platform using SDK in executor
+        await self._run_in_executor(
+            lambda: self.platforms_service.delete_target_platform(
+                delete_target_platform=delete_platform
+            )
         )
-        
+
         self.logger.info(f"Target platform deleted successfully: {target_platform_id}")
         return {
             "target_platform_id": target_platform_id,
@@ -1616,10 +1660,12 @@ class CyberArkMCPServer:
     async def get_platform_statistics(self, **kwargs) -> ArkPCloudPlatformStatistics:
         """Calculate comprehensive platform statistics using ark-sdk-python"""
         self._ensure_service_initialized('platforms_service')
-        
-        # Get platform statistics using SDK
-        stats = self.platforms_service.platforms_stats()
-        
+
+        # Get platform statistics using SDK in executor
+        stats = await self._run_in_executor(
+            lambda: self.platforms_service.platforms_stats()
+        )
+
         self.logger.info(f"Platform statistics calculated: {stats.platforms_count} total platforms")
         return stats
 
@@ -1627,10 +1673,12 @@ class CyberArkMCPServer:
     async def get_target_platform_statistics(self, **kwargs) -> ArkPCloudTargetPlatformStatistics:
         """Calculate comprehensive target platform statistics using ark-sdk-python"""
         self._ensure_service_initialized('platforms_service')
-        
-        # Get target platform statistics using SDK
-        stats = self.platforms_service.target_platforms_stats()
-        
+
+        # Get target platform statistics using SDK in executor
+        stats = await self._run_in_executor(
+            lambda: self.platforms_service.target_platforms_stats()
+        )
+
         self.logger.info(f"Target platform statistics calculated: {stats.target_platforms_count} total target platforms")
         return stats
 
@@ -1647,13 +1695,15 @@ class CyberArkMCPServer:
         default_search = f'startTime ge {start_time_from}'
         
         sessions_filter = ArkSMSessionsFilter(search=default_search)
-        
-        # Get sessions using SDK
-        pages = list(self.sm_service.list_sessions_by(sessions_filter))
-        
+
+        # Get sessions using SDK in executor
+        pages = await self._run_in_executor(
+            lambda: list(self.sm_service.list_sessions_by(sessions_filter))
+        )
+
         # Flatten pagination and return Pydantic models
         sessions = [session for page in pages for session in page.items]
-        
+
         self.logger.info(f"Retrieved {len(sessions)} sessions using ArkSMService")
         return sessions
 
@@ -1661,21 +1711,23 @@ class CyberArkMCPServer:
     async def list_sessions_by_filter(self, search: Optional[str] = None, **kwargs) -> List[ArkSMSession]:
         """List sessions with advanced filtering using ArkSMService"""
         self._ensure_service_initialized('sm_service')
-        
+
         # Create filter with search query - use default if none provided
         if search is None:
             from datetime import datetime, timedelta
             start_time_from = (datetime.utcnow() - timedelta(days=1)).isoformat(timespec='seconds') + 'Z'
             search = f'startTime ge {start_time_from}'
-        
+
         sessions_filter = ArkSMSessionsFilter(search=search)
-        
-        # Get sessions using SDK
-        pages = list(self.sm_service.list_sessions_by(sessions_filter))
-        
+
+        # Get sessions using SDK in executor
+        pages = await self._run_in_executor(
+            lambda: list(self.sm_service.list_sessions_by(sessions_filter))
+        )
+
         # Flatten pagination and return Pydantic models
         sessions = [session for page in pages for session in page.items]
-        
+
         self.logger.info(f"Retrieved {len(sessions)} filtered sessions using ArkSMService")
         return sessions
 
@@ -1684,10 +1736,12 @@ class CyberArkMCPServer:
         """Get detailed information about a specific session using ArkSMService"""
         self._ensure_service_initialized('sm_service')
         
-        # Get session details using SDK
+        # Get session details using SDK in executor
         get_session = ArkSMGetSession(session_id=session_id)
-        session = self.sm_service.session(get_session)
-        
+        session = await self._run_in_executor(
+            lambda: self.sm_service.session(get_session)
+        )
+
         self.logger.info(f"Retrieved session details for ID: {session_id} using ArkSMService")
         return session
 
@@ -1696,13 +1750,15 @@ class CyberArkMCPServer:
         """List activities for a specific session using ArkSMService"""
         self._ensure_service_initialized('sm_service')
         
-        # Get session activities using SDK
+        # Get session activities using SDK in executor
         get_session_activities = ArkSMGetSessionActivities(session_id=session_id)
-        pages = list(self.sm_service.list_session_activities(get_session_activities))
-        
+        pages = await self._run_in_executor(
+            lambda: list(self.sm_service.list_session_activities(get_session_activities))
+        )
+
         # Flatten pagination and return Pydantic models
         activities = [activity for page in pages for activity in page.items]
-        
+
         self.logger.info(f"Retrieved {len(activities)} activities for session: {session_id} using ArkSMService")
         return activities
 
@@ -1718,10 +1774,12 @@ class CyberArkMCPServer:
             search = f'startTime ge {start_time_from}'
         
         sessions_filter = ArkSMSessionsFilter(search=search)
-        
-        # Get session count using SDK
-        count = self.sm_service.count_sessions_by(sessions_filter)
-        
+
+        # Get session count using SDK in executor
+        count = await self._run_in_executor(
+            lambda: self.sm_service.count_sessions_by(sessions_filter)
+        )
+
         self.logger.info(f"Counted {count} sessions using ArkSMService")
         return {"count": count, "filter": search}
 
@@ -1729,10 +1787,12 @@ class CyberArkMCPServer:
     async def get_session_statistics(self, **kwargs) -> ArkSMSessionStatistics:
         """Get general session statistics using ArkSMService"""
         self._ensure_service_initialized('sm_service')
-        
-        # Get session statistics using SDK
-        stats = self.sm_service.sessions_stats()
-        
+
+        # Get session statistics using SDK in executor
+        stats = await self._run_in_executor(
+            lambda: self.sm_service.sessions_stats()
+        )
+
         self.logger.info(f"Retrieved session statistics using ArkSMService")
         return stats
 
@@ -1871,8 +1931,10 @@ class CyberArkMCPServer:
         self._ensure_service_initialized('applications_service')
         
         get_app = ArkPCloudGetApplication(app_id=app_id)
-        application = self.applications_service.application(get_app)
-        
+        application = await self._run_in_executor(
+            lambda: self.applications_service.application(get_app)
+        )
+
         self.logger.info(f"Application details retrieved successfully for: {app_id}")
         return application
     
@@ -1914,8 +1976,10 @@ class CyberArkMCPServer:
             add_app_params['expiration_date'] = expiration_date
             
         add_app = ArkPCloudAddApplication(**add_app_params)
-        application = self.applications_service.add_application(add_app)
-        
+        application = await self._run_in_executor(
+            lambda: self.applications_service.add_application(add_app)
+        )
+
         self.logger.info(f"Application added successfully: {app_id}")
         return application
     
@@ -1925,8 +1989,10 @@ class CyberArkMCPServer:
         self._ensure_service_initialized('applications_service')
         
         delete_app = ArkPCloudDeleteApplication(app_id=app_id)
-        self.applications_service.delete_application(delete_app)
-        
+        await self._run_in_executor(
+            lambda: self.applications_service.delete_application(delete_app)
+        )
+
         self.logger.info(f"Application deleted successfully: {app_id}")
         return {"app_id": app_id, "status": "deleted"}
     
@@ -1941,11 +2007,15 @@ class CyberArkMCPServer:
                 app_id=app_id,
                 auth_types=kwargs['auth_types']
             )
-            auth_methods = self.applications_service.list_application_auth_methods_by(auth_filter)
+            auth_methods = await self._run_in_executor(
+                lambda: self.applications_service.list_application_auth_methods_by(auth_filter)
+            )
         else:
             list_auth_methods = ArkPCloudListApplicationAuthMethods(app_id=app_id)
-            auth_methods = self.applications_service.list_application_auth_methods(list_auth_methods)
-        
+            auth_methods = await self._run_in_executor(
+                lambda: self.applications_service.list_application_auth_methods(list_auth_methods)
+            )
+
         self.logger.info(f"Application auth methods listed successfully for {app_id}: {len(auth_methods)} found")
         return auth_methods
     
@@ -1955,8 +2025,10 @@ class CyberArkMCPServer:
         self._ensure_service_initialized('applications_service')
         
         get_auth_method = ArkPCloudGetApplicationAuthMethod(app_id=app_id, auth_id=auth_id)
-        auth_method = self.applications_service.application_auth_method(get_auth_method)
-        
+        auth_method = await self._run_in_executor(
+            lambda: self.applications_service.application_auth_method(get_auth_method)
+        )
+
         self.logger.info(f"Application auth method details retrieved successfully for {app_id}/{auth_id}")
         return auth_method
     
@@ -2029,8 +2101,10 @@ class CyberArkMCPServer:
         self._ensure_service_initialized('applications_service')
         
         delete_auth_method = ArkPCloudDeleteApplicationAuthMethod(app_id=app_id, auth_id=auth_id)
-        self.applications_service.delete_application_auth_method(delete_auth_method)
-        
+        await self._run_in_executor(
+            lambda: self.applications_service.delete_application_auth_method(delete_auth_method)
+        )
+
         self.logger.info(f"Application auth method deleted successfully: {app_id}/{auth_id}")
         return {"app_id": app_id, "auth_id": auth_id, "status": "deleted"}
     
