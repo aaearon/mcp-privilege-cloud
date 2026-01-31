@@ -22,21 +22,21 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: System :: Systems Administration :: Authentication/Directory",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.20.0,<2.0.0",
     "httpx>=0.28.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "ark-sdk-python>=2.0.0,<3.0.0",
+    "ark-sdk-python @ git+https://github.com/cyberark/ark-sdk-python.git@v2.1.0",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +63,9 @@ test = [
 
 [project.scripts]
 mcp-privilege-cloud = "mcp_privilege_cloud:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_privilege_cloud"]
@@ -132,7 +135,7 @@ directory = "htmlcov"
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 select = [
     "E",  # pycodestyle errors
@@ -158,7 +161,7 @@ known-first-party = ["mcp_privilege_cloud"]
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true

@@ -16,7 +16,7 @@ This comprehensive guide provides everything developers need to contribute to th
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11 or higher
 - Git
 - CyberArk Privilege Cloud tenant (for integration testing)
 - CyberArk Identity service account

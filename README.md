@@ -15,7 +15,7 @@ A production-ready Model Context Protocol (MCP) server for comprehensive CyberAr
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - CyberArk Privilege Cloud service account
 
 ## Installation
