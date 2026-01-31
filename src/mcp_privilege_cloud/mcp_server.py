@@ -9,12 +9,16 @@ through the Model Context Protocol (MCP).
 import logging
 import os
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Literal
 
 # Import BaseModel for Pydantic model detection
 from pydantic import BaseModel
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.session import ServerSession
 
 # Add the src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -47,10 +51,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize the MCP server
-mcp = FastMCP("CyberArk Privilege Cloud MCP Server")
 
-# Server instance will be created lazily by tools
+@dataclass
+class AppContext:
+    """Application context with typed dependencies for lifespan management."""
+    server: CyberArkMCPServer
+
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    """Manage application lifecycle with type-safe context.
+
+    Initializes CyberArkMCPServer on startup and cleans up resources on shutdown.
+    The yielded AppContext provides typed access to the server instance.
+    """
+    logger.info("Initializing CyberArk MCP Server via lifespan...")
+    cyberark_server = CyberArkMCPServer.from_environment()
+    logger.info("CyberArk MCP Server initialized successfully")
+
+    try:
+        yield AppContext(server=cyberark_server)
+    finally:
+        # Cleanup resources on shutdown
+        if hasattr(cyberark_server, '_executor'):
+            logger.info("Shutting down executor...")
+            cyberark_server._executor.shutdown(wait=True)
+        logger.info("CyberArk MCP Server shutdown complete")
+
+
+# Initialize the MCP server with lifespan management
+mcp = FastMCP("CyberArk Privilege Cloud MCP Server", lifespan=app_lifespan)
+
+# Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
 server: Optional[CyberArkMCPServer] = None
 
 def get_server() -> CyberArkMCPServer:
@@ -87,20 +119,34 @@ def _convert_to_dict(obj: Any) -> Any:
         return obj
 
 
-async def execute_tool(tool_name: str, *args: Any, **kwargs: Any) -> Any:
+async def execute_tool(
+    tool_name: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None,
+    **kwargs: Any
+) -> Any:
     """Execute a CyberArk tool by calling the corresponding server method.
-    
+
     This function serves as the MCP boundary layer, converting Pydantic models
     returned by server methods to dictionaries for MCP client consumption.
+
+    Args:
+        tool_name: The server method name to call
+        ctx: Optional MCP context with lifespan_context containing the server
+        **kwargs: Parameters to pass to the server method
     """
     try:
-        server_instance = get_server()
+        # Get server from context if available, otherwise use legacy get_server()
+        if ctx is not None and hasattr(ctx, 'request_context'):
+            server_instance = ctx.request_context.lifespan_context.server
+        else:
+            server_instance = get_server()
+
         server_method = getattr(server_instance, tool_name)
-        result = await server_method(*args, **kwargs)
-        
+        result = await server_method(**kwargs)
+
         # Convert Pydantic models to dictionaries at MCP boundary
         converted_result = _convert_to_dict(result)
-        
+
         logger.info(f"Successfully executed tool: {tool_name}")
         return converted_result
     except Exception as e:
@@ -119,11 +165,12 @@ async def create_account(
     secret_type: Optional[str] = None,
     platform_account_properties: Optional[Dict[str, Any]] = None,
     secret_management: Optional[Dict[str, Any]] = None,
-    remote_machines_access: Optional[Dict[str, Any]] = None
+    remote_machines_access: Optional[Dict[str, Any]] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Create a new privileged account in CyberArk Privilege Cloud.
-    
+
     Args:
         platform_id: Platform ID (required) - Examples: "WinServerLocal", "UnixSSH", "Oracle"
         safe_name: Target safe name (required) - Must exist and be accessible
@@ -135,15 +182,15 @@ async def create_account(
         platform_account_properties: Platform properties (optional) - {"LogonDomain": "CORP", "Port": "3389"}
         secret_management: Management config (optional) - {"automaticManagementEnabled": true}
         remote_machines_access: Access config (optional) - {"remoteMachines": "server1;server2"}
-    
+
     Returns:
         Created account object with ID and metadata
-        
+
     Example:
         create_account("WinServerLocal", "Production-Servers", address="web01.corp.com", user_name="admin")
     """
-    return await execute_tool("create_account", platform_id=platform_id, safe_name=safe_name, 
-                             name=name, address=address, user_name=user_name, secret=secret, 
+    return await execute_tool("create_account", ctx=ctx, platform_id=platform_id, safe_name=safe_name,
+                             name=name, address=address, user_name=user_name, secret=secret,
                              secret_type=secret_type, platform_account_properties=platform_account_properties,
                              secret_management=secret_management, remote_machines_access=remote_machines_access)
 
@@ -559,25 +606,30 @@ async def get_target_platform_statistics() -> Any:
 
 # Data access tools - return raw API data
 @mcp.tool()
-async def get_account_details(account_id: str) -> Any:
+async def get_account_details(
+    account_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific account in CyberArk Privilege Cloud.
-    
+
     Args:
         account_id: The unique ID of the account to retrieve details for (required)
-    
+
     Returns:
         Account object with complete details and exact API fields
     """
-    return await execute_tool("get_account_details", account_id=account_id)
+    return await execute_tool("get_account_details", ctx=ctx, account_id=account_id)
 
 @mcp.tool()
-async def list_accounts() -> Any:
+async def list_accounts(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List all accessible accounts in CyberArk Privilege Cloud.
-    
+
     Returns:
         List of account objects with their exact API fields
     """
-    return await execute_tool("list_accounts")
+    return await execute_tool("list_accounts", ctx=ctx)
 
 @mcp.tool()
 async def search_accounts(
@@ -700,16 +752,19 @@ async def count_accounts_by_criteria() -> Any:
     return await execute_tool("count_accounts_by_criteria")
 
 @mcp.tool()
-async def get_safe_details(safe_name: str) -> Any:
+async def get_safe_details(
+    safe_name: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific safe in CyberArk Privilege Cloud.
-    
+
     Args:
         safe_name: The name of the safe to retrieve details for (required)
-    
+
     Returns:
         Safe object with complete details and exact API fields
     """
-    return await execute_tool("get_safe_details", safe_name=safe_name)
+    return await execute_tool("get_safe_details", ctx=ctx, safe_name=safe_name)
 
 @mcp.tool()
 async def list_safes() -> Any:
@@ -955,13 +1010,15 @@ async def get_platform_details(platform_id: str) -> Any:
     return await execute_tool("get_platform_details", platform_id=platform_id)
 
 @mcp.tool()
-async def list_platforms() -> Any:
+async def list_platforms(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List all available platforms in CyberArk Privilege Cloud.
-    
+
     Returns:
         List of platform objects with their exact API fields
     """
-    return await execute_tool("list_platforms")
+    return await execute_tool("list_platforms", ctx=ctx)
 
 
 # Application Management Tools using ArkPCloudApplicationsService

@@ -170,18 +170,22 @@ class TestAccountManagement:
         expected_account = sample_accounts[0]
 
         # Mock the accounts service for get account
+        # SDK uses account(get_account=ArkPCloudGetAccount(...)) method
         mock_account = Mock()
         mock_account.model_dump.return_value = expected_account
 
         mock_accounts_service = Mock()
-        mock_accounts_service.get_account.return_value = mock_account
+        mock_accounts_service.account.return_value = mock_account
         server.accounts_service = mock_accounts_service
 
         result = await server.get_account_details(account_id)
 
         # Result is a Pydantic model, convert to dict for comparison
         assert result.model_dump() == expected_account
-        mock_accounts_service.get_account.assert_called_once_with(account_id=account_id)
+        # Verify account() was called with get_account parameter
+        mock_accounts_service.account.assert_called_once()
+        call_kwargs = mock_accounts_service.account.call_args.kwargs
+        assert call_kwargs['get_account'].account_id == account_id
 
     async def test_create_account_minimal(self, server):
         """Test creating account with minimal required fields"""

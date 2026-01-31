@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 160+ passing tests
+2. **Check current test status** - All changes must maintain 210+ passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -96,9 +96,9 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **COMPREHENSIVE PCLOUD INTEGRATION WITH SESSION MONITORING** - Production ready with complete PCloud service coverage plus session monitoring, official ark-sdk-python integration, 53 MCP tools (278% expansion), and enterprise-grade capabilities  
-**Last Updated**: July 29, 2025  
-**Recent Achievement**: Completed all major PCloud service expansions including Session Monitoring integration. Achieved complete coverage of all 5 PCloud services (accounts, safes, platforms, applications, session monitoring) with advanced analytics, CRUD operations, comprehensive member management, and privileged session monitoring. Expanded from 14 to 53 tools with 160+ passing tests and zero regression.
+**Current Status**: ✅ **MODERNIZED MCP ARCHITECTURE** - Production ready with FastMCP lifespan management, context injection, typed response models, and complete PCloud service coverage
+**Last Updated**: January 31, 2026
+**Recent Achievement**: Modernized MCP server architecture leveraging mcp SDK v1.26.0 features. Implemented lifespan management for proper server lifecycle, context injection for dependency access in tools, and Pydantic response models for typed returns. Added 50+ new tests bringing total to 213 passing tests with zero regression.
 
 ## Architecture
 
@@ -115,7 +115,7 @@ The server provides 53 MCP tools for comprehensive CyberArk operations, built on
 - **Applications Management Tools (8 tools)**: Complete application lifecycle - `list_applications`, `get_application_details`, `add_application`, `delete_application`, `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`, `get_applications_stats`
 - **Session Monitoring Tools (5 tools)**: Privileged session monitoring and analytics - `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `list_session_activities`, `count_sessions`, `get_session_statistics`
 
-> **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 5 PCloud services with enterprise-grade CRUD operations, advanced analytics, member management, and privileged session monitoring. Built on official ark-sdk-python library with 160+ passing tests and zero regression.
+> **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 5 PCloud services with enterprise-grade CRUD operations, advanced analytics, member management, and privileged session monitoring. Built on official ark-sdk-python library with 210+ passing tests and zero regression.
 
 ## Enhanced Platform Data Combination
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 160+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 210+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -294,23 +294,45 @@ async def your_new_method(self, param: str, **kwargs) -> Dict[str, Any]:
     return result.model_dump()  # Always use .model_dump() for SDK responses
 ```
 
-**🤖 MANDATORY PATTERN: Tool Execution**
+**🤖 MANDATORY PATTERN: Tool Execution with Context**
 ```python
-# DO NOT create individual tool wrappers - use this pattern in mcp_server.py
+# Modern pattern with context injection (preferred)
 @mcp.tool()
-async def your_new_tool(param: str) -> Dict[str, Any]:
+async def your_new_tool(
+    param: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Dict[str, Any]:
     """Tool description for MCP clients"""
-    return await execute_tool("method_name", param=param)
+    return await execute_tool("method_name", ctx=ctx, param=param)
+```
+
+**🤖 MANDATORY PATTERN: Lifespan Management**
+```python
+# Server lifecycle is managed via app_lifespan context manager
+# Access server through ctx.request_context.lifespan_context.server
+@dataclass
+class AppContext:
+    server: CyberArkMCPServer
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    cyberark_server = CyberArkMCPServer.from_environment()
+    try:
+        yield AppContext(server=cyberark_server)
+    finally:
+        # Cleanup resources
+        pass
 ```
 
 **🤖 FILE STRUCTURE GUIDE**:
 - `sdk_auth.py` - Authentication only, no business logic
 - `server.py` - Business logic with @handle_sdk_errors decorator
-- `mcp_server.py` - MCP tools using execute_tool() function
+- `mcp_server.py` - MCP tools with lifespan management and context injection
+- `models.py` - Pydantic response models for typed returns
 - `exceptions.py` - Custom exceptions only
 
 ### Testing Validation ✅ **VERIFIED**
-- **160+ tests passing** - Zero functionality regression with comprehensive expansion
+- **210+ tests passing** - Zero functionality regression with comprehensive expansion
 - **Test Coverage Maintained** - All expansion preserved existing test patterns
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
@@ -440,7 +462,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 160+ tests must continue passing
+5. **Preserve test coverage** - All 210+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -451,7 +473,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 160+ tests still pass
+4. Verify all 210+ tests still pass
 ```
 
 ## References
