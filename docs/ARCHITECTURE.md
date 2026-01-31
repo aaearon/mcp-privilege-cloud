@@ -43,7 +43,7 @@ src/mcp_privilege_cloud/
 **Purpose**: Core business logic using official ark-sdk-python services
 
 **Key Features**:
-- **Complete SDK Service Integration**: Uses ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService (all 4 PCloud services)
+- **Complete SDK Service Integration**: Uses ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService, ArkSMService (all 5 PCloud services)
 - **Simplified Architecture**: Eliminates custom HTTP client in favor of SDK services
 - **Enhanced Reliability**: SDK handles authentication, rate limiting, and error handling
 - **Response Processing**: Direct SDK response handling with data integrity preservation
@@ -61,7 +61,7 @@ src/mcp_privilege_cloud/
 
 **Key Features**:
 - **FastMCP Server**: MCP protocol implementation
-- **Comprehensive Tool Suite**: 45 enterprise-grade action tools for complete CyberArk PCloud operations across all 4 services (17+11+10+9)
+- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+12+8+5)
 - **SDK-Powered Reliability**: All tools leverage official ark-sdk-python services
 - **Parameter Validation**: Enhanced input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
@@ -141,7 +141,7 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 ## Tool Architecture
 
-The server exposes 45 enterprise-grade MCP tools organized by functionality across all 4 PCloud services, all powered by ark-sdk-python:
+The server exposes 45 enterprise-grade MCP tools organized by functionality across all 5 PCloud services, all powered by ark-sdk-python:
 
 **Account Management Tools (17 tools)**:
 - Core Operations: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`

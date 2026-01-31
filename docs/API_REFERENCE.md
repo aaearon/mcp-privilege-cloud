@@ -19,7 +19,7 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server provides **55 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
+The CyberArk Privilege Cloud MCP Server provides **53 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
 
 ### Core Capabilities
 - **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (17 tools)
@@ -35,7 +35,7 @@ The CyberArk Privilege Cloud MCP Server provides **55 enterprise-grade tools** f
 - **API Version**: Gen2 endpoints (preferred over Gen1 legacy endpoints)
 - **Response Format**: JSON with standardized error handling
 
-**🤖 LLM REFERENCE NOTE**: This document provides complete API specifications for all 55 tools. All tools follow consistent patterns with SDK-powered authentication, error handling, and response formatting. For implementation details and exact parameter definitions, refer to `src/mcp_privilege_cloud/mcp_server.py`.
+**🤖 LLM REFERENCE NOTE**: This document provides complete API specifications for all 53 tools. All tools follow consistent patterns with SDK-powered authentication, error handling, and response formatting. For implementation details and exact parameter definitions, refer to `src/mcp_privilege_cloud/mcp_server.py`.
 
 ## Authentication
 
@@ -59,7 +59,7 @@ CYBERARK_LOG_LEVEL=INFO        # Logging level
 
 ## Tool Categories
 
-The server provides 45 enterprise-grade tools organized across all 4 CyberArk PCloud services:
+The server provides 53 enterprise-grade tools organized across all 5 CyberArk PCloud services:
 
 ### Account Management Tools (17 tools)
 **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`

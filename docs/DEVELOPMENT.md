@@ -485,7 +485,7 @@ npx @modelcontextprotocol/inspector
 - **Environment Variables**: Add these two required variables:
   - `CYBERARK_CLIENT_ID`: your-client-id  
   - `CYBERARK_CLIENT_SECRET`: your-secret
-- **Expected Result**: Connection shows "45 tools available"
+- **Expected Result**: Connection shows "53 tools available"
 
 #### 2. Command Line Testing (Recommended for Automation)
 
@@ -511,7 +511,7 @@ npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -
 ### Expected Behavior Patterns
 
 #### Successful Connection Indicators
-- ✅ **Tool Count**: `tools/list` returns exactly 45 tools
+- ✅ **Tool Count**: `tools/list` returns exactly 53 tools
 - ✅ **Resource Count**: `resources/list` returns empty array (correct - server uses tools, not resources)
 - ✅ **Authentication**: All tool calls require valid CyberArk credentials
 - ✅ **Response Format**: All tools return JSON with exact CyberArk API field names

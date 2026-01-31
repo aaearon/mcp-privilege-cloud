@@ -5,8 +5,8 @@ Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Fo
 ## Current Test Status ✅ **VERIFIED**
 
 **Test Suite Results**: **144/144 tests passing** (100% success rate)  
-**Code Coverage**: Comprehensive coverage across all 55 tools  
-**Integration Testing**: All 55 MCP tools verified across all services with proper parameter passing  
+**Code Coverage**: Comprehensive coverage across all 53 tools  
+**Integration Testing**: All 53 MCP tools verified across all services with proper parameter passing  
 
 The test suite validates the complete implementation ensuring comprehensive coverage of all tool categories with zero regression.
 
@@ -27,7 +27,7 @@ pytest -m integration   # Integration tests only
 # MCP Inspector CLI Testing (for LLMs)
 # Requires: npm install -g @modelcontextprotocol/inspector
 python test_mcp_cli.py health_check     # Server health check
-python test_mcp_cli.py list_tools       # List all 55 tools
+python test_mcp_cli.py list_tools       # List all 53 tools
 python test_mcp_cli.py call_tool list_accounts  # Test specific tool
 python test_mcp_cli.py capabilities     # Discover tool capabilities
 python test_mcp_cli.py validation_suite # Run comprehensive validation
@@ -53,7 +53,7 @@ The test suite is organized into specialized test files with comprehensive cover
 - Core server initialization and configuration
 - Network error handling
 - Response parsing validation
-- API endpoint testing across all 4 PCloud services
+- API endpoint testing across all 5 PCloud services
 
 **TestPlatformManagement** - Platform operations and comprehensive API integration (enhanced coverage)
 - Platform package import functionality
@@ -115,7 +115,7 @@ The testing architecture has been simplified by converting to a tool-based archi
 - **Total Tests**: 144+ tests across 6 test files
 - **Target Coverage**: Minimum 80% code coverage maintained across 45-tool expansion
 - **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
-- **Test Types**: Unit, integration, MCP tools tests across all 4 PCloud services
+- **Test Types**: Unit, integration, MCP tools tests across all 5 PCloud services
 - **Service Coverage**: Complete testing for ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService
 
 ## Testing Strategy
@@ -140,7 +140,7 @@ The testing architecture has been simplified by converting to a tool-based archi
 ### Key Test Files for LLM Development
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (88+ tests)
 - `tests/test_account_operations.py` - Complete account lifecycle management (85+ tests)  
-- `tests/test_mcp_integration.py` - MCP tool wrappers and integration across all 4 services (18+ tests)
+- `tests/test_mcp_integration.py` - MCP tool wrappers and integration across all 5 services (18+ tests)
 - `tests/test_integration.py` - End-to-end integration tests with enhanced platform operations (25+ tests)
 - `tests/test_performance.py` - Performance and optimization tests (11+ tests)
 - `tests/test_resources.py` - MCP resource implementation tests (42+ tests)
@@ -191,7 +191,7 @@ cp .env.example .env
 python test_mcp_cli.py health_check
 
 # Tool discovery and validation
-python test_mcp_cli.py list_tools        # List all 45 available tools
+python test_mcp_cli.py list_tools        # List all 53 available tools
 python test_mcp_cli.py capabilities      # Detailed tool capabilities analysis
 
 # Tool execution testing

@@ -31,12 +31,12 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.0.0",
-    "httpx>=0.27.0",
+    "mcp[cli]>=1.20.0,<2.0.0",
+    "httpx>=0.28.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "ark-sdk-python>=1.0.0",
+    "ark-sdk-python>=2.0.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -78,6 +78,7 @@ include = [
 # Pytest configuration
 [tool.pytest.ini_options]
 minversion = "8.0"
+asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
     "--strict-config",
