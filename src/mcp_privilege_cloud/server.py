@@ -20,7 +20,8 @@ from ark_sdk_python.models.services.pcloud.accounts import (
     ArkPCloudVerifyAccountCredentials,
     ArkPCloudReconcileAccountCredentials,
     ArkPCloudUpdateAccount,
-    ArkPCloudDeleteAccount
+    ArkPCloudDeleteAccount,
+    ArkPCloudGetAccount
 )
 
 # Try to import response model types - these may be generic Pydantic models
@@ -454,8 +455,9 @@ class CyberArkMCPServer:
     async def get_account_details(self, account_id: str) -> ArkPCloudAccount:
         """Get detailed information about a specific account using ark-sdk-python"""
         self._ensure_service_initialized('accounts_service')
+        get_account_request = ArkPCloudGetAccount(account_id=account_id)
         account = await self._run_in_executor(
-            self.accounts_service.get_account, account_id=account_id
+            self.accounts_service.account, get_account=get_account_request
         )
         self.logger.info(f"Retrieved account details for ID: {account_id} using ark-sdk-python")
         return account
