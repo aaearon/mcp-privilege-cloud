@@ -1,65 +1,89 @@
 # CyberArk Privilege Cloud MCP Server
 
-A production-ready Model Context Protocol (MCP) server for comprehensive CyberArk Privilege Cloud integration using the official ark-sdk-python library. Provides complete privileged access management through 53 enterprise-grade MCP tools covering all CyberArk PCloud services with session monitoring capabilities.
+An MCP server for CyberArk Privilege Cloud, built on the official [ark-sdk-python](https://github.com/cyberark/ark-sdk-python) library. Provides 53 tools for privileged access management.
 
-## Features
+## Quick Start
 
-- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (18 tools)
-- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (11 tools)  
-- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (12 tools)
-- **Applications Management**: Full application lifecycle with authentication method management and statistics (9 tools)
-- **Session Monitoring**: Real-time session tracking, activity monitoring, and analytics (6 tools)
-- **Advanced Analytics**: Account filtering, grouping, distribution analysis, and environment categorization
-- **Enterprise Security**: Built on official ark-sdk-python with OAuth, audit logging, and comprehensive error handling
-- **Production Ready**: 160+ passing tests, zero regression, complete API coverage with exact data fidelity
+**1. Install uv** (if not already installed):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**2. Configure Claude Desktop** - Add to your configuration file:
+
+| OS | Configuration File Location |
+|----|----------------------------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+```json
+{
+  "mcpServers": {
+    "cyberark-privilege-cloud": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/aaearon/mcp-privilege-cloud.git",
+        "mcp-privilege-cloud"
+      ],
+      "env": {
+        "CYBERARK_CLIENT_ID": "your-service-user-username",
+        "CYBERARK_CLIENT_SECRET": "your-service-user-password"
+      }
+    }
+  }
+}
+```
+
+**3. Restart Claude Desktop** - The MCP server will appear in the tools menu (hammer icon) when connected.
+
+## Example Prompts
+
+Once configured, you can ask Claude things like:
+
+**Account Management:**
+- "List all accounts in the Production safe"
+- "Show me Windows accounts that are failing management"
+- "Create a new local admin account for server PROD-WEB-01"
+- "Which accounts haven't had their passwords changed in 90 days?"
+
+**Safe Management:**
+- "Create a new safe called 'DevOps-Credentials' with 30-day retention"
+- "Add the DevOps team as safe members with retrieve permissions"
+- "Show me all safes and their member counts"
+
+**Platform & Session Monitoring:**
+- "List all active platforms and their account counts"
+- "Show me active privileged sessions"
+- "Get session activity for the last hour"
 
 ## Prerequisites
 
-- Python 3.11+
-- CyberArk Privilege Cloud service account
+- [CyberArk Identity Service User](https://docs.cyberark.com/identity-administration/latest/en/content/ispss/ispss-add-service-user.htm) with:
+  - Appropriate Identity roles for the desired operations (e.g., Privilege Cloud Administrator for platform management)
+  - Safe permissions granting access to the safes and accounts you want to manage
 
-## Installation
+## Client Integration
 
-```bash
-# Recommended: Install from GitHub repository
-uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
+### Claude Desktop
 
-# Development: Clone repository
-git clone https://github.com/aaearon/mcp-privilege-cloud.git
-cd mcp-privilege-cloud
-uv sync
-```
+See [Quick Start](#quick-start) above for configuration.
 
-## Configuration
+If the configuration file doesn't exist, create it. If it already exists with other MCP servers, add the `cyberark-privilege-cloud` entry to the existing `mcpServers` object.
 
-Create `.env` file with required credentials:
+### Claude Code
+
+Add the MCP server using the Claude Code CLI:
 
 ```bash
-CYBERARK_CLIENT_ID=your-service-account-username
-CYBERARK_CLIENT_SECRET=your-service-account-password
+claude mcp add cyberark-privilege-cloud \
+  -e CYBERARK_CLIENT_ID=your-service-user-username \
+  -e CYBERARK_CLIENT_SECRET=your-service-user-password \
+  -- uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
 
-Test configuration:
-```bash
-python -c "from mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Health:', asyncio.run(server.health_check())['status'])"
-```
-
-## Usage
-
-### Running the Server
-
-```bash
-# Production
-uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
-
-# Development  
-uv run mcp-privilege-cloud
-
-# Module execution
-python -m mcp_privilege_cloud
-```
-
-### Available Tools (53 Total)
+## Available Tools (53 Total)
 
 **Account Management (18 tools):**
 - **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
@@ -84,117 +108,99 @@ python -m mcp_privilege_cloud
 - **Session Management**: `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `count_sessions`
 - **Activity Tracking**: `list_session_activities`, `get_session_statistics`
 
-## Client Integration
+## Features
 
-### Claude Code
+- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management
+- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions
+- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations
+- **Applications Management**: Full application lifecycle with authentication method management
+- **Session Monitoring**: Real-time session tracking, activity monitoring, and analytics
+- **Enterprise Security**: Built on official ark-sdk-python with OAuth and comprehensive error handling
 
-Add the MCP server using the Claude Code CLI:
+## Configuration
 
-```bash
-# Add MCP server from GitHub repository with environment variables
-CYBERARK_CLIENT_ID=your-service-account-username CYBERARK_CLIENT_SECRET=your-service-account-password claude mcp add cyberark-privilege-cloud -- uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
-```
+The MCP server requires two environment variables for authentication:
 
-### Claude Desktop
+| Variable | Description |
+|----------|-------------|
+| `CYBERARK_CLIENT_ID` | Your Service User username |
+| `CYBERARK_CLIENT_SECRET` | Your Service User password |
 
-Add to your Claude Desktop MCP settings file:
+**For Claude Desktop/Claude Code**: Pass these directly in the configuration (see [Client Integration](#client-integration)). No `.env` file is needed.
 
-```json
-{
-  "mcpServers": {
-    "cyberark-privilege-cloud": {
-      "command": "uvx",
-      "args": [
-        "--from", 
-        "git+https://github.com/aaearon/mcp-privilege-cloud.git",
-        "mcp-privilege-cloud"
-      ],
-      "env": {
-        "CYBERARK_CLIENT_ID": "your-service-account-username",
-        "CYBERARK_CLIENT_SECRET": "your-service-account-password"
-      }
-    }
-  }
-}
-```
-
-## Testing with MCP Inspector
-
-**Quick Start:**
-```bash
-npx @modelcontextprotocol/inspector
-```
-Configure with server command `uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud` and your service account credentials. Should show 53 tools available across all CyberArk PCloud services including session monitoring.
-
-For comprehensive testing procedures, see [DEVELOPMENT.md](DEVELOPMENT.md).
-
-## Testing
-
-### Unit/Integration Tests
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage  
-uv run pytest --cov=mcp_privilege_cloud
-
-# Integration tests
-uv run pytest -m integration
-```
-
-### MCP Inspector CLI Testing
-For programmatic testing and LLM-driven validation:
+**For local development/testing**: Create a `.env` file in the project root directory:
 
 ```bash
-# Install inspector (one-time setup)
-npm install @modelcontextprotocol/inspector
-
-# Test with the single-file testing script
-python test_mcp_cli.py health_check      # Server health check
-python test_mcp_cli.py list_tools        # List all 53 tools
-python test_mcp_cli.py call_tool list_accounts  # Test specific tool
-python test_mcp_cli.py generate_report   # Full test report
-
-# Python API for LLMs
-from test_mcp_cli import MCPTester
-tester = MCPTester()
-tools = tester.list_tools()              # Get all tools
-health = tester.test_server_health()     # Health check
+CYBERARK_CLIENT_ID=your-service-user-username
+CYBERARK_CLIENT_SECRET=your-service-user-password
 ```
-
-The `test_mcp_cli.py` script provides a single-file solution for programmatic MCP server testing, designed for LLM integration and ad-hoc validation.
 
 ## Troubleshooting
 
-**Common Issues:**
+| Issue | Solution |
+|-------|----------|
+| MCP not appearing in Claude | Restart Claude Desktop after saving configuration |
+| Authentication failed | Verify Service User credentials in CyberArk Identity |
+| Permission errors | Ensure the Service User has appropriate Identity roles and safe permissions |
+| Connection issues | Verify you're using the `.cloud` domain (not `.com`) |
+| `uvx` not found | Install uv: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
-- **Missing environment variables**: Create `.env` file with credentials
-- **Authentication failed**: Verify service account in CyberArk Identity
-- **Permission errors**: Ensure safe permissions for service account
-- **Connection issues**: Verify `.cloud` domain (not `.com`)
-
-**Quick Health Check:**
+**Verify MCP server manually:**
 ```bash
-python -c "from mcp_privilege_cloud.server import CyberArkMCPServer; import asyncio; server = CyberArkMCPServer.from_environment(); print('Status:', asyncio.run(server.health_check())['status'])"
+uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
+
+## Development
+
+### Installation
+
+```bash
+git clone https://github.com/aaearon/mcp-privilege-cloud.git
+cd mcp-privilege-cloud
+uv sync
+```
+
+### Running Tests
+
+```bash
+uv run pytest                              # Run all tests
+uv run pytest --cov=mcp_privilege_cloud    # Run with coverage
+uv run pytest -m integration               # Integration tests only
+```
+
+### Running the Server Locally
+
+```bash
+uv run mcp-privilege-cloud      # With uv
+python -m mcp_privilege_cloud   # Direct module execution
+```
+
+### Testing with MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+Configure with command `uv run mcp-privilege-cloud` and your credentials.
 
 ## Documentation
 
-- **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications
-- **[Development Guide](DEVELOPMENT.md)** - Architecture and contributing
+- **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications and parameters
+- **[Architecture](ARCHITECTURE.md)** - System design and components
+- **[Development Guide](DEVELOPMENT.md)** - Contributing and development workflows
 - **[Testing Guide](docs/TESTING.md)** - Detailed testing instructions
 
 ## Security
 
 - Never commit credentials to version control
 - Use secure environment variable management
-- Grant minimal required permissions to service accounts
+- Grant minimal required permissions to Service Users
 - Official SDK provides automatic token management and secure protocols
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues and feature requests, please use the [GitHub Issues](https://github.com/aaearon/mcp-privilege-cloud/issues) page.
+For issues and feature requests, please use [GitHub Issues](https://github.com/aaearon/mcp-privilege-cloud/issues).
