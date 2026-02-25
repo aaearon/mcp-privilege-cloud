@@ -15,9 +15,10 @@ from mcp.server.auth.provider import AccessToken, TokenVerifier
 
 logger = logging.getLogger(__name__)
 
-# Well-known OIDC application ID used by all CyberArk Identity tenants.
-# This is the same default used by ark-sdk-python (see ArkAuthMethod).
-CYBERARK_OIDC_APP_ID = "__idaptive_cybr_user_oidc"
+# OIDC application ID for CyberArk Identity.
+# Configurable via CYBERARK_OIDC_APP_ID env var; defaults to custom app.
+import os
+CYBERARK_OIDC_APP_ID = os.getenv("CYBERARK_OIDC_APP_ID", "mcpprivilegecloud")
 
 
 class CyberArkTokenVerifier(TokenVerifier):

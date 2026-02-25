@@ -32,7 +32,7 @@ def _default_claims(**overrides: object) -> dict:
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
         "iss": "https://abc1234.id.cyberark.cloud/",
-        "aud": "__idaptive_cybr_user_oidc",
+        "aud": "mcpprivilegecloud",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),
         "unique_name": "testuser@abc1234.cyberark.cloud",

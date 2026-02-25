@@ -29,7 +29,7 @@ def _default_claims(**overrides: object) -> dict:
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
         "iss": "https://abc1234.id.cyberark.cloud/",
-        "aud": "__idaptive_cybr_user_oidc",
+        "aud": "mcpprivilegecloud",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),
         "unique_name": "testuser@abc1234.cyberark.cloud",
@@ -45,10 +45,10 @@ class TestCyberArkTokenVerifierInit:
     """Test CyberArkTokenVerifier initialization."""
 
     def test_oidc_app_id_constant(self):
-        """CYBERARK_OIDC_APP_ID should match the well-known CyberArk Identity value."""
+        """CYBERARK_OIDC_APP_ID should default to the custom app."""
         from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
 
-        assert CYBERARK_OIDC_APP_ID == "__idaptive_cybr_user_oidc"
+        assert CYBERARK_OIDC_APP_ID == "mcpprivilegecloud"
 
     def test_init_with_tenant_url(self):
         """Verifier should initialize with a CyberArk Identity tenant URL."""

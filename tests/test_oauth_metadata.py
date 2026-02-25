@@ -210,7 +210,7 @@ class TestDynamicClientRegistration:
 
         response = _build_dcr_response(body)
 
-        assert response["client_id"] == "__idaptive_cybr_user_oidc"
+        assert response["client_id"] == "mcpprivilegecloud"
         assert response["token_endpoint_auth_method"] == "none"
         assert response["grant_types"] == ["authorization_code", "refresh_token"]
         assert response["response_types"] == ["code"]
@@ -236,7 +236,7 @@ class TestDynamicClientRegistration:
 
         response = _build_dcr_response({})
 
-        assert response["client_id"] == "__idaptive_cybr_user_oidc"
+        assert response["client_id"] == "mcpprivilegecloud"
         assert response["client_name"] == "MCP Client"
         assert response["redirect_uris"] == []
 
