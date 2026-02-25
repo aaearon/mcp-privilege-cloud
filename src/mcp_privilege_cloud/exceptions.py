@@ -45,6 +45,27 @@ class AuthenticationError(Exception):
     pass
 
 
+class OAuthError(Exception):
+    """Raised when OAuth token verification or exchange fails.
+
+    Covers JWT validation failures, JWKS fetch errors, invalid claims,
+    and other OAuth-related authentication issues.
+    """
+
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class SessionExpiredError(Exception):
+    """Raised when a user session has expired and needs re-authentication.
+
+    Used by UserSessionManager when a cached session exceeds its TTL
+    or the underlying token has expired.
+    """
+    pass
+
+
 # SDK exception compatibility functions
 def is_sdk_exception(exception: Exception) -> bool:
     """Check if an exception is from ark-sdk-python"""
@@ -69,7 +90,9 @@ def convert_sdk_exception(exception: Exception) -> CyberArkAPIError:
 # Re-export SDK exceptions for direct use
 __all__ = [
     "CyberArkAPIError",
-    "AuthenticationError", 
+    "AuthenticationError",
+    "OAuthError",
+    "SessionExpiredError",
     "ArkServiceException",
     "ArkPCloudException",
     "ArkAuthException",
