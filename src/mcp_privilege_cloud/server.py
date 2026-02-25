@@ -305,7 +305,51 @@ class CyberArkMCPServer:
     def from_environment(cls) -> "CyberArkMCPServer":
         """Create server from environment variables"""
         return cls()
-    
+
+    @classmethod
+    def from_token(
+        cls,
+        jwt_token: str,
+        username: str,
+        refresh_token: Optional[str] = None,
+    ) -> "CyberArkMCPServer":
+        """Create server instance authenticated with a pre-existing JWT token.
+
+        Used for per-user OAuth sessions where each user's Bearer token
+        creates an isolated server with their own SDK session.
+
+        Args:
+            jwt_token: Raw JWT access token from CyberArk Identity OAuth flow.
+            username: Username associated with the token.
+            refresh_token: Optional OAuth refresh token for renewal.
+
+        Returns:
+            CyberArkMCPServer with services initialized using the token.
+
+        Raises:
+            ValueError: If the JWT is invalid or expired.
+        """
+        from mcp_privilege_cloud.token_auth import ArkISPAuthFromToken
+
+        instance = cls.__new__(cls)
+        instance.logger = logging.getLogger(__name__)
+        instance._executor = ThreadPoolExecutor(
+            max_workers=5, thread_name_prefix="cyberark-sdk"
+        )
+
+        # Create token-based auth bridge
+        token_auth = ArkISPAuthFromToken(jwt_token, username, refresh_token)
+
+        # Initialize services with token-based auth
+        instance.accounts_service = ArkPCloudAccountsService(token_auth)
+        instance.safes_service = ArkPCloudSafesService(token_auth)
+        instance.platforms_service = ArkPCloudPlatformsService(token_auth)
+        instance.applications_service = ArkPCloudApplicationsService(token_auth)
+        instance.sm_service = ArkSMService(token_auth)
+
+        instance.logger.info("Server initialized from token for user: %s", username)
+        return instance
+
     async def _run_in_executor(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Run synchronous SDK calls in ThreadPoolExecutor to avoid blocking the event loop."""
         loop = asyncio.get_running_loop()

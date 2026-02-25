@@ -761,10 +761,12 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ark-sdk-python" },
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pyjwt" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]
@@ -793,11 +795,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ark-sdk-python", git = "https://github.com/cyberark/ark-sdk-python.git?rev=v2.1.0" },
+    { name = "cryptography", specifier = ">=41.0.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.20.0,<2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "pydantic-settings", specifier = ">=2.1.0" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },

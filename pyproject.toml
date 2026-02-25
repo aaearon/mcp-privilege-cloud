@@ -38,6 +38,8 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "ark-sdk-python @ git+https://github.com/cyberark/ark-sdk-python.git@v2.1.0",
     "uvicorn>=0.30.0",
+    "PyJWT>=2.8.0",
+    "cryptography>=41.0.0",
 ]
 
 [project.optional-dependencies]
