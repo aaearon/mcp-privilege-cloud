@@ -96,6 +96,28 @@ def mock_context_with_server(mock_server):
 
 
 @pytest.fixture
+def mock_oauth_context(mock_server):
+    """Provide a mock MCP context with session_manager for OAuth-mode testing.
+
+    Usage in tests:
+        async def test_tool(mock_oauth_context):
+            ctx, server, manager = mock_oauth_context
+            server.list_accounts.return_value = [...]
+            result = await some_tool(param, ctx=ctx)
+    """
+    from mcp_privilege_cloud.mcp_server import AppContext
+
+    mock_manager = AsyncMock()
+    mock_manager.get_or_create = AsyncMock(return_value=mock_server)
+
+    ctx = Mock()
+    ctx.request_context.lifespan_context = AppContext(
+        server=None, session_manager=mock_manager
+    )
+    return ctx, mock_server, mock_manager
+
+
+@pytest.fixture
 def isolated_server():
     """
     Provide a completely isolated server instance for testing.

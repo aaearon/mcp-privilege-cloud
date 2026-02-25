@@ -11,11 +11,11 @@ import os
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Literal
 
 # Import BaseModel for Pydantic model detection
-from pydantic import BaseModel
+from pydantic import AnyHttpUrl, BaseModel
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
@@ -51,45 +51,126 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# OAuth imports
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.settings import AuthSettings
+
+try:
+    from .token_verifier import CyberArkTokenVerifier
+except ImportError:
+    from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+try:
+    from .session_manager import UserSessionManager
+except ImportError:
+    from mcp_privilege_cloud.session_manager import UserSessionManager
+
 # Streamable HTTP transport configuration
 MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
 MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
 
 
+def is_oauth_mode() -> bool:
+    """Check if OAuth per-user mode is configured via environment variables."""
+    return bool(
+        os.getenv("CYBERARK_IDENTITY_TENANT_URL")
+        and os.getenv("CYBERARK_OAUTH_APP_ID")
+    )
+
+
+def get_access_token() -> Optional[AccessToken]:
+    """Get the access token from the current MCP auth context.
+
+    Returns None if no auth context is available (legacy mode).
+    """
+    try:
+        from mcp.server.auth.middleware.auth_context import (
+            get_access_token as _get_access_token,
+        )
+        return _get_access_token()
+    except Exception:
+        return None
+
+
 @dataclass
 class AppContext:
     """Application context with typed dependencies for lifespan management."""
-    server: CyberArkMCPServer
+    server: Optional[CyberArkMCPServer] = None
+    session_manager: Optional[UserSessionManager] = None
 
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Manage application lifecycle with type-safe context.
 
-    Initializes CyberArkMCPServer on startup and cleans up resources on shutdown.
-    The yielded AppContext provides typed access to the server instance.
+    In OAuth mode: creates a UserSessionManager for per-user sessions.
+    In legacy mode: creates a single CyberArkMCPServer from env vars.
     """
-    logger.info("Initializing CyberArk MCP Server via lifespan...")
-    cyberark_server = CyberArkMCPServer.from_environment()
-    logger.info("CyberArk MCP Server initialized successfully")
+    if is_oauth_mode():
+        logger.info("Initializing in OAuth per-user mode...")
+        max_sessions = int(os.getenv("MCP_MAX_SESSIONS", "100"))
+        session_ttl = int(os.getenv("MCP_SESSION_TTL", "3600"))
+        session_manager = UserSessionManager(
+            max_sessions=max_sessions,
+            session_ttl=session_ttl,
+        )
+        logger.info("Session manager initialized (max=%d, ttl=%ds)", max_sessions, session_ttl)
 
-    try:
-        yield AppContext(server=cyberark_server)
-    finally:
-        # Cleanup resources on shutdown
-        if hasattr(cyberark_server, '_executor'):
-            logger.info("Shutting down executor...")
-            cyberark_server._executor.shutdown(wait=True)
-        logger.info("CyberArk MCP Server shutdown complete")
+        try:
+            yield AppContext(server=None, session_manager=session_manager)
+        finally:
+            logger.info("Shutting down session manager...")
+            await session_manager.shutdown()
+            logger.info("Session manager shutdown complete")
+    else:
+        logger.info("Initializing in legacy service account mode...")
+        cyberark_server = CyberArkMCPServer.from_environment()
+        logger.info("CyberArk MCP Server initialized successfully")
+
+        try:
+            yield AppContext(server=cyberark_server, session_manager=None)
+        finally:
+            if hasattr(cyberark_server, '_executor'):
+                logger.info("Shutting down executor...")
+                cyberark_server._executor.shutdown(wait=True)
+            logger.info("CyberArk MCP Server shutdown complete")
 
 
-# Initialize the MCP server with lifespan management
-mcp = FastMCP(
-    "CyberArk Privilege Cloud MCP Server",
-    lifespan=app_lifespan,
-    host=MCP_HOST,
-    port=MCP_PORT,
-)
+def create_mcp_server() -> FastMCP:
+    """Create and configure the FastMCP server instance.
+
+    In OAuth mode: configures token_verifier and AuthSettings.
+    In legacy mode: no auth configuration.
+    """
+    kwargs: Dict[str, Any] = {
+        "lifespan": app_lifespan,
+        "host": MCP_HOST,
+        "port": MCP_PORT,
+    }
+
+    if is_oauth_mode():
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"]
+        app_id = os.environ["CYBERARK_OAUTH_APP_ID"]
+        server_url = os.getenv("MCP_SERVER_URL", f"http://{MCP_HOST}:{MCP_PORT}")
+
+        kwargs["token_verifier"] = CyberArkTokenVerifier(
+            identity_tenant_url=tenant_url,
+            app_id=app_id,
+        )
+        kwargs["auth"] = AuthSettings(
+            issuer_url=AnyHttpUrl(tenant_url),
+            resource_server_url=AnyHttpUrl(server_url),
+        )
+        logger.info("OAuth auth configured (tenant: %s, app: %s)", tenant_url, app_id)
+    else:
+        kwargs["token_verifier"] = None
+        kwargs["auth"] = None
+
+    return FastMCP("CyberArk Privilege Cloud MCP Server", **kwargs)
+
+
+# Initialize the MCP server
+mcp = create_mcp_server()
 
 # Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
 server: Optional[CyberArkMCPServer] = None
@@ -138,16 +219,36 @@ async def execute_tool(
     This function serves as the MCP boundary layer, converting Pydantic models
     returned by server methods to dictionaries for MCP client consumption.
 
+    In OAuth mode: resolves per-user server via session_manager using the
+    access token from MCP auth context.
+    In legacy mode: uses the shared server from lifespan context or get_server().
+
     Args:
         tool_name: The server method name to call
         ctx: Optional MCP context with lifespan_context containing the server
         **kwargs: Parameters to pass to the server method
     """
     try:
-        # Get server from context if available, otherwise use legacy get_server()
+        server_instance = None
+
         if ctx is not None and hasattr(ctx, 'request_context'):
-            server_instance = ctx.request_context.lifespan_context.server
-        else:
+            app_ctx = ctx.request_context.lifespan_context
+
+            # Try OAuth per-user resolution first
+            if app_ctx.session_manager is not None:
+                access_token = get_access_token()
+                if access_token is not None:
+                    server_instance = await app_ctx.session_manager.get_or_create(
+                        jwt_token=access_token.token,
+                        username=access_token.client_id,
+                    )
+
+            # Fall back to legacy shared server
+            if server_instance is None and app_ctx.server is not None:
+                server_instance = app_ctx.server
+
+        # Final fallback to legacy get_server()
+        if server_instance is None:
             server_instance = get_server()
 
         server_method = getattr(server_instance, tool_name)
