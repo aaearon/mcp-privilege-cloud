@@ -136,14 +136,16 @@ class TestBuildOAuthMetadata:
     """Test the _build_oauth_metadata helper."""
 
     def test_returns_correct_rfc8414_fields(self):
-        """Should return RFC 8414 metadata mapped from OIDC discovery."""
+        """Should return RFC 8414 metadata with app-specific endpoints."""
         from mcp_privilege_cloud.mcp_server import _build_oauth_metadata
+        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
+        issuer = SAMPLE_OIDC_DISCOVERY["issuer"].rstrip("/")
 
         assert metadata["issuer"] == SAMPLE_OIDC_DISCOVERY["issuer"]
-        assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
-        assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
+        assert metadata["authorization_endpoint"] == f"{issuer}/OAuth2/Authorize/{CYBERARK_OIDC_APP_ID}"
+        assert metadata["token_endpoint"] == f"{issuer}/OAuth2/Token/{CYBERARK_OIDC_APP_ID}"
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
         assert metadata["code_challenge_methods_supported"] == ["S256"]
         assert metadata["scopes_supported"] == ["openid", "profile", "email"]

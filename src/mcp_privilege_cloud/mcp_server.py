@@ -180,14 +180,19 @@ async def _fetch_oidc_discovery(tenant_url: str) -> dict:
 def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     """Build RFC 8414 authorization server metadata from OIDC discovery.
 
-    Includes registration_endpoint pointing to our server's DCR proxy,
-    while authorization/token endpoints point to CyberArk Identity.
+    Uses app-specific CyberArk Identity endpoints (with OIDC app ID in path)
+    instead of the generic tenant-level endpoints from OIDC discovery.
+    The generic /Oauth/Openid endpoint doesn't resolve the app context;
+    the app-specific /OAuth2/Authorize/{app_id} endpoint does.
     """
     base = server_url.rstrip("/")
+    issuer = oidc_config["issuer"].rstrip("/")
+    app_id = CYBERARK_OIDC_APP_ID
+
     metadata = {
         "issuer": oidc_config["issuer"],
-        "authorization_endpoint": oidc_config["authorization_endpoint"],
-        "token_endpoint": oidc_config["token_endpoint"],
+        "authorization_endpoint": f"{issuer}/OAuth2/Authorize/{app_id}",
+        "token_endpoint": f"{issuer}/OAuth2/Token/{app_id}",
         "registration_endpoint": f"{base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
         "grant_types_supported": ["authorization_code", "refresh_token"],
