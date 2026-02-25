@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
 **Last Updated**: February 25, 2026
-**Recent Achievement**: Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 280 passing tests with zero regression.
+**Recent Achievement**: RFC 8414 `/.well-known/oauth-authorization-server` endpoint via FastMCP `custom_route()`, proxying CyberArk Identity OIDC discovery. Enables claude.ai OAuth discovery flow. Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 289 passing tests with zero regression.
 
 ## Architecture
 
@@ -331,7 +331,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `token_verifier.py` - JWT verification via CyberArk Identity JWKS (MCP TokenVerifier protocol)
 - `session_manager.py` - Per-user session lifecycle: SHA-256 keying, TTL, max_sessions, LRU eviction
 - `server.py` - Business logic with @handle_sdk_errors decorator + `from_token()` factory
-- `mcp_server.py` - MCP tools with dual-mode lifespan, context injection, Streamable HTTP transport
+- `mcp_server.py` - MCP tools with dual-mode lifespan, context injection, Streamable HTTP transport, RFC 8414 metadata route
 - `models.py` - Pydantic response models for typed returns
 - `exceptions.py` - Custom exceptions: OAuthError, SessionExpiredError, CyberArkAPIError
 
@@ -418,6 +418,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `tests/test_token_verifier.py` - CyberArkTokenVerifier JWT verification tests
 - `tests/test_session_manager.py` - UserSessionManager session lifecycle tests
 - `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
+- `tests/test_oauth_metadata.py` - RFC 8414 `/.well-known/oauth-authorization-server` endpoint tests
 - Additional test files for comprehensive coverage of all 53 tools
 
 **Key Commands**: 

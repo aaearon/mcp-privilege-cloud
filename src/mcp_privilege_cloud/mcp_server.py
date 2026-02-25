@@ -14,11 +14,15 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Literal
 
+import httpx
+
 # Import BaseModel for Pydantic model detection
 from pydantic import AnyHttpUrl, BaseModel
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 # Add the src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -133,6 +137,69 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             logger.info("CyberArk MCP Server shutdown complete")
 
 
+_oidc_discovery_cache: Optional[dict] = None
+
+
+async def _fetch_oidc_discovery(tenant_url: str) -> dict:
+    """Fetch and cache OIDC discovery from CyberArk Identity tenant."""
+    global _oidc_discovery_cache
+    if _oidc_discovery_cache is not None:
+        return _oidc_discovery_cache
+
+    url = f"{tenant_url.rstrip('/')}/.well-known/openid-configuration"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        _oidc_discovery_cache = resp.json()
+    logger.info("Fetched OIDC discovery from %s", tenant_url)
+    return _oidc_discovery_cache
+
+
+def _build_oauth_metadata(oidc_config: dict) -> dict:
+    """Build RFC 8414 authorization server metadata from OIDC discovery."""
+    metadata = {
+        "issuer": oidc_config["issuer"],
+        "authorization_endpoint": oidc_config["authorization_endpoint"],
+        "token_endpoint": oidc_config["token_endpoint"],
+        "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
+        "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
+    }
+    scopes = oidc_config.get("scopes_supported")
+    if scopes is not None:
+        metadata["scopes_supported"] = scopes
+    return metadata
+
+
+def _register_oauth_metadata_route(mcp_server: FastMCP) -> None:
+    """Register /.well-known/oauth-authorization-server route on the FastMCP server."""
+
+    @mcp_server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
+    async def oauth_authorization_server_metadata(request: Request) -> Response:
+        """Serve RFC 8414 metadata by proxying CyberArk Identity OIDC discovery."""
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
+        try:
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery from %s", tenant_url)
+            return JSONResponse(
+                {"error": "Failed to fetch OIDC discovery"},
+                status_code=502,
+            )
+
+        metadata = _build_oauth_metadata(oidc_config)
+        return JSONResponse(metadata, headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+        })
+
+
 def create_mcp_server() -> FastMCP:
     """Create and configure the FastMCP server instance.
 
@@ -166,6 +233,10 @@ def create_mcp_server() -> FastMCP:
 
 # Initialize the MCP server
 mcp = create_mcp_server()
+
+# Register OAuth metadata route in OAuth mode
+if is_oauth_mode():
+    _register_oauth_metadata_route(mcp)
 
 # Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
 server: Optional[CyberArkMCPServer] = None
