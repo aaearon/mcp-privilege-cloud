@@ -165,7 +165,7 @@ class TestBuildOAuthMetadata:
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
         assert metadata["grant_types_supported"] == ["authorization_code", "refresh_token"]
-        assert metadata["token_endpoint_auth_methods_supported"] == ["none"]
+        assert "client_secret_post" in metadata["token_endpoint_auth_methods_supported"]
 
     def test_defaults_when_oidc_fields_missing(self):
         """Should use sensible defaults when OIDC discovery omits optional fields."""
@@ -201,8 +201,8 @@ class TestBuildOAuthMetadata:
 class TestDynamicClientRegistration:
     """Test the /register DCR proxy endpoint."""
 
-    def test_dcr_returns_cyberark_oidc_client_id(self):
-        """DCR should return the pre-configured CyberArk Identity OIDC app ID."""
+    def test_dcr_returns_client_id_from_env(self):
+        """DCR should return CYBERARK_CLIENT_ID from env when set."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
 
         body = {
@@ -210,12 +210,23 @@ class TestDynamicClientRegistration:
             "redirect_uris": ["https://claude.ai/api/mcp/auth_callback"],
         }
 
-        response = _build_dcr_response(body)
+        with patch.dict(os.environ, {"CYBERARK_CLIENT_ID": "myuser@tenant", "CYBERARK_CLIENT_SECRET": "s3cret"}):
+            response = _build_dcr_response(body)
 
-        assert response["client_id"] == "mcpprivilegecloud"
-        assert response["token_endpoint_auth_method"] == "none"
+        assert response["client_id"] == "myuser@tenant"
+        assert response["client_secret"] == "s3cret"
+        assert response["token_endpoint_auth_method"] == "client_secret_post"
         assert response["grant_types"] == ["authorization_code", "refresh_token"]
-        assert response["response_types"] == ["code"]
+
+    def test_dcr_public_client_when_no_secret(self):
+        """DCR should return public client (no secret) when CYBERARK_CLIENT_SECRET is unset."""
+        from mcp_privilege_cloud.mcp_server import _build_dcr_response
+
+        with patch.dict(os.environ, {}, clear=True):
+            response = _build_dcr_response({})
+
+        assert response["token_endpoint_auth_method"] == "none"
+        assert "client_secret" not in response
 
     def test_dcr_echoes_client_name(self):
         """DCR should echo back the client_name from the request."""
@@ -233,12 +244,14 @@ class TestDynamicClientRegistration:
         assert response["redirect_uris"] == uris
 
     def test_dcr_defaults_for_empty_body(self):
-        """DCR should use defaults when request body is empty."""
+        """DCR should use OIDC app ID as fallback client_id."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
+        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
 
-        response = _build_dcr_response({})
+        with patch.dict(os.environ, {}, clear=True):
+            response = _build_dcr_response({})
 
-        assert response["client_id"] == "mcpprivilegecloud"
+        assert response["client_id"] == CYBERARK_OIDC_APP_ID
         assert response["client_name"] == "MCP Client"
         assert response["redirect_uris"] == []
 

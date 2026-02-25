@@ -151,15 +151,26 @@ def _build_dcr_response(body: dict) -> dict:
 
     Returns pre-configured CyberArk Identity OIDC app credentials
     so MCP clients can obtain a client_id without manual configuration.
+    Uses CYBERARK_CLIENT_ID/SECRET for confidential client auth.
     """
-    return {
-        "client_id": CYBERARK_OIDC_APP_ID,
+    client_id = os.getenv("CYBERARK_CLIENT_ID", CYBERARK_OIDC_APP_ID)
+    client_secret = os.getenv("CYBERARK_CLIENT_SECRET")
+
+    response: Dict[str, Any] = {
+        "client_id": client_id,
         "client_name": body.get("client_name", "MCP Client"),
         "redirect_uris": body.get("redirect_uris", []),
-        "token_endpoint_auth_method": "none",
         "grant_types": ["authorization_code", "refresh_token"],
         "response_types": ["code"],
     }
+
+    if client_secret:
+        response["client_secret"] = client_secret
+        response["token_endpoint_auth_method"] = "client_secret_post"
+    else:
+        response["token_endpoint_auth_method"] = "none"
+
+    return response
 
 
 async def _fetch_oidc_discovery(tenant_url: str) -> dict:
@@ -196,7 +207,7 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
         "registration_endpoint": f"{base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
         "grant_types_supported": ["authorization_code", "refresh_token"],
-        "token_endpoint_auth_methods_supported": ["none"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
         "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
     }
     scopes = oidc_config.get("scopes_supported")
