@@ -184,6 +184,7 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 **OAuth Per-User Mode Environment Variables** (recommended):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)
 - `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)

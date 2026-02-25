@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
 **Last Updated**: February 25, 2026
-**Recent Achievement**: Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 278 passing tests with zero regression.
+**Recent Achievement**: Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 280 passing tests with zero regression.
 
 ## Architecture
 
@@ -347,6 +347,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 
 **Optional Environment Variables**:
+- `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)
 - `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)
@@ -393,10 +394,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 ### Entry Points
 
 #### Standardized Execution Methods (Recommended)
-- **`uvx mcp-privilege-cloud`** - Primary production execution (starts Streamable HTTP server on MCP_HOST:MCP_PORT)
+- **`uvx mcp-privilege-cloud`** - Primary production execution (stdio by default)
 - **`uv run mcp-privilege-cloud`** - Development execution with dependency management
 - **`python -m mcp_privilege_cloud`** - Standard Python module execution
-- **Transport**: Streamable HTTP on `http://127.0.0.1:8000/mcp` (configurable via `MCP_HOST`/`MCP_PORT`)
+- **Transport**: Controlled by `MCP_TRANSPORT` env var (default: `stdio`). Set to `streamable-http` for HTTP on `MCP_HOST`:`MCP_PORT`.
 
 #### Legacy Entry Points (Deprecated)
 - **`run_server.py`** - Legacy multiplatform entry point (removed in SDK migration)

@@ -1524,10 +1524,21 @@ async def get_session_statistics() -> Any:
     return await execute_tool("get_session_statistics")
 
 
+VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
+
+
 def main() -> None:
-    """Main entry point for the MCP server"""
-    logger.info("Starting CyberArk Privilege Cloud MCP Server")
-    mcp.run(transport="streamable-http")
+    """Main entry point for the MCP server."""
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport not in VALID_TRANSPORTS:
+        logger.error(
+            "Invalid MCP_TRANSPORT=%r (valid: %s)",
+            transport,
+            ", ".join(sorted(VALID_TRANSPORTS)),
+        )
+        sys.exit(1)
+    logger.info("Starting CyberArk Privilege Cloud MCP Server (transport=%s)", transport)
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

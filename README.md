@@ -128,6 +128,7 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
+| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
 | `MCP_MAX_SESSIONS` | No | Max concurrent user sessions (default: `100`) |
@@ -141,6 +142,7 @@ A single shared service account authenticates all requests. Simpler setup but al
 |----------|----------|-------------|
 | `CYBERARK_CLIENT_ID` | Yes | Your Service User username |
 | `CYBERARK_CLIENT_SECRET` | Yes | Your Service User password |
+| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 
 **For Claude Desktop/Claude Code**: Pass these directly in the configuration (see [Client Integration](#client-integration)). No `.env` file is needed.
 
@@ -153,6 +155,9 @@ CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 # OR legacy service account mode
 CYBERARK_CLIENT_ID=your-service-user-username
 CYBERARK_CLIENT_SECRET=your-service-user-password
+
+# Transport: stdio (default), sse, or streamable-http
+# MCP_TRANSPORT=streamable-http
 ```
 
 ## Troubleshooting

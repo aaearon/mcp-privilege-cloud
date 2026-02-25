@@ -65,10 +65,30 @@ class TestStreamableHTTPTransport:
             assert host == "0.0.0.0"
             assert port == 9000
 
-    def test_main_calls_run_with_streamable_http(self):
-        """Test that main() calls mcp.run with streamable-http transport."""
-        with patch("mcp_privilege_cloud.mcp_server.mcp") as mock_mcp:
-            from mcp_privilege_cloud.mcp_server import main
-            main()
+    def test_main_defaults_to_stdio(self):
+        """Test that main() defaults to stdio transport when MCP_TRANSPORT is not set."""
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("MCP_TRANSPORT", None)
+            with patch("mcp_privilege_cloud.mcp_server.mcp") as mock_mcp:
+                from mcp_privilege_cloud.mcp_server import main
+                main()
 
-            mock_mcp.run.assert_called_once_with(transport="streamable-http")
+                mock_mcp.run.assert_called_once_with(transport="stdio")
+
+    def test_main_uses_streamable_http_when_configured(self):
+        """Test that main() uses streamable-http when MCP_TRANSPORT is set."""
+        with patch.dict("os.environ", {"MCP_TRANSPORT": "streamable-http"}):
+            with patch("mcp_privilege_cloud.mcp_server.mcp") as mock_mcp:
+                from mcp_privilege_cloud.mcp_server import main
+                main()
+
+                mock_mcp.run.assert_called_once_with(transport="streamable-http")
+
+    def test_main_rejects_invalid_transport(self):
+        """Test that main() exits with error for invalid MCP_TRANSPORT value."""
+        with patch.dict("os.environ", {"MCP_TRANSPORT": "invalid"}):
+            with patch("mcp_privilege_cloud.mcp_server.mcp"):
+                from mcp_privilege_cloud.mcp_server import main
+                with pytest.raises(SystemExit):
+                    main()
