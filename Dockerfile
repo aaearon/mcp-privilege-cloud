@@ -11,8 +11,9 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies (without the project itself)
 RUN uv sync --frozen --no-install-project
 
-# Copy source code
+# Copy source and files needed by hatchling build
 COPY src/ src/
+COPY README.md ./
 
 # Install the project
 RUN uv sync --frozen
