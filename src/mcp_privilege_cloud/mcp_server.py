@@ -51,6 +51,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Streamable HTTP transport configuration
+MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
+
 
 @dataclass
 class AppContext:
@@ -80,7 +84,12 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 
 # Initialize the MCP server with lifespan management
-mcp = FastMCP("CyberArk Privilege Cloud MCP Server", lifespan=app_lifespan)
+mcp = FastMCP(
+    "CyberArk Privilege Cloud MCP Server",
+    lifespan=app_lifespan,
+    host=MCP_HOST,
+    port=MCP_PORT,
+)
 
 # Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
 server: Optional[CyberArkMCPServer] = None
@@ -1422,8 +1431,7 @@ async def get_session_statistics() -> Any:
 def main() -> None:
     """Main entry point for the MCP server"""
     logger.info("Starting CyberArk Privilege Cloud MCP Server")
-    # Environment validation is handled by server initialization above
-    mcp.run()
+    mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":
