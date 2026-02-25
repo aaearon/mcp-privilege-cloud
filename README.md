@@ -119,18 +119,40 @@ claude mcp add cyberark-privilege-cloud \
 
 ## Configuration
 
-The MCP server requires two environment variables for authentication:
+The server supports two authentication modes. It auto-detects which mode to use based on the environment variables present.
 
-| Variable | Description |
-|----------|-------------|
-| `CYBERARK_CLIENT_ID` | Your Service User username |
-| `CYBERARK_CLIENT_SECRET` | Your Service User password |
+### OAuth Per-User Mode (Recommended)
+
+Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. Requires an OAuth2 app configured in CyberArk Identity (see [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
+| `CYBERARK_OAUTH_APP_ID` | Yes | OAuth2 application ID from CyberArk Identity |
+| `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
+| `MCP_PORT` | No | Server bind port (default: `8000`) |
+| `MCP_MAX_SESSIONS` | No | Max concurrent user sessions (default: `100`) |
+| `MCP_SESSION_TTL` | No | Session TTL in seconds (default: `3600`) |
+
+### Legacy Service Account Mode
+
+A single shared service account authenticates all requests. Simpler setup but all operations run under one identity.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_CLIENT_ID` | Yes | Your Service User username |
+| `CYBERARK_CLIENT_SECRET` | Yes | Your Service User password |
 
 **For Claude Desktop/Claude Code**: Pass these directly in the configuration (see [Client Integration](#client-integration)). No `.env` file is needed.
 
 **For local development/testing**: Create a `.env` file in the project root directory:
 
 ```bash
+# OAuth per-user mode
+CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+CYBERARK_OAUTH_APP_ID=your-oauth-app-id
+
+# OR legacy service account mode
 CYBERARK_CLIENT_ID=your-service-user-username
 CYBERARK_CLIENT_SECRET=your-service-user-password
 ```
@@ -186,7 +208,8 @@ Configure with command `uv run mcp-privilege-cloud` and your credentials.
 ## Documentation
 
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications and parameters
-- **[Architecture](ARCHITECTURE.md)** - System design and components
+- **[Architecture](docs/ARCHITECTURE.md)** - System design and components
+- **[CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)** - OAuth app configuration guide
 - **[Development Guide](DEVELOPMENT.md)** - Contributing and development workflows
 - **[Testing Guide](docs/TESTING.md)** - Detailed testing instructions
 

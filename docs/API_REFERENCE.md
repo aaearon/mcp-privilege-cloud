@@ -39,22 +39,44 @@ The CyberArk Privilege Cloud MCP Server provides **53 enterprise-grade tools** f
 
 ## Authentication
 
-### OAuth 2.0 Configuration
-All tools require proper authentication configuration through environment variables:
+The server supports two authentication modes, auto-detected from environment variables.
+
+### OAuth Per-User Mode (Recommended)
+
+Each user authenticates with their own CyberArk Identity credentials. The server verifies JWTs against the CyberArk Identity JWKS endpoint and creates isolated per-user sessions.
 
 ```bash
-# Required Environment Variables
-CYBERARK_CLIENT_ID=service-account-username    # OAuth service account
-CYBERARK_CLIENT_SECRET=service-account-password
+# Required for OAuth per-user mode
+CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+CYBERARK_OAUTH_APP_ID=your-oauth-app-id
 
-# Optional Configuration
+# Optional
+MCP_HOST=127.0.0.1             # Server bind host
+MCP_PORT=8000                  # Server bind port
+MCP_MAX_SESSIONS=100           # Max concurrent sessions
+MCP_SESSION_TTL=3600           # Session TTL in seconds
 CYBERARK_LOG_LEVEL=INFO        # Logging level
 ```
 
+**Per-User Token Flow**:
+1. MCP client sends Bearer token in request
+2. `CyberArkTokenVerifier` validates JWT signature via JWKS
+3. `UserSessionManager` resolves or creates a per-user `CyberArkMCPServer`
+4. Tool executes with the user's own CyberArk permissions
+
+### Legacy Service Account Mode
+
+A single shared service account authenticates all requests.
+
+```bash
+CYBERARK_CLIENT_ID=service-account-username
+CYBERARK_CLIENT_SECRET=service-account-password
+```
+
 ### Token Management
-- **Expiration**: 15 minutes with automatic refresh
-- **Caching**: Secure in-memory token caching
-- **Concurrency**: Thread-safe token refresh with double-checked locking
+- **Per-User Mode**: JWT verification via JWKS, sessions cached by token hash with TTL
+- **Legacy Mode**: 15-minute token expiration with automatic refresh
+- **Caching**: Secure in-memory token/session caching
 - **Error Recovery**: Automatic retry on 401 authentication errors
 
 ## Tool Categories

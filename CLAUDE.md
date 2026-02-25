@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 232+ passing tests
+2. **Check current test status** - All changes must maintain 277+ passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -96,9 +96,9 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION IN PROGRESS** - Phases 1-2 complete: Streamable HTTP transport and token auth bridge implemented. Per-user OAuth via CyberArk Identity in progress (Phases 3-5 remaining).
+**Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
 **Last Updated**: February 25, 2026
-**Recent Achievement**: Migrated transport from stdio to Streamable HTTP. Implemented `ArkISPAuthFromToken` token auth bridge and `CyberArkMCPServer.from_token()` factory for per-user JWT-based sessions. 232 passing tests with zero regression.
+**Recent Achievement**: Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). 277 passing tests with zero regression.
 
 ## Architecture
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 232+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 277+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -309,40 +309,41 @@ async def your_new_tool(
 **🤖 MANDATORY PATTERN: Lifespan Management**
 ```python
 # Server lifecycle is managed via app_lifespan context manager
-# Access server through ctx.request_context.lifespan_context.server
+# Dual mode: OAuth (session_manager) or legacy (server)
 @dataclass
 class AppContext:
-    server: CyberArkMCPServer
+    server: Optional[CyberArkMCPServer] = None
+    session_manager: Optional[UserSessionManager] = None
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
-    cyberark_server = CyberArkMCPServer.from_environment()
-    try:
+    if is_oauth_mode():
+        session_manager = UserSessionManager(...)
+        yield AppContext(session_manager=session_manager)
+    else:
+        cyberark_server = CyberArkMCPServer.from_environment()
         yield AppContext(server=cyberark_server)
-    finally:
-        # Cleanup resources
-        pass
 ```
 
 **🤖 FILE STRUCTURE GUIDE**:
-- `sdk_auth.py` - Service account authentication (legacy, being replaced)
+- `sdk_auth.py` - Service account authentication (legacy mode)
 - `token_auth.py` - Token-based auth bridge: `ArkISPAuthFromToken` for per-user OAuth JWTs
+- `token_verifier.py` - JWT verification via CyberArk Identity JWKS (MCP TokenVerifier protocol)
+- `session_manager.py` - Per-user session lifecycle: SHA-256 keying, TTL, max_sessions, LRU eviction
 - `server.py` - Business logic with @handle_sdk_errors decorator + `from_token()` factory
-- `mcp_server.py` - MCP tools with lifespan management, context injection, Streamable HTTP transport
+- `mcp_server.py` - MCP tools with dual-mode lifespan, context injection, Streamable HTTP transport
 - `models.py` - Pydantic response models for typed returns
-- `exceptions.py` - Custom exceptions only
-- `token_verifier.py` - JWT verification via CyberArk Identity JWKS (Phase 3 - pending)
-- `session_manager.py` - Per-user session lifecycle management (Phase 3 - pending)
+- `exceptions.py` - Custom exceptions: OAuthError, SessionExpiredError, CyberArkAPIError
 
 ### Testing Validation ✅ **VERIFIED**
-- **232+ tests passing** - Zero functionality regression with comprehensive expansion
-- **Test Coverage Maintained** - All expansion preserved existing test patterns
+- **277+ tests passing** - Zero functionality regression across all phases
+- **Test Coverage Maintained** - 16 token verifier + 15 session manager + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
 
 ## Configuration
 
-**Required Environment Variables** (OAuth per-user mode — in progress):
+**Required Environment Variables** (OAuth per-user mode):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 - `CYBERARK_OAUTH_APP_ID` - OAuth2 app ID registered in CyberArk Identity
 
@@ -353,7 +354,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `MCP_MAX_SESSIONS` - Max concurrent user sessions (default: `100`)
 - `MCP_SESSION_TTL` - Session TTL in seconds (default: `3600`)
 
-**Legacy Environment Variables** (service account mode — being replaced):
+**Legacy Environment Variables** (service account mode — fallback):
 - `CYBERARK_CLIENT_ID` - OAuth service account username
 - `CYBERARK_CLIENT_SECRET` - Service account password
 
@@ -404,7 +405,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 ## Testing Strategy
 
-**Test Files**: 232+ total tests across 11+ test files
+**Test Files**: 277+ total tests across 14+ test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (comprehensive error handling)
 - `tests/test_account_operations.py` - Account lifecycle management with CRUD operations
 - `tests/test_applications_service.py` - Applications service testing with authentication methods
@@ -414,6 +415,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `tests/test_enhanced_error_messages.py` - Error message consistency testing
 - `tests/test_transport.py` - Streamable HTTP transport configuration tests
 - `tests/test_token_auth.py` - Token auth bridge and `from_token` factory tests
+- `tests/test_token_verifier.py` - CyberArkTokenVerifier JWT verification tests
+- `tests/test_session_manager.py` - UserSessionManager session lifecycle tests
+- `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
 - Additional test files for comprehensive coverage of all 53 tools
 
 **Key Commands**: 
@@ -479,7 +483,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 232+ tests must continue passing
+5. **Preserve test coverage** - All 277+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -490,17 +494,18 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 232+ tests still pass
+4. Verify all 277+ tests still pass
 ```
 
 ## References
 
 - **README.md** - Complete setup and configuration documentation
-- **ARCHITECTURE.md** - System architecture and component details
+- **docs/ARCHITECTURE.md** - System architecture and component details
 - **DEVELOPMENT.md** - Development workflows and procedures
 - **INSTRUCTIONS.md** - Development workflow and coding standards
 - **docs/API_REFERENCE.md** - Complete tool specifications and examples
 - **docs/TESTING.md** - Comprehensive testing guidelines and procedures
+- **docs/CYBERARK_IDENTITY_SETUP.md** - CyberArk Identity OAuth app configuration guide
 
 ---
 

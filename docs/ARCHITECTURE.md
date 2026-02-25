@@ -12,31 +12,72 @@ The CyberArk Privilege Cloud MCP Server follows a **simplified, streamlined arch
 
 ## Core Components
 
-The project is structured around four main modules leveraging the official ark-sdk-python:
+The project is structured around these core modules leveraging the official ark-sdk-python:
 
 ```
 src/mcp_privilege_cloud/
-├── sdk_auth.py      # Official SDK authentication wrapper
-├── server.py        # Core CyberArk API integration via SDK
-├── mcp_server.py    # MCP protocol implementation  
-└── exceptions.py    # Custom exception handling
+├── sdk_auth.py          # Legacy service account authentication
+├── token_auth.py        # Token-based auth bridge (ArkISPAuthFromToken)
+├── token_verifier.py    # JWT verification via CyberArk Identity JWKS
+├── session_manager.py   # Per-user session lifecycle management
+├── server.py            # Core CyberArk API integration via SDK
+├── mcp_server.py        # MCP protocol implementation (Streamable HTTP)
+└── exceptions.py        # Custom exception handling
 ```
 
-### 1. SDK Authentication Module (`sdk_auth.py`)
+### Authentication Architecture (Dual-Mode)
 
-**Purpose**: Official CyberArk SDK authentication wrapper for enterprise-grade security
+The server supports two authentication modes:
+
+**OAuth Per-User Mode** (recommended for multi-user deployments):
+- Users authenticate via CyberArk Identity OAuth Authorization Code flow
+- Each user's JWT is verified against the JWKS endpoint by `CyberArkTokenVerifier`
+- Per-user `CyberArkMCPServer` instances are managed by `UserSessionManager`
+- Sessions are cached by SHA-256 of the access token with TTL expiry
+
+**Legacy Service Account Mode** (single shared identity):
+- A single service account authenticates via `CYBERARK_CLIENT_ID`/`CYBERARK_CLIENT_SECRET`
+- All requests share one `CyberArkMCPServer` instance
+- Authentication handled by `CyberArkSDKAuthenticator` in `sdk_auth.py`
+
+### 1. Token Auth Bridge (`token_auth.py`)
+
+**Purpose**: Bridge externally-obtained OAuth JWTs into ark-sdk-python's auth interface
+
+**Key Features**:
+- **ArkISPAuthFromToken**: Subclasses `ArkISPAuth` to accept pre-existing JWTs
+- **Claim Extraction**: Decodes JWT payload for `sub`, `exp`, `iss`, `subdomain`, `platform_domain`
+- **ArkToken Construction**: Builds SDK-compatible token with metadata for PCloud service init
+- **Expiry Validation**: Rejects expired tokens at construction time
+
+### 1b. Token Verifier (`token_verifier.py`)
+
+**Purpose**: MCP SDK `TokenVerifier` protocol implementation for CyberArk Identity JWTs
+
+**Key Features**:
+- **JWKS Validation**: Verifies JWT signatures against CyberArk Identity `/oauth2/certs`
+- **MCP Protocol Compliance**: Returns `AccessToken` for MCP auth middleware
+- **Claim Validation**: Enforces `exp`, `iss`, `sub`, `aud` with RS256 algorithm
+- **Graceful Failures**: Returns `None` on any verification failure (no exceptions)
+
+### 1c. Session Manager (`session_manager.py`)
+
+**Purpose**: Per-user session lifecycle management with resource limits
+
+**Key Features**:
+- **SHA-256 Keying**: Sessions cached by hash of access token
+- **TTL Expiry**: Configurable session lifetime (default: 3600s)
+- **Max Sessions**: Configurable limit with LRU eviction (default: 100)
+- **Graceful Shutdown**: Cleans up all server executors on shutdown
+
+### 1d. Legacy SDK Authentication (`sdk_auth.py`)
+
+**Purpose**: Service account authentication wrapper (legacy mode)
 
 **Key Features**:
 - **Official SDK Integration**: Uses ark-sdk-python for authenticated API access
 - **Automatic Token Management**: SDK handles token lifecycle automatically
-- **Enterprise Security**: CyberArk-tested authentication patterns
 - **Environment Configuration**: Seamless integration with existing credential management
-- **Future-Proof Design**: Automatic compatibility with SDK updates
-
-**Implementation Details**:
-- Wraps ark-sdk-python authentication client
-- Provides consistent interface for server methods
-- Leverages SDK's built-in token management and error handling
 
 ### 2. Server Module (`server.py`)
 
@@ -74,8 +115,20 @@ src/mcp_privilege_cloud/
 
 ## API Integration Architecture
 
-### SDK-Enhanced Authentication Flow
+### Authentication Flows
 
+**OAuth Per-User Mode:**
+```
+MCP Client → Bearer Token → CyberArkTokenVerifier (JWKS) → AccessToken
+                                                               ↓
+execute_tool() → get_access_token() → UserSessionManager.get_or_create()
+                                              ↓
+                              ArkISPAuthFromToken(jwt) → CyberArkMCPServer.from_token()
+                                                               ↓
+                                              SDK Services → CyberArk PCloud API
+```
+
+**Legacy Service Account Mode:**
 ```
 Client Request → MCP Tool → Server Method → SDK Auth → ark-sdk-python → CyberArk Identity
                                       ↓                      ↓
@@ -129,14 +182,26 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 ### Configuration Management
 
-**Environment Variables**:
+**OAuth Per-User Mode Environment Variables** (recommended):
+- `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_OAUTH_APP_ID` - OAuth2 application ID registered in CyberArk Identity
+- `MCP_HOST` - Server bind host (default: `127.0.0.1`)
+- `MCP_PORT` - Server bind port (default: `8000`)
+- `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)
+- `MCP_MAX_SESSIONS` - Max concurrent user sessions (default: `100`)
+- `MCP_SESSION_TTL` - Session TTL in seconds (default: `3600`)
+
+**Legacy Service Account Mode Environment Variables**:
 - `CYBERARK_CLIENT_ID` - OAuth service account username
 - `CYBERARK_CLIENT_SECRET` - Service account password
+
+**Mode Detection**: The server automatically selects OAuth mode when both `CYBERARK_IDENTITY_TENANT_URL` and `CYBERARK_OAUTH_APP_ID` are set; otherwise falls back to legacy mode.
 
 **Security Principles**:
 - Never log sensitive information (tokens, passwords)
 - Environment variable-based configuration only
-- OAuth token caching with automatic refresh
+- JWT verification via JWKS for per-user tokens
+- Per-user session isolation with token-keyed caching
 - Principle of least privilege for service accounts
 
 ## Tool Architecture
