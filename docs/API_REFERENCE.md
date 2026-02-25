@@ -48,7 +48,6 @@ Each user authenticates with their own CyberArk Identity credentials. The server
 ```bash
 # Required for OAuth per-user mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
-CYBERARK_OAUTH_APP_ID=your-oauth-app-id
 
 # Optional
 MCP_HOST=127.0.0.1             # Server bind host

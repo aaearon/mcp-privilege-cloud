@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
 **Last Updated**: February 25, 2026
-**Recent Achievement**: Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). 277 passing tests with zero regression.
+**Recent Achievement**: Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 278 passing tests with zero regression.
 
 ## Architecture
 
@@ -345,7 +345,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 **Required Environment Variables** (OAuth per-user mode):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
-- `CYBERARK_OAUTH_APP_ID` - OAuth2 app ID registered in CyberArk Identity
 
 **Optional Environment Variables**:
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)

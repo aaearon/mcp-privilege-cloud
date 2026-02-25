@@ -7,29 +7,9 @@ This guide explains how to configure a CyberArk Identity OAuth2 application for 
 - CyberArk Identity administrator access
 - CyberArk Privilege Cloud tenant
 
-## Step 1: Register an OAuth2 Application
+## Step 1: No Custom OAuth App Registration Needed
 
-1. Log in to your CyberArk Identity Administration portal
-2. Navigate to **Apps & Widgets** > **Web Apps**
-3. Click **Add Web Apps** > **Custom** > **OAuth2 Client**
-4. Configure the application:
-
-| Setting | Value |
-|---------|-------|
-| **Application ID** | `mcp-privilege-cloud` (or your preferred name) |
-| **Application Name** | MCP Privilege Cloud Server |
-| **Grant Type** | Authorization Code |
-| **Token Type** | JWT |
-| **Issuer** | Your tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
-
-5. Under **Tokens**:
-   - Set **Token Lifetime** to your desired duration (recommended: 1 hour)
-   - Enable **Refresh Tokens** for long-lived sessions
-
-6. Under **Scope**:
-   - Add scopes as required for your deployment (e.g., `openid`, `profile`)
-
-7. Save the application and note the **Application ID**
+The MCP server uses CyberArk Identity's built-in OIDC application (`__idaptive_cybr_user_oidc`), which is present on every CyberArk Identity tenant. No custom OAuth2 application registration is required.
 
 ## Step 2: Configure Redirect URIs
 
@@ -53,7 +33,6 @@ Set the following environment variables:
 ```bash
 # Required
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
-CYBERARK_OAUTH_APP_ID=mcp-privilege-cloud
 
 # Optional
 MCP_HOST=127.0.0.1        # Server bind address
@@ -73,7 +52,7 @@ uv run mcp-privilege-cloud
 You should see log output indicating OAuth per-user mode:
 ```
 Initializing in OAuth per-user mode...
-Token verifier initialized (tenant: https://abc1234.id.cyberark.cloud, app: mcp-privilege-cloud)
+Token verifier initialized (tenant: https://abc1234.id.cyberark.cloud)
 Session manager initialized (max=100, ttl=3600s)
 ```
 
@@ -98,7 +77,7 @@ Session manager initialized (max=100, ttl=3600s)
 
 | Issue | Solution |
 |-------|----------|
-| "Token verification failed" | Verify `CYBERARK_OAUTH_APP_ID` matches the Application ID in CyberArk Identity |
+| "Token verification failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is correct and the user has a valid token |
 | "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable and correct |
 | "Session limit reached" | Increase `MCP_MAX_SESSIONS` or decrease `MCP_SESSION_TTL` |
-| Server starts in legacy mode | Ensure both `CYBERARK_IDENTITY_TENANT_URL` and `CYBERARK_OAUTH_APP_ID` are set |
+| Server starts in legacy mode | Ensure `CYBERARK_IDENTITY_TENANT_URL` is set |

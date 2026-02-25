@@ -32,7 +32,7 @@ def _default_claims(**overrides: object) -> dict:
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
         "iss": "https://abc1234.id.cyberark.cloud/",
-        "aud": "test-app-id",
+        "aud": "__idaptive_cybr_user_oidc",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),
         "unique_name": "testuser@abc1234.cyberark.cloud",
@@ -52,7 +52,6 @@ class TestOAuthEnvVarConfiguration:
 
         with patch.dict(os.environ, {
             "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-            "CYBERARK_OAUTH_APP_ID": "test-app-id",
         }):
             assert is_oauth_mode() is True
 
@@ -211,7 +210,6 @@ class TestAppLifespanOAuthMode:
 
         with patch.dict(os.environ, {
             "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-            "CYBERARK_OAUTH_APP_ID": "test-app-id",
         }):
             with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
                 mock_fastmcp = MagicMock()
@@ -244,7 +242,6 @@ class TestAppLifespanOAuthMode:
 
         with patch.dict(os.environ, {
             "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-            "CYBERARK_OAUTH_APP_ID": "test-app-id",
         }):
             with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
                 with patch(
@@ -269,7 +266,6 @@ class TestMCPServerOAuthInit:
 
         with patch.dict(os.environ, {
             "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-            "CYBERARK_OAUTH_APP_ID": "test-app-id",
             "MCP_HOST": "127.0.0.1",
             "MCP_PORT": "8000",
         }):

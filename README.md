@@ -128,7 +128,6 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
-| `CYBERARK_OAUTH_APP_ID` | Yes | OAuth2 application ID from CyberArk Identity |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
 | `MCP_MAX_SESSIONS` | No | Max concurrent user sessions (default: `100`) |
@@ -150,7 +149,6 @@ A single shared service account authenticates all requests. Simpler setup but al
 ```bash
 # OAuth per-user mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
-CYBERARK_OAUTH_APP_ID=your-oauth-app-id
 
 # OR legacy service account mode
 CYBERARK_CLIENT_ID=your-service-user-username

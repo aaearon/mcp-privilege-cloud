@@ -15,6 +15,10 @@ from mcp.server.auth.provider import AccessToken, TokenVerifier
 
 logger = logging.getLogger(__name__)
 
+# Well-known OIDC application ID used by all CyberArk Identity tenants.
+# This is the same default used by ark-sdk-python (see ArkAuthMethod).
+CYBERARK_OIDC_APP_ID = "__idaptive_cybr_user_oidc"
+
 
 class CyberArkTokenVerifier(TokenVerifier):
     """Verify JWTs against CyberArk Identity JWKS endpoint.
@@ -25,24 +29,20 @@ class CyberArkTokenVerifier(TokenVerifier):
     Returns AccessToken on success, None on any verification failure.
     """
 
-    def __init__(self, identity_tenant_url: str, app_id: str) -> None:
+    def __init__(self, identity_tenant_url: str) -> None:
         """Initialize the token verifier.
 
         Args:
             identity_tenant_url: CyberArk Identity tenant URL
                 (e.g., "https://abc1234.id.cyberark.cloud").
-            app_id: OAuth2 application ID registered in CyberArk Identity,
-                used as the expected JWT audience.
         """
         self._identity_tenant_url = identity_tenant_url.rstrip("/")
-        self._app_id = app_id
         self._jwks_uri = f"{self._identity_tenant_url}/oauth2/certs"
         self._jwks_client = PyJWKClient(self._jwks_uri, cache_keys=True)
 
         logger.info(
-            "Token verifier initialized (tenant: %s, app: %s)",
+            "Token verifier initialized (tenant: %s)",
             self._identity_tenant_url,
-            self._app_id,
         )
 
     async def verify_token(self, token: str) -> Optional[AccessToken]:
@@ -108,7 +108,7 @@ class CyberArkTokenVerifier(TokenVerifier):
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=self._app_id,
+            audience=CYBERARK_OIDC_APP_ID,
             issuer=self._identity_tenant_url + "/",
             options={"require": ["exp", "iss", "sub", "aud"]},
         )

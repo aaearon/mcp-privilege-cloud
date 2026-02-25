@@ -184,7 +184,6 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 **OAuth Per-User Mode Environment Variables** (recommended):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
-- `CYBERARK_OAUTH_APP_ID` - OAuth2 application ID registered in CyberArk Identity
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)
 - `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)
@@ -195,7 +194,7 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 - `CYBERARK_CLIENT_ID` - OAuth service account username
 - `CYBERARK_CLIENT_SECRET` - Service account password
 
-**Mode Detection**: The server automatically selects OAuth mode when both `CYBERARK_IDENTITY_TENANT_URL` and `CYBERARK_OAUTH_APP_ID` are set; otherwise falls back to legacy mode.
+**Mode Detection**: The server automatically selects OAuth mode when `CYBERARK_IDENTITY_TENANT_URL` is set; otherwise falls back to legacy mode.
 
 **Security Principles**:
 - Never log sensitive information (tokens, passwords)

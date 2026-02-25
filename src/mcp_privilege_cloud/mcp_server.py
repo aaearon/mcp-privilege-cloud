@@ -72,10 +72,7 @@ MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
 
 def is_oauth_mode() -> bool:
     """Check if OAuth per-user mode is configured via environment variables."""
-    return bool(
-        os.getenv("CYBERARK_IDENTITY_TENANT_URL")
-        and os.getenv("CYBERARK_OAUTH_APP_ID")
-    )
+    return bool(os.getenv("CYBERARK_IDENTITY_TENANT_URL"))
 
 
 def get_access_token() -> Optional[AccessToken]:
@@ -150,18 +147,16 @@ def create_mcp_server() -> FastMCP:
 
     if is_oauth_mode():
         tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"]
-        app_id = os.environ["CYBERARK_OAUTH_APP_ID"]
         server_url = os.getenv("MCP_SERVER_URL", f"http://{MCP_HOST}:{MCP_PORT}")
 
         kwargs["token_verifier"] = CyberArkTokenVerifier(
             identity_tenant_url=tenant_url,
-            app_id=app_id,
         )
         kwargs["auth"] = AuthSettings(
             issuer_url=AnyHttpUrl(tenant_url),
             resource_server_url=AnyHttpUrl(server_url),
         )
-        logger.info("OAuth auth configured (tenant: %s, app: %s)", tenant_url, app_id)
+        logger.info("OAuth auth configured (tenant: %s)", tenant_url)
     else:
         kwargs["token_verifier"] = None
         kwargs["auth"] = None

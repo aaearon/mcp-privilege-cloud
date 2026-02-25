@@ -29,7 +29,7 @@ def _default_claims(**overrides: object) -> dict:
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
         "iss": "https://abc1234.id.cyberark.cloud/",
-        "aud": "test-app-id",
+        "aud": "__idaptive_cybr_user_oidc",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),
         "unique_name": "testuser@abc1234.cyberark.cloud",
@@ -44,17 +44,21 @@ def _default_claims(**overrides: object) -> dict:
 class TestCyberArkTokenVerifierInit:
     """Test CyberArkTokenVerifier initialization."""
 
+    def test_oidc_app_id_constant(self):
+        """CYBERARK_OIDC_APP_ID should match the well-known CyberArk Identity value."""
+        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+
+        assert CYBERARK_OIDC_APP_ID == "__idaptive_cybr_user_oidc"
+
     def test_init_with_tenant_url(self):
         """Verifier should initialize with a CyberArk Identity tenant URL."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         assert verifier._identity_tenant_url == "https://abc1234.id.cyberark.cloud"
-        assert verifier._app_id == "test-app-id"
 
     def test_init_strips_trailing_slash(self):
         """Tenant URL should have trailing slash stripped."""
@@ -62,7 +66,6 @@ class TestCyberArkTokenVerifierInit:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud/",
-            app_id="test-app-id",
         )
 
         assert verifier._identity_tenant_url == "https://abc1234.id.cyberark.cloud"
@@ -73,7 +76,6 @@ class TestCyberArkTokenVerifierInit:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         assert verifier._jwks_uri == "https://abc1234.id.cyberark.cloud/oauth2/certs"
@@ -92,7 +94,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         # Mock the JWT decode to return our claims (skip actual signature verification)
@@ -114,7 +115,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         with patch.object(verifier, "_decode_and_verify", return_value=claims):
@@ -133,7 +133,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         # Simulate PyJWT raising ExpiredSignatureError
@@ -157,7 +156,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         import jwt as pyjwt
@@ -181,7 +179,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         import jwt as pyjwt
@@ -202,7 +199,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         import jwt as pyjwt
@@ -227,7 +223,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         with patch.object(verifier, "_decode_and_verify", return_value=claims):
@@ -246,7 +241,6 @@ class TestCyberArkTokenVerifierVerify:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         with patch.object(verifier, "_decode_and_verify", return_value=claims):
@@ -266,7 +260,6 @@ class TestCyberArkTokenVerifierJWKS:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         assert verifier._jwks_client is not None
@@ -280,7 +273,6 @@ class TestCyberArkTokenVerifierJWKS:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         import jwt as pyjwt
@@ -304,7 +296,6 @@ class TestCyberArkTokenVerifierJWKS:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         mock_key = MagicMock()
@@ -316,11 +307,13 @@ class TestCyberArkTokenVerifierJWKS:
             with patch("jwt.decode", return_value=claims) as mock_decode:
                 result = await verifier._decode_and_verify(jwt_token)
 
+                from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+
                 mock_decode.assert_called_once_with(
                     jwt_token,
                     mock_key.key,
                     algorithms=["RS256"],
-                    audience=verifier._app_id,
+                    audience=CYBERARK_OIDC_APP_ID,
                     issuer=verifier._identity_tenant_url + "/",
                     options={"require": ["exp", "iss", "sub", "aud"]},
                 )
@@ -336,7 +329,6 @@ class TestCyberArkTokenVerifierProtocol:
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            app_id="test-app-id",
         )
 
         assert hasattr(verifier, "verify_token")
