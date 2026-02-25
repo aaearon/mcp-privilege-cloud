@@ -220,7 +220,7 @@ def create_mcp_server() -> FastMCP:
             identity_tenant_url=tenant_url,
         )
         kwargs["auth"] = AuthSettings(
-            issuer_url=AnyHttpUrl(tenant_url),
+            issuer_url=AnyHttpUrl(server_url),
             resource_server_url=AnyHttpUrl(server_url),
         )
         logger.info("OAuth auth configured (tenant: %s)", tenant_url)
