@@ -139,6 +139,28 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 _oidc_discovery_cache: Optional[dict] = None
 
+# Import OIDC app ID constant for DCR responses
+try:
+    from .token_verifier import CYBERARK_OIDC_APP_ID
+except ImportError:
+    from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+
+
+def _build_dcr_response(body: dict) -> dict:
+    """Build RFC 7591 Dynamic Client Registration response.
+
+    Returns pre-configured CyberArk Identity OIDC app credentials
+    so MCP clients can obtain a client_id without manual configuration.
+    """
+    return {
+        "client_id": CYBERARK_OIDC_APP_ID,
+        "client_name": body.get("client_name", "MCP Client"),
+        "redirect_uris": body.get("redirect_uris", []),
+        "token_endpoint_auth_method": "none",
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"],
+    }
+
 
 async def _fetch_oidc_discovery(tenant_url: str) -> dict:
     """Fetch and cache OIDC discovery from CyberArk Identity tenant."""
@@ -155,13 +177,21 @@ async def _fetch_oidc_discovery(tenant_url: str) -> dict:
     return _oidc_discovery_cache
 
 
-def _build_oauth_metadata(oidc_config: dict) -> dict:
-    """Build RFC 8414 authorization server metadata from OIDC discovery."""
+def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
+    """Build RFC 8414 authorization server metadata from OIDC discovery.
+
+    Includes registration_endpoint pointing to our server's DCR proxy,
+    while authorization/token endpoints point to CyberArk Identity.
+    """
+    base = server_url.rstrip("/")
     metadata = {
         "issuer": oidc_config["issuer"],
         "authorization_endpoint": oidc_config["authorization_endpoint"],
         "token_endpoint": oidc_config["token_endpoint"],
+        "registration_endpoint": f"{base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["none"],
         "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
     }
     scopes = oidc_config.get("scopes_supported")
@@ -170,8 +200,8 @@ def _build_oauth_metadata(oidc_config: dict) -> dict:
     return metadata
 
 
-def _register_oauth_metadata_route(mcp_server: FastMCP) -> None:
-    """Register /.well-known/oauth-authorization-server route on the FastMCP server."""
+def _register_oauth_routes(mcp_server: FastMCP) -> None:
+    """Register OAuth discovery and DCR routes on the FastMCP server."""
 
     @mcp_server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
     async def oauth_authorization_server_metadata(request: Request) -> Response:
@@ -193,11 +223,45 @@ def _register_oauth_metadata_route(mcp_server: FastMCP) -> None:
                 status_code=502,
             )
 
-        metadata = _build_oauth_metadata(oidc_config)
+        server_url = os.getenv("MCP_SERVER_URL", f"http://{MCP_HOST}:{MCP_PORT}")
+        metadata = _build_oauth_metadata(oidc_config, server_url)
         return JSONResponse(metadata, headers={
             "Cache-Control": "public, max-age=3600",
             "Access-Control-Allow-Origin": "*",
         })
+
+    @mcp_server.custom_route("/register", methods=["POST", "OPTIONS"])
+    async def dynamic_client_registration(request: Request) -> Response:
+        """RFC 7591 Dynamic Client Registration proxy.
+
+        Returns the pre-configured CyberArk Identity OIDC app client ID
+        so MCP clients (e.g. claude.ai) can obtain credentials automatically.
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        registration_response = _build_dcr_response(body)
+
+        logger.info(
+            "DCR: registered client_name=%s redirect_uris=%s",
+            registration_response["client_name"],
+            registration_response["redirect_uris"],
+        )
+
+        return JSONResponse(
+            registration_response,
+            status_code=201,
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
 
 
 def create_mcp_server() -> FastMCP:
@@ -234,9 +298,9 @@ def create_mcp_server() -> FastMCP:
 # Initialize the MCP server
 mcp = create_mcp_server()
 
-# Register OAuth metadata route in OAuth mode
+# Register OAuth discovery and DCR routes in OAuth mode
 if is_oauth_mode():
-    _register_oauth_metadata_route(mcp)
+    _register_oauth_routes(mcp)
 
 # Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
 server: Optional[CyberArkMCPServer] = None
