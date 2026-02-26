@@ -3,11 +3,17 @@
 Implements the MCP SDK's TokenVerifier protocol to validate OAuth JWTs
 issued by CyberArk Identity, enabling per-user authentication in
 Resource Server mode.
+
+JWKS URI is resolved lazily from OIDC discovery on first token
+verification, ensuring compatibility with all CyberArk Identity app
+types (OAuth 2.0 Client, OIDC, etc.).
 """
 
 import logging
+import os
 from typing import Optional
 
+import httpx
 import jwt as pyjwt
 from jwt import PyJWKClient
 
@@ -17,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 # OIDC application ID for CyberArk Identity.
 # Configurable via CYBERARK_OIDC_APP_ID env var; defaults to custom app.
-import os
 CYBERARK_OIDC_APP_ID = os.getenv("CYBERARK_OIDC_APP_ID", "mcpprivilegecloud")
 
 
@@ -27,6 +32,8 @@ class CyberArkTokenVerifier(TokenVerifier):
     Implements the MCP SDK TokenVerifier protocol:
         async def verify_token(self, token: str) -> AccessToken | None
 
+    The JWKS URI is resolved lazily from the OIDC discovery document
+    on first use, so it works regardless of CyberArk Identity app type.
     Returns AccessToken on success, None on any verification failure.
     """
 
@@ -38,13 +45,44 @@ class CyberArkTokenVerifier(TokenVerifier):
                 (e.g., "https://abc1234.id.cyberark.cloud").
         """
         self._identity_tenant_url = identity_tenant_url.rstrip("/")
-        self._jwks_uri = f"{self._identity_tenant_url}/OAuth2/Keys/{CYBERARK_OIDC_APP_ID}"
-        self._jwks_client = PyJWKClient(self._jwks_uri, cache_keys=True)
+        self._jwks_uri: Optional[str] = None
+        self._jwks_client: Optional[PyJWKClient] = None
 
         logger.info(
             "Token verifier initialized (tenant: %s)",
             self._identity_tenant_url,
         )
+
+    async def _ensure_jwks_client(self) -> None:
+        """Lazily resolve JWKS URI from OIDC discovery and create client.
+
+        Fetches the OIDC discovery document to obtain the authoritative
+        jwks_uri. Falls back to a constructed URI if discovery fails.
+        """
+        if self._jwks_client is not None:
+            return
+
+        discovery_url = (
+            f"{self._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}"
+            f"/.well-known/openid-configuration"
+        )
+        fallback_uri = f"{self._identity_tenant_url}/OAuth2/Keys/{CYBERARK_OIDC_APP_ID}"
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(discovery_url)
+                resp.raise_for_status()
+                oidc_config = resp.json()
+                self._jwks_uri = oidc_config.get("jwks_uri", fallback_uri)
+                logger.info("JWKS URI resolved from OIDC discovery: %s", self._jwks_uri)
+        except Exception as e:
+            logger.warning(
+                "OIDC discovery failed (%s), using fallback JWKS URI: %s",
+                e, fallback_uri,
+            )
+            self._jwks_uri = fallback_uri
+
+        self._jwks_client = PyJWKClient(self._jwks_uri, cache_keys=True)
 
     async def verify_token(self, token: str) -> Optional[AccessToken]:
         """Verify a JWT token and return an AccessToken if valid.
@@ -103,6 +141,7 @@ class CyberArkTokenVerifier(TokenVerifier):
         Raises:
             jwt.PyJWTError: On any verification failure.
         """
+        await self._ensure_jwks_client()
         signing_key = self._jwks_client.get_signing_key_from_jwt(token)
 
         return pyjwt.decode(

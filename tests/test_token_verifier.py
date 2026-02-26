@@ -70,15 +70,15 @@ class TestCyberArkTokenVerifierInit:
 
         assert verifier._identity_tenant_url == "https://abc1234.id.cyberark.cloud"
 
-    def test_jwks_uri_derived_from_tenant_url(self):
-        """JWKS URI should be derived from the tenant URL."""
+    def test_jwks_uri_none_before_resolution(self):
+        """JWKS URI should be None before lazy resolution."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
         )
 
-        assert verifier._jwks_uri == "https://abc1234.id.cyberark.cloud/OAuth2/Keys/mcpprivilegecloud"
+        assert verifier._jwks_uri is None
 
 
 class TestCyberArkTokenVerifierVerify:
@@ -253,16 +253,98 @@ class TestCyberArkTokenVerifierVerify:
 class TestCyberArkTokenVerifierJWKS:
     """Test JWKS fetching and caching."""
 
-    @pytest.mark.asyncio
-    async def test_jwks_client_created(self):
-        """Verifier should create a PyJWKClient for the JWKS URI."""
+    def test_jwks_client_not_created_at_init(self):
+        """JWKS client should NOT be created at init (lazy resolution)."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         verifier = CyberArkTokenVerifier(
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
         )
 
+        assert verifier._jwks_client is None
+
+    @pytest.mark.asyncio
+    async def test_jwks_uri_resolved_from_oidc_discovery(self):
+        """JWKS URI should be resolved from OIDC discovery on first use."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+        verifier = CyberArkTokenVerifier(
+            identity_tenant_url="https://abc1234.id.cyberark.cloud",
+        )
+
+        oidc_response = {
+            "jwks_uri": "https://abc1234.id.cyberark.cloud/OAuth2/Keys/real-app-key-id",
+            "issuer": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
+        }
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = oidc_response
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_resp
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await verifier._ensure_jwks_client()
+
+        assert verifier._jwks_uri == "https://abc1234.id.cyberark.cloud/OAuth2/Keys/real-app-key-id"
         assert verifier._jwks_client is not None
+
+    @pytest.mark.asyncio
+    async def test_jwks_uri_falls_back_on_discovery_failure(self):
+        """Should fall back to constructed JWKS URI if OIDC discovery fails."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
+
+        verifier = CyberArkTokenVerifier(
+            identity_tenant_url="https://abc1234.id.cyberark.cloud",
+        )
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get.side_effect = Exception("connection refused")
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await verifier._ensure_jwks_client()
+
+        expected_fallback = f"https://abc1234.id.cyberark.cloud/OAuth2/Keys/{CYBERARK_OIDC_APP_ID}"
+        assert verifier._jwks_uri == expected_fallback
+        assert verifier._jwks_client is not None
+
+    @pytest.mark.asyncio
+    async def test_jwks_client_cached_after_first_resolution(self):
+        """JWKS client should be reused after first resolution."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+        verifier = CyberArkTokenVerifier(
+            identity_tenant_url="https://abc1234.id.cyberark.cloud",
+        )
+
+        oidc_response = {
+            "jwks_uri": "https://abc1234.id.cyberark.cloud/OAuth2/Keys/real-key",
+            "issuer": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
+        }
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = oidc_response
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_resp
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await verifier._ensure_jwks_client()
+            first_client = verifier._jwks_client
+
+            # Second call should not re-fetch
+            await verifier._ensure_jwks_client()
+            assert verifier._jwks_client is first_client
 
     @pytest.mark.asyncio
     async def test_jwks_fetch_failure_returns_none(self):
@@ -301,23 +383,25 @@ class TestCyberArkTokenVerifierJWKS:
         mock_key = MagicMock()
         mock_key.key = "mock-public-key"
 
-        with patch.object(
-            verifier._jwks_client, "get_signing_key_from_jwt", return_value=mock_key
-        ):
-            with patch("jwt.decode", return_value=claims) as mock_decode:
-                result = await verifier._decode_and_verify(jwt_token)
+        # Pre-set a mock JWKS client so _ensure_jwks_client is a no-op
+        mock_jwks_client = MagicMock()
+        mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
+        verifier._jwks_client = mock_jwks_client
 
-                from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+        with patch("jwt.decode", return_value=claims) as mock_decode:
+            result = await verifier._decode_and_verify(jwt_token)
 
-                mock_decode.assert_called_once_with(
-                    jwt_token,
-                    mock_key.key,
-                    algorithms=["RS256"],
-                    audience=CYBERARK_OIDC_APP_ID,
-                    issuer=f"{verifier._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
-                    options={"require": ["exp", "iss", "sub", "aud"]},
-                )
-                assert result == claims
+            from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+
+            mock_decode.assert_called_once_with(
+                jwt_token,
+                mock_key.key,
+                algorithms=["RS256"],
+                audience=CYBERARK_OIDC_APP_ID,
+                issuer=f"{verifier._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
+                options={"require": ["exp", "iss", "sub", "aud"]},
+            )
+            assert result == claims
 
 
 class TestCyberArkTokenVerifierProtocol:
