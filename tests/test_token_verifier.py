@@ -6,6 +6,7 @@ implementing the MCP SDK's TokenVerifier protocol.
 
 import base64
 import json
+import os
 import time
 
 import pytest
@@ -391,7 +392,75 @@ class TestCyberArkTokenVerifierJWKS:
         with patch("jwt.decode", return_value=claims) as mock_decode:
             result = await verifier._decode_and_verify(jwt_token)
 
-            from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+            mock_decode.assert_called_once_with(
+                jwt_token,
+                mock_key.key,
+                algorithms=["RS256"],
+                audience=verifier._expected_audience,
+                issuer=f"{verifier._identity_tenant_url}/{verifier._expected_app_id}/",
+                options={"require": ["exp", "iss", "sub", "aud"]},
+            )
+            assert result == claims
+
+
+class TestCyberArkTokenVerifierAudience:
+    """Test audience resolution from CYBERARK_CLIENT_ID."""
+
+    @pytest.mark.asyncio
+    async def test_audience_uses_client_id_env_var(self):
+        """When CYBERARK_CLIENT_ID is set, it should be used as expected audience."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+        client_id = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
+        claims = _default_claims(aud=client_id)
+        jwt_token = _make_jwt(claims)
+
+        with patch.dict(os.environ, {"CYBERARK_CLIENT_ID": client_id}):
+            verifier = CyberArkTokenVerifier(
+                identity_tenant_url="https://abc1234.id.cyberark.cloud",
+            )
+
+        mock_key = MagicMock()
+        mock_key.key = "mock-public-key"
+        mock_jwks_client = MagicMock()
+        mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
+        verifier._jwks_client = mock_jwks_client
+
+        with patch("jwt.decode", return_value=claims) as mock_decode:
+            await verifier._decode_and_verify(jwt_token)
+
+            mock_decode.assert_called_once_with(
+                jwt_token,
+                mock_key.key,
+                algorithms=["RS256"],
+                audience=client_id,
+                issuer=f"{verifier._identity_tenant_url}/{verifier._expected_app_id}/",
+                options={"require": ["exp", "iss", "sub", "aud"]},
+            )
+
+    @pytest.mark.asyncio
+    async def test_audience_falls_back_to_oidc_app_id(self):
+        """Without CYBERARK_CLIENT_ID, should use CYBERARK_OIDC_APP_ID as audience."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
+
+        claims = _default_claims()
+        jwt_token = _make_jwt(claims)
+
+        with patch.dict(os.environ, {}, clear=False):
+            # Ensure CYBERARK_CLIENT_ID is not set
+            os.environ.pop("CYBERARK_CLIENT_ID", None)
+            verifier = CyberArkTokenVerifier(
+                identity_tenant_url="https://abc1234.id.cyberark.cloud",
+            )
+
+        mock_key = MagicMock()
+        mock_key.key = "mock-public-key"
+        mock_jwks_client = MagicMock()
+        mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
+        verifier._jwks_client = mock_jwks_client
+
+        with patch("jwt.decode", return_value=claims) as mock_decode:
+            await verifier._decode_and_verify(jwt_token)
 
             mock_decode.assert_called_once_with(
                 jwt_token,
@@ -401,7 +470,6 @@ class TestCyberArkTokenVerifierJWKS:
                 issuer=f"{verifier._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
                 options={"require": ["exp", "iss", "sub", "aud"]},
             )
-            assert result == claims
 
 
 class TestCyberArkTokenVerifierProtocol:

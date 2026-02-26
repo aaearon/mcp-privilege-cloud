@@ -48,9 +48,18 @@ class CyberArkTokenVerifier(TokenVerifier):
         self._jwks_uri: Optional[str] = None
         self._jwks_client: Optional[PyJWKClient] = None
 
+        # The app name used for OIDC discovery and issuer validation
+        self._expected_app_id = CYBERARK_OIDC_APP_ID
+
+        # The expected audience: CyberArk Identity tokens use the
+        # auto-generated OAuth2 Client ID as `aud`, not the app name.
+        # Use CYBERARK_CLIENT_ID if set, otherwise fall back to app ID.
+        self._expected_audience = os.getenv("CYBERARK_CLIENT_ID") or CYBERARK_OIDC_APP_ID
+
         logger.info(
-            "Token verifier initialized (tenant: %s)",
+            "Token verifier initialized (tenant: %s, audience: %s)",
             self._identity_tenant_url,
+            self._expected_audience,
         )
 
     async def _ensure_jwks_client(self) -> None:
@@ -113,7 +122,7 @@ class CyberArkTokenVerifier(TokenVerifier):
                 logger.warning(
                     "Token claims — iss: %s, aud: %s, sub: %s (expected aud: %s)",
                     unverified.get("iss"), unverified.get("aud"), unverified.get("sub"),
-                    CYBERARK_OIDC_APP_ID,
+                    self._expected_audience,
                 )
             except Exception:
                 pass
@@ -158,7 +167,7 @@ class CyberArkTokenVerifier(TokenVerifier):
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=CYBERARK_OIDC_APP_ID,
-            issuer=f"{self._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
+            audience=self._expected_audience,
+            issuer=f"{self._identity_tenant_url}/{self._expected_app_id}/",
             options={"require": ["exp", "iss", "sub", "aud"]},
         )
