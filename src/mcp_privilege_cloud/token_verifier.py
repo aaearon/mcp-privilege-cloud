@@ -52,9 +52,14 @@ class CyberArkTokenVerifier(TokenVerifier):
         self._expected_app_id = CYBERARK_OIDC_APP_ID
 
         # The expected audience: CyberArk Identity tokens use the
-        # auto-generated OAuth2 Client ID as `aud`, not the app name.
-        # Use CYBERARK_CLIENT_ID if set, otherwise fall back to app ID.
-        self._expected_audience = os.getenv("CYBERARK_CLIENT_ID") or CYBERARK_OIDC_APP_ID
+        # auto-generated OAuth2 Client ID (a UUID) as `aud`, not the app
+        # name. CYBERARK_CLIENT_ID may hold service account credentials
+        # for DCR, so use a dedicated CYBERARK_OAUTH_AUDIENCE env var.
+        self._expected_audience = (
+            os.getenv("CYBERARK_OAUTH_AUDIENCE")
+            or os.getenv("CYBERARK_CLIENT_ID")
+            or CYBERARK_OIDC_APP_ID
+        )
 
         logger.info(
             "Token verifier initialized (tenant: %s, audience: %s)",

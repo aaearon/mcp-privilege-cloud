@@ -404,21 +404,27 @@ class TestCyberArkTokenVerifierJWKS:
 
 
 class TestCyberArkTokenVerifierAudience:
-    """Test audience resolution from CYBERARK_CLIENT_ID."""
+    """Test audience resolution: CYBERARK_OAUTH_AUDIENCE > CYBERARK_CLIENT_ID > app ID."""
 
     @pytest.mark.asyncio
-    async def test_audience_uses_client_id_env_var(self):
-        """When CYBERARK_CLIENT_ID is set, it should be used as expected audience."""
+    async def test_audience_prefers_oauth_audience_env_var(self):
+        """CYBERARK_OAUTH_AUDIENCE should take priority over CYBERARK_CLIENT_ID."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
-        client_id = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
-        claims = _default_claims(aud=client_id)
+        oauth_audience = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
+        claims = _default_claims(aud=oauth_audience)
         jwt_token = _make_jwt(claims)
 
-        with patch.dict(os.environ, {"CYBERARK_CLIENT_ID": client_id}):
+        env = {
+            "CYBERARK_OAUTH_AUDIENCE": oauth_audience,
+            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
+        }
+        with patch.dict(os.environ, env):
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
+
+        assert verifier._expected_audience == oauth_audience
 
         mock_key = MagicMock()
         mock_key.key = "mock-public-key"
@@ -433,43 +439,40 @@ class TestCyberArkTokenVerifierAudience:
                 jwt_token,
                 mock_key.key,
                 algorithms=["RS256"],
-                audience=client_id,
+                audience=oauth_audience,
                 issuer=f"{verifier._identity_tenant_url}/{verifier._expected_app_id}/",
                 options={"require": ["exp", "iss", "sub", "aud"]},
             )
 
     @pytest.mark.asyncio
+    async def test_audience_falls_back_to_client_id(self):
+        """Without CYBERARK_OAUTH_AUDIENCE, should use CYBERARK_CLIENT_ID."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+        client_id = "some-client-id"
+
+        env = {"CYBERARK_CLIENT_ID": client_id}
+        with patch.dict(os.environ, env):
+            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
+            verifier = CyberArkTokenVerifier(
+                identity_tenant_url="https://abc1234.id.cyberark.cloud",
+            )
+
+        assert verifier._expected_audience == client_id
+
+    @pytest.mark.asyncio
     async def test_audience_falls_back_to_oidc_app_id(self):
-        """Without CYBERARK_CLIENT_ID, should use CYBERARK_OIDC_APP_ID as audience."""
+        """Without either env var, should use CYBERARK_OIDC_APP_ID as audience."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
-        claims = _default_claims()
-        jwt_token = _make_jwt(claims)
-
         with patch.dict(os.environ, {}, clear=False):
-            # Ensure CYBERARK_CLIENT_ID is not set
+            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
             os.environ.pop("CYBERARK_CLIENT_ID", None)
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        mock_key = MagicMock()
-        mock_key.key = "mock-public-key"
-        mock_jwks_client = MagicMock()
-        mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
-        verifier._jwks_client = mock_jwks_client
-
-        with patch("jwt.decode", return_value=claims) as mock_decode:
-            await verifier._decode_and_verify(jwt_token)
-
-            mock_decode.assert_called_once_with(
-                jwt_token,
-                mock_key.key,
-                algorithms=["RS256"],
-                audience=CYBERARK_OIDC_APP_ID,
-                issuer=f"{verifier._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
-                options={"require": ["exp", "iss", "sub", "aud"]},
-            )
+        assert verifier._expected_audience == CYBERARK_OIDC_APP_ID
 
 
 class TestCyberArkTokenVerifierProtocol:
