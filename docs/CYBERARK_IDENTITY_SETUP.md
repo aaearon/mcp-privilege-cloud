@@ -103,39 +103,33 @@ This should return JSON with `authorization_endpoint`, `token_endpoint`, and `jw
 # Required: triggers OAuth mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
-# Service user credentials (used in DCR response for MCP clients)
+# Service account — for PCloud API access via platform token
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
+
+# OIDC app — from Trust tab, for DCR + JWT audience validation
+CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
+CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
 ```
 
 ### Legacy Service Account Mode
 
-Uses the same service user credentials but authenticates all requests under a single identity:
+Uses the service account credentials directly for all PCloud API calls (no OAuth):
 
 ```bash
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
-```
-
-### Optional: Separate OAuth Client Credentials
-
-If you need different credentials for DCR (OAuth mode) vs legacy mode, use these override env vars:
-
-```bash
-# These take priority over CYBERARK_CLIENT_ID/SECRET for DCR and JWT audience
-CYBERARK_OAUTH_CLIENT_ID=oauth-client@cyberark.cloud.XXXX
-CYBERARK_OAUTH_CLIENT_SECRET=oauth-client-password
 ```
 
 ## How It Works
 
 1. **User connects** to the MCP server via an MCP client (claude.ai, Copilot Studio, etc.)
-2. **MCP client** calls DCR (`/register`) and receives client_id/secret from the service user
-3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code + PKCE)
+2. **MCP client** calls DCR (`/register`) and receives OIDC app credentials from `CYBERARK_OAUTH_CLIENT_ID`/`SECRET`
+3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code flow)
 4. **MCP server** receives the Bearer JWT token with each request
 5. **CyberArkTokenVerifier** validates the JWT signature against the JWKS endpoint
-6. **UserSessionManager** creates (or retrieves) an isolated `CyberArkMCPServer` instance for that user
-7. **Tools execute** with the user's own CyberArk permissions and audit trail
+6. **execute_tool()** verifies user identity from the OIDC JWT, then routes API calls through the service account's platform token
+7. **Tools execute** under the service account's CyberArk permissions, with the authenticated user's identity logged for audit
 
 ## Security Considerations
 

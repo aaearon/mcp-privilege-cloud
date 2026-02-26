@@ -466,13 +466,14 @@ class TestCyberArkTokenVerifierAudience:
 
     @pytest.mark.asyncio
     async def test_audience_falls_back_to_client_id(self):
-        """Without CYBERARK_OAUTH_AUDIENCE, should use CYBERARK_CLIENT_ID."""
+        """Without CYBERARK_OAUTH_CLIENT_ID or CYBERARK_OAUTH_AUDIENCE, should use CYBERARK_CLIENT_ID."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         client_id = "some-client-id"
 
         env = {"CYBERARK_CLIENT_ID": client_id}
         with patch.dict(os.environ, env):
+            os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
             os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
@@ -482,10 +483,11 @@ class TestCyberArkTokenVerifierAudience:
 
     @pytest.mark.asyncio
     async def test_audience_falls_back_to_oidc_app_id(self):
-        """Without either env var, should use CYBERARK_OIDC_APP_ID as audience."""
+        """Without any env vars, should use CYBERARK_OIDC_APP_ID as audience."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
         with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
             os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
             os.environ.pop("CYBERARK_CLIENT_ID", None)
             verifier = CyberArkTokenVerifier(

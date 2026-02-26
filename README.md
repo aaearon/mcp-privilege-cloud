@@ -123,14 +123,15 @@ The server supports two authentication modes. It auto-detects which mode to use 
 
 ### OAuth Per-User Mode (Recommended)
 
-Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. Requires an OAuth2 app configured in CyberArk Identity (see [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)).
+Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a **service account platform token** for all PCloud API calls. Requires an OAuth2 app configured in CyberArk Identity (see [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
-| `CYBERARK_CLIENT_ID` | Yes | Service user login name (must be marked "OAuth 2.0 confidential client") |
-| `CYBERARK_CLIENT_SECRET` | Yes | Service user password |
-| `CYBERARK_SUBDOMAIN` | Yes | Privilege Cloud tenant subdomain (from your PCloud URL) |
+| `CYBERARK_CLIENT_ID` | Yes | Service account login name (used for PCloud platform token) |
+| `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
+| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR + JWT audience) |
+| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (used for DCR) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
@@ -153,9 +154,13 @@ A single shared service account authenticates all requests. Simpler setup but al
 
 ```bash
 # OAuth per-user mode (recommended)
-CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+# Service account — for PCloud API access via platform token
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
+# OIDC app — from Trust tab, for DCR + JWT audience validation
+CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
+CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
+CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
 # OR legacy service account mode
 CYBERARK_CLIENT_ID=your-service-user-username

@@ -117,12 +117,18 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         )
         logger.info("Session manager initialized (max=%d, ttl=%ds)", max_sessions, session_ttl)
 
+        # Service account server for PCloud API access
+        cyberark_server = CyberArkMCPServer.from_environment()
+        logger.info("Service account bridge initialized for PCloud API access")
+
         try:
-            yield AppContext(server=None, session_manager=session_manager)
+            yield AppContext(server=cyberark_server, session_manager=session_manager)
         finally:
             logger.info("Shutting down session manager...")
             await session_manager.shutdown()
-            logger.info("Session manager shutdown complete")
+            if hasattr(cyberark_server, '_executor'):
+                cyberark_server._executor.shutdown(wait=True)
+            logger.info("OAuth mode shutdown complete")
     else:
         logger.info("Initializing in legacy service account mode...")
         cyberark_server = CyberArkMCPServer.from_environment()
@@ -393,17 +399,16 @@ async def execute_tool(
         if ctx is not None and hasattr(ctx, 'request_context'):
             app_ctx = ctx.request_context.lifespan_context
 
-            # Try OAuth per-user resolution first
+            # Try OAuth identity verification first
             if app_ctx.session_manager is not None:
                 access_token = get_access_token()
                 if access_token is not None:
-                    server_instance = await app_ctx.session_manager.get_or_create(
-                        jwt_token=access_token.token,
-                        username=access_token.client_id,
-                    )
-
+                    logger.info("Authenticated user: %s", access_token.client_id)
+                    server_instance = app_ctx.server
+                else:
+                    raise PermissionError("OAuth mode requires authentication")
             # Fall back to legacy shared server
-            if server_instance is None and app_ctx.server is not None:
+            elif app_ctx.server is not None:
                 server_instance = app_ctx.server
 
         # Final fallback to legacy get_server()

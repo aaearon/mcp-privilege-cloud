@@ -109,28 +109,24 @@ class TestExecuteToolOAuthResolution:
     """Test execute_tool resolving per-user server via session manager."""
 
     @pytest.mark.asyncio
-    async def test_execute_tool_uses_session_manager_when_available(self):
-        """execute_tool should use session_manager when auth context provides a token."""
+    async def test_execute_tool_uses_service_account_server_in_oauth_mode(self):
+        """execute_tool should verify identity via token, then use app_ctx.server."""
         from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
-        from mcp_privilege_cloud.session_manager import UserSessionManager
 
-        # Create mock session manager
+        # Service account server (shared)
         mock_server = AsyncMock()
         mock_server.list_accounts = AsyncMock(return_value=[])
 
-        mock_manager = AsyncMock(spec=UserSessionManager)
-        mock_manager.get_or_create = AsyncMock(return_value=mock_server)
+        mock_manager = AsyncMock()
 
-        # Create mock context with session_manager and access token
         claims = _default_claims()
         jwt_token = _make_jwt(claims)
 
         ctx = Mock()
         ctx.request_context.lifespan_context = AppContext(
-            server=None, session_manager=mock_manager
+            server=mock_server, session_manager=mock_manager
         )
 
-        # Mock get_access_token to return an AccessToken-like object
         mock_access_token = Mock()
         mock_access_token.token = jwt_token
         mock_access_token.client_id = claims["sub"]
@@ -141,8 +137,9 @@ class TestExecuteToolOAuthResolution:
         ):
             result = await execute_tool("list_accounts", ctx=ctx)
 
-        mock_manager.get_or_create.assert_called_once()
+        # Should use service account server, NOT session_manager.get_or_create
         mock_server.list_accounts.assert_called_once()
+        mock_manager.get_or_create.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_execute_tool_falls_back_to_legacy_server(self):
@@ -165,39 +162,24 @@ class TestExecuteToolOAuthResolution:
         mock_server.list_accounts.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute_tool_extracts_username_from_token(self):
-        """execute_tool should extract username from JWT claims for session creation."""
+    async def test_execute_tool_rejects_unauthenticated_oauth(self):
+        """execute_tool should reject unauthenticated requests in OAuth mode."""
         from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
-        from mcp_privilege_cloud.session_manager import UserSessionManager
 
         mock_server = AsyncMock()
-        mock_server.list_accounts = AsyncMock(return_value=[])
-
-        mock_manager = AsyncMock(spec=UserSessionManager)
-        mock_manager.get_or_create = AsyncMock(return_value=mock_server)
-
-        claims = _default_claims()
-        jwt_token = _make_jwt(claims)
+        mock_manager = AsyncMock()
 
         ctx = Mock()
         ctx.request_context.lifespan_context = AppContext(
-            server=None, session_manager=mock_manager
+            server=mock_server, session_manager=mock_manager
         )
-
-        mock_access_token = Mock()
-        mock_access_token.token = jwt_token
-        mock_access_token.client_id = claims["sub"]
 
         with patch(
             "mcp_privilege_cloud.mcp_server.get_access_token",
-            return_value=mock_access_token,
+            return_value=None,
         ):
-            await execute_tool("list_accounts", ctx=ctx)
-
-        # Verify username was extracted from client_id
-        call_kwargs = mock_manager.get_or_create.call_args
-        assert call_kwargs.kwargs["username"] == claims["sub"]
-        assert call_kwargs.kwargs["jwt_token"] == jwt_token
+            with pytest.raises(PermissionError, match="OAuth mode requires authentication"):
+                await execute_tool("list_accounts", ctx=ctx)
 
 
 class TestAppLifespanOAuthMode:
@@ -205,17 +187,24 @@ class TestAppLifespanOAuthMode:
 
     @pytest.mark.asyncio
     async def test_lifespan_creates_session_manager_in_oauth_mode(self):
-        """In OAuth mode, app_lifespan should create a UserSessionManager."""
+        """In OAuth mode, app_lifespan should create both session_manager AND server."""
         from mcp_privilege_cloud.mcp_server import app_lifespan
 
         with patch.dict(os.environ, {
             "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
         }):
             with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
-                mock_fastmcp = MagicMock()
-                async with app_lifespan(mock_fastmcp) as app_ctx:
-                    assert app_ctx.session_manager is not None
-                    assert app_ctx.server is None
+                with patch(
+                    "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
+                ) as mock_from_env:
+                    mock_server = MagicMock()
+                    mock_server._executor = MagicMock()
+                    mock_from_env.return_value = mock_server
+
+                    mock_fastmcp = MagicMock()
+                    async with app_lifespan(mock_fastmcp) as app_ctx:
+                        assert app_ctx.session_manager is not None
+                        assert app_ctx.server is not None
 
     @pytest.mark.asyncio
     async def test_lifespan_creates_server_in_legacy_mode(self):
@@ -245,16 +234,23 @@ class TestAppLifespanOAuthMode:
         }):
             with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
                 with patch(
-                    "mcp_privilege_cloud.mcp_server.UserSessionManager"
-                ) as MockManager:
-                    mock_manager = AsyncMock()
-                    MockManager.return_value = mock_manager
+                    "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
+                ) as mock_from_env:
+                    mock_server = MagicMock()
+                    mock_server._executor = MagicMock()
+                    mock_from_env.return_value = mock_server
 
-                    mock_fastmcp = MagicMock()
-                    async with app_lifespan(mock_fastmcp) as app_ctx:
-                        pass
+                    with patch(
+                        "mcp_privilege_cloud.mcp_server.UserSessionManager"
+                    ) as MockManager:
+                        mock_manager = AsyncMock()
+                        MockManager.return_value = mock_manager
 
-                    mock_manager.shutdown.assert_called_once()
+                        mock_fastmcp = MagicMock()
+                        async with app_lifespan(mock_fastmcp) as app_ctx:
+                            pass
+
+                        mock_manager.shutdown.assert_called_once()
 
 
 class TestMCPServerOAuthInit:

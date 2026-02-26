@@ -96,9 +96,9 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
-**Last Updated**: February 25, 2026
-**Recent Achievement**: RFC 8414 `/.well-known/oauth-authorization-server` endpoint via FastMCP `custom_route()`, proxying CyberArk Identity OIDC discovery. Enables claude.ai OAuth discovery flow. Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 315 passing tests with zero regression.
+**Current Status**: ✅ **SERVICE ACCOUNT TOKEN BRIDGE COMPLETE** - OAuth mode verifies user identity via OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
+**Last Updated**: February 26, 2026
+**Recent Achievement**: Service account token bridge architecture. PCloud rejects CyberArk Identity OIDC JWTs (`CAJWT001E`), so OAuth mode now creates a service account server alongside the session manager. `execute_tool()` verifies user identity from the OIDC JWT (via `get_access_token()`), then routes all PCloud API calls through the service account's platform token. Separate OIDC app credentials (`CYBERARK_OAUTH_CLIENT_ID`/`SECRET`) for DCR and JWT audience validation. 326 passing tests with zero regression.
 
 ## Architecture
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 277+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 326+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -336,7 +336,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `exceptions.py` - Custom exceptions: OAuthError, SessionExpiredError, CyberArkAPIError
 
 ### Testing Validation ✅ **VERIFIED**
-- **277+ tests passing** - Zero functionality regression across all phases
+- **326+ tests passing** - Zero functionality regression across all phases
 - **Test Coverage Maintained** - 16 token verifier + 15 session manager + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
@@ -345,13 +345,12 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 **Required Environment Variables** (OAuth per-user mode):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
-- `CYBERARK_CLIENT_ID` - Service user login name (must be marked "OAuth 2.0 confidential client")
-- `CYBERARK_CLIENT_SECRET` - Service user password
-- `CYBERARK_SUBDOMAIN` - Privilege Cloud tenant subdomain (from `https://<subdomain>.privilegecloud.cyberark.cloud`)
+- `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token access)
+- `CYBERARK_CLIENT_SECRET` - Service account password
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR + JWT audience validation)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
 
 **Optional Environment Variables**:
-- `CYBERARK_OAUTH_CLIENT_ID` - Override client_id for DCR/audience (if different from `CYBERARK_CLIENT_ID`)
-- `CYBERARK_OAUTH_CLIENT_SECRET` - Override client_secret for DCR (if different from `CYBERARK_CLIENT_SECRET`)
 - `CYBERARK_OIDC_APP_ID` - OIDC app name in URL paths (default: `mcpprivilegecloud`)
 - `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
@@ -491,7 +490,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 277+ tests must continue passing
+5. **Preserve test coverage** - All 326+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -502,7 +501,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 277+ tests still pass
+4. Verify all 326+ tests still pass
 ```
 
 ## References
