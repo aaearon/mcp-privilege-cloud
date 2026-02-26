@@ -86,16 +86,16 @@ class TestDCRClientIdResolution:
 
 class TestTokenVerifierAudienceResolution:
     """Test audience priority chain:
-    CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OAUTH_AUDIENCE > CYBERARK_CLIENT_ID > CYBERARK_OIDC_APP_ID
+    CYBERARK_OAUTH_AUDIENCE > CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID > CYBERARK_OIDC_APP_ID
     """
 
-    def test_oauth_client_id_highest_priority(self):
-        """CYBERARK_OAUTH_CLIENT_ID should take highest priority for audience."""
+    def test_oauth_audience_highest_priority(self):
+        """CYBERARK_OAUTH_AUDIENCE should take highest priority (explicit override)."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         env = {
-            "CYBERARK_OAUTH_CLIENT_ID": "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
-            "CYBERARK_OAUTH_AUDIENCE": "old-audience-value",
+            "CYBERARK_OAUTH_AUDIENCE": "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
+            "CYBERARK_OAUTH_CLIENT_ID": "c21840a7-trust-tab-id",
             "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
         }
         with patch.dict(os.environ, env):
@@ -105,21 +105,21 @@ class TestTokenVerifierAudienceResolution:
 
         assert verifier._expected_audience == "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
 
-    def test_oauth_audience_backward_compat(self):
-        """CYBERARK_OAUTH_AUDIENCE should work as backward compat (2nd priority)."""
+    def test_oauth_client_id_second_priority(self):
+        """CYBERARK_OAUTH_CLIENT_ID should be 2nd priority for audience."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         env = {
-            "CYBERARK_OAUTH_AUDIENCE": "backward-compat-audience",
+            "CYBERARK_OAUTH_CLIENT_ID": "c21840a7-trust-tab-id",
             "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
         }
         with patch.dict(os.environ, env):
-            os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
+            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == "backward-compat-audience"
+        assert verifier._expected_audience == "c21840a7-trust-tab-id"
 
     def test_legacy_client_id_fallback(self):
         """CYBERARK_CLIENT_ID should be used as 3rd fallback for audience."""

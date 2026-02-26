@@ -53,12 +53,14 @@ class CyberArkTokenVerifier(TokenVerifier):
 
         # The expected audience: CyberArk Identity tokens use the
         # auto-generated OAuth2 Client ID as `aud`, not the app
-        # name. Priority: CYBERARK_OAUTH_CLIENT_ID (canonical) >
-        # CYBERARK_OAUTH_AUDIENCE (backward compat) > CYBERARK_CLIENT_ID
-        # (legacy) > CYBERARK_OIDC_APP_ID (ultimate fallback).
+        # name. The Trust tab client_id (CYBERARK_OAUTH_CLIENT_ID) differs
+        # from the app's internal ID that appears in the JWT `aud` claim.
+        # Priority: CYBERARK_OAUTH_AUDIENCE (explicit audience override) >
+        # CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID (legacy) >
+        # CYBERARK_OIDC_APP_ID (ultimate fallback).
         self._expected_audience = (
-            os.getenv("CYBERARK_OAUTH_CLIENT_ID")
-            or os.getenv("CYBERARK_OAUTH_AUDIENCE")
+            os.getenv("CYBERARK_OAUTH_AUDIENCE")
+            or os.getenv("CYBERARK_OAUTH_CLIENT_ID")
             or os.getenv("CYBERARK_CLIENT_ID")
             or CYBERARK_OIDC_APP_ID
         )

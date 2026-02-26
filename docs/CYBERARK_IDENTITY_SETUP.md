@@ -107,9 +107,11 @@ CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
 
-# OIDC app — from Trust tab, for DCR + JWT audience validation
+# OIDC app — from Trust tab, for DCR
 CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
 CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
+# JWT audience — the app's internal ID (differs from Trust tab client_id)
+CYBERARK_OAUTH_AUDIENCE=your-oidc-app-internal-id
 ```
 
 ### Legacy Service Account Mode

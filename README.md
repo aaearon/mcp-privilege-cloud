@@ -130,8 +130,9 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
 | `CYBERARK_CLIENT_ID` | Yes | Service account login name (used for PCloud platform token) |
 | `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
-| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR + JWT audience) |
+| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR) |
 | `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (used for DCR) |
+| `CYBERARK_OAUTH_AUDIENCE` | Yes | JWT audience claim (app's internal ID -- differs from Trust tab client_id) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
@@ -157,9 +158,11 @@ A single shared service account authenticates all requests. Simpler setup but al
 # Service account — for PCloud API access via platform token
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
-# OIDC app — from Trust tab, for DCR + JWT audience validation
+# OIDC app — from Trust tab, for DCR
 CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
 CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
+# JWT audience — the app's internal ID (differs from Trust tab client_id)
+CYBERARK_OAUTH_AUDIENCE=your-oidc-app-internal-id
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
 # OR legacy service account mode
