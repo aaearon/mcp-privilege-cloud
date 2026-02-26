@@ -12,6 +12,7 @@ services:
       CYBERARK_CLIENT_ID: ${CYBERARK_CLIENT_ID:-}
       CYBERARK_CLIENT_SECRET: ${CYBERARK_CLIENT_SECRET:-}
       CYBERARK_OAUTH_AUDIENCE: ${CYBERARK_OAUTH_AUDIENCE:-}
+      CYBERARK_SUBDOMAIN: ${CYBERARK_SUBDOMAIN:-}
     env_file:
       - path: .env
         required: false
