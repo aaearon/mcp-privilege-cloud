@@ -31,7 +31,7 @@ def _default_claims(**overrides: object) -> dict:
     """Return default valid JWT claims with optional overrides."""
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
-        "iss": "https://abc1234.id.cyberark.cloud/",
+        "iss": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
         "aud": "mcpprivilegecloud",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),

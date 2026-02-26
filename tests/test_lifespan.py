@@ -38,10 +38,7 @@ class TestLifespanContextManager:
 
         mock_server = Mock()
 
-        with patch.dict(os.environ, {
-            'CYBERARK_CLIENT_ID': 'test-client',
-            'CYBERARK_CLIENT_SECRET': 'test-secret'
-        }):
+        with patch('mcp_privilege_cloud.mcp_server.is_oauth_mode', return_value=False):
             with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_class:
                 mock_class.from_environment.return_value = mock_server
 
@@ -74,10 +71,7 @@ class TestLifespanContextManager:
         mock_server = Mock()
         mock_server._executor = mock_executor
 
-        with patch.dict(os.environ, {
-            'CYBERARK_CLIENT_ID': 'test-client',
-            'CYBERARK_CLIENT_SECRET': 'test-secret'
-        }):
+        with patch('mcp_privilege_cloud.mcp_server.is_oauth_mode', return_value=False):
             with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_class:
                 mock_class.from_environment.return_value = mock_server
 
@@ -94,10 +88,7 @@ class TestLifespanContextManager:
 
         mock_server = Mock(spec=['list_accounts'])  # No _executor attribute
 
-        with patch.dict(os.environ, {
-            'CYBERARK_CLIENT_ID': 'test-client',
-            'CYBERARK_CLIENT_SECRET': 'test-secret'
-        }):
+        with patch('mcp_privilege_cloud.mcp_server.is_oauth_mode', return_value=False):
             with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_class:
                 mock_class.from_environment.return_value = mock_server
 
@@ -129,10 +120,7 @@ class TestLifespanErrorHandling:
         """Lifespan should propagate server initialization errors"""
         from mcp_privilege_cloud.mcp_server import app_lifespan, mcp
 
-        with patch.dict(os.environ, {
-            'CYBERARK_CLIENT_ID': 'test-client',
-            'CYBERARK_CLIENT_SECRET': 'test-secret'
-        }):
+        with patch('mcp_privilege_cloud.mcp_server.is_oauth_mode', return_value=False):
             with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_class:
                 mock_class.from_environment.side_effect = ValueError("Missing credentials")
 
@@ -149,10 +137,7 @@ class TestLifespanErrorHandling:
         mock_server = Mock()
         mock_server._executor = mock_executor
 
-        with patch.dict(os.environ, {
-            'CYBERARK_CLIENT_ID': 'test-client',
-            'CYBERARK_CLIENT_SECRET': 'test-secret'
-        }):
+        with patch('mcp_privilege_cloud.mcp_server.is_oauth_mode', return_value=False):
             with patch('mcp_privilege_cloud.mcp_server.CyberArkMCPServer') as mock_class:
                 mock_class.from_environment.return_value = mock_server
 

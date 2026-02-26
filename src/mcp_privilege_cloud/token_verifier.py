@@ -38,7 +38,7 @@ class CyberArkTokenVerifier(TokenVerifier):
                 (e.g., "https://abc1234.id.cyberark.cloud").
         """
         self._identity_tenant_url = identity_tenant_url.rstrip("/")
-        self._jwks_uri = f"{self._identity_tenant_url}/oauth2/certs"
+        self._jwks_uri = f"{self._identity_tenant_url}/OAuth2/Keys/{CYBERARK_OIDC_APP_ID}"
         self._jwks_client = PyJWKClient(self._jwks_uri, cache_keys=True)
 
         logger.info(
@@ -110,6 +110,6 @@ class CyberArkTokenVerifier(TokenVerifier):
             signing_key.key,
             algorithms=["RS256"],
             audience=CYBERARK_OIDC_APP_ID,
-            issuer=self._identity_tenant_url + "/",
+            issuer=f"{self._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
             options={"require": ["exp", "iss", "sub", "aud"]},
         )

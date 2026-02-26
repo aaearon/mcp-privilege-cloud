@@ -7,26 +7,50 @@ This guide explains how to configure a CyberArk Identity OAuth2 application for 
 - CyberArk Identity administrator access
 - CyberArk Privilege Cloud tenant
 
-## Step 1: No Custom OAuth App Registration Needed
+## Step 1: Create an OIDC Application in CyberArk Identity
 
-The MCP server uses CyberArk Identity's built-in OIDC application (`__idaptive_cybr_user_oidc`), which is present on every CyberArk Identity tenant. No custom OAuth2 application registration is required.
-
-## Step 2: Configure Redirect URIs
-
-Add the appropriate redirect URI based on your MCP client:
+1. Navigate to **Apps & Widgets** > **Add Web Apps** > **Custom** > **OAuth2 Client**
+2. Create an app named `mcpprivilegecloud` (this is the default `CYBERARK_OIDC_APP_ID`)
+3. On the **Trust** tab, add the redirect URIs for your MCP clients:
 
 | Client | Redirect URI |
 |--------|-------------|
+| claude.ai | `https://claude.ai/api/mcp/auth_callback` |
 | Local development | `http://localhost:8000/oauth/callback` |
 | Production | `https://your-server.example.com/oauth/callback` |
 
-## Step 3: Assign Users/Roles
+4. On the **Tokens** tab, configure token settings as needed
+5. Note the auto-generated **Client ID** — set this as `CYBERARK_CLIENT_ID`
+
+## Step 2: Add Trusted DNS Domains (Required for PKCE Clients)
+
+CyberArk Identity requires clients using PKCE to have their domain added to trusted DNS domains:
+
+1. Navigate to **Settings** > **Authentication** > **Security Settings** > **API Security**
+2. Under **Trusted DNS Domains for API Calls**, add:
+   - `claude.ai` (for claude.ai integration)
+   - Any other MCP client domains that will use the OAuth flow
+3. Save the settings
+
+**Without this step, CyberArk Identity will return `invalid_client` errors during the authorization code flow.**
+
+## Step 3: Verify Per-App OIDC Discovery
+
+Verify the OIDC discovery endpoint is accessible for your app:
+
+```bash
+curl https://YOUR_TENANT.id.cyberark.cloud/mcpprivilegecloud/.well-known/openid-configuration
+```
+
+This should return JSON with `authorization_endpoint`, `token_endpoint`, and `jwks_uri` that include the app ID in the path (e.g., `/OAuth2/Authorize/mcpprivilegecloud`).
+
+## Step 4: Assign Users/Roles
 
 1. Navigate to the application's **Permissions** tab
 2. Add the users or roles that should have access to the MCP server
 3. Users must also have appropriate **Privilege Cloud** permissions (safe access, platform admin, etc.)
 
-## Step 4: Configure the MCP Server
+## Step 5: Configure the MCP Server
 
 Set the following environment variables:
 
@@ -41,7 +65,7 @@ MCP_MAX_SESSIONS=100       # Max concurrent user sessions
 MCP_SESSION_TTL=3600       # Session lifetime in seconds
 ```
 
-## Step 5: Verify Configuration
+## Step 6: Verify Configuration
 
 Start the server and verify it initializes in OAuth mode:
 

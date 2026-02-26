@@ -13,11 +13,11 @@ from unittest.mock import AsyncMock, patch
 
 # Sample OIDC discovery response from CyberArk Identity
 SAMPLE_OIDC_DISCOVERY = {
-    "issuer": "https://abc1234.id.cyberark.cloud/",
-    "authorization_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/Authorize/__idaptive_cybr_user_oidc",
-    "token_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/Token/__idaptive_cybr_user_oidc",
-    "userinfo_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/UserInfo/__idaptive_cybr_user_oidc",
-    "jwks_uri": "https://abc1234.id.cyberark.cloud/OAuth2/Keys/__idaptive_cybr_user_oidc",
+    "issuer": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
+    "authorization_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/Authorize/mcpprivilegecloud",
+    "token_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/Token/mcpprivilegecloud",
+    "userinfo_endpoint": "https://abc1234.id.cyberark.cloud/OAuth2/UserInfo/mcpprivilegecloud",
+    "jwks_uri": "https://abc1234.id.cyberark.cloud/OAuth2/Keys/mcpprivilegecloud",
     "response_types_supported": ["code", "id_token", "code id_token"],
     "code_challenge_methods_supported": ["S256"],
     "scopes_supported": ["openid", "profile", "email"],
@@ -54,10 +54,10 @@ class TestFetchOidcDiscovery:
 
             result = await _fetch_oidc_discovery("https://abc1234.id.cyberark.cloud")
 
-        assert result["issuer"] == "https://abc1234.id.cyberark.cloud/"
+        assert result["issuer"] == "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/"
         assert "authorization_endpoint" in result
         mock_client.get.assert_called_once_with(
-            "https://abc1234.id.cyberark.cloud/.well-known/openid-configuration"
+            "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/.well-known/openid-configuration"
         )
 
     @pytest.mark.asyncio
@@ -108,7 +108,7 @@ class TestFetchOidcDiscovery:
             await _fetch_oidc_discovery("https://abc1234.id.cyberark.cloud/")
 
         mock_client.get.assert_called_once_with(
-            "https://abc1234.id.cyberark.cloud/.well-known/openid-configuration"
+            "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/.well-known/openid-configuration"
         )
 
     @pytest.mark.asyncio
@@ -136,16 +136,14 @@ class TestBuildOAuthMetadata:
     """Test the _build_oauth_metadata helper."""
 
     def test_returns_correct_rfc8414_fields(self):
-        """Should return RFC 8414 metadata with app-specific endpoints."""
+        """Should return RFC 8414 metadata with endpoints from OIDC discovery."""
         from mcp_privilege_cloud.mcp_server import _build_oauth_metadata
-        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
-        issuer = SAMPLE_OIDC_DISCOVERY["issuer"].rstrip("/")
 
         assert metadata["issuer"] == SAMPLE_OIDC_DISCOVERY["issuer"]
-        assert metadata["authorization_endpoint"] == f"{issuer}/OAuth2/Authorize/{CYBERARK_OIDC_APP_ID}"
-        assert metadata["token_endpoint"] == f"{issuer}/OAuth2/Token/{CYBERARK_OIDC_APP_ID}"
+        assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
+        assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
         assert metadata["code_challenge_methods_supported"] == ["S256"]
         assert metadata["scopes_supported"] == ["openid", "profile", "email"]
@@ -254,6 +252,21 @@ class TestDynamicClientRegistration:
         assert response["client_id"] == CYBERARK_OIDC_APP_ID
         assert response["client_name"] == "MCP Client"
         assert response["redirect_uris"] == []
+
+    def test_dcr_logs_warning_when_client_id_not_set(self):
+        """DCR should log a warning when CYBERARK_CLIENT_ID is not set."""
+        from mcp_privilege_cloud.mcp_server import _build_dcr_response
+        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+        import logging
+
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("mcp_privilege_cloud.mcp_server.logger") as mock_logger:
+                response = _build_dcr_response({})
+
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "CYBERARK_CLIENT_ID" in warning_msg
+        assert response["client_id"] == CYBERARK_OIDC_APP_ID
 
 
 class TestOAuthRouteRegistration:

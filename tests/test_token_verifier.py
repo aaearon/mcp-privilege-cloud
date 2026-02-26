@@ -28,7 +28,7 @@ def _default_claims(**overrides: object) -> dict:
     """Return default valid JWT claims with optional overrides."""
     claims = {
         "sub": "testuser@cyberark.cloud.12345",
-        "iss": "https://abc1234.id.cyberark.cloud/",
+        "iss": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
         "aud": "mcpprivilegecloud",
         "exp": int(time.time()) + 3600,
         "iat": int(time.time()),
@@ -78,7 +78,7 @@ class TestCyberArkTokenVerifierInit:
             identity_tenant_url="https://abc1234.id.cyberark.cloud",
         )
 
-        assert verifier._jwks_uri == "https://abc1234.id.cyberark.cloud/oauth2/certs"
+        assert verifier._jwks_uri == "https://abc1234.id.cyberark.cloud/OAuth2/Keys/mcpprivilegecloud"
 
 
 class TestCyberArkTokenVerifierVerify:
@@ -314,7 +314,7 @@ class TestCyberArkTokenVerifierJWKS:
                     mock_key.key,
                     algorithms=["RS256"],
                     audience=CYBERARK_OIDC_APP_ID,
-                    issuer=verifier._identity_tenant_url + "/",
+                    issuer=f"{verifier._identity_tenant_url}/{CYBERARK_OIDC_APP_ID}/",
                     options={"require": ["exp", "iss", "sub", "aud"]},
                 )
                 assert result == claims
