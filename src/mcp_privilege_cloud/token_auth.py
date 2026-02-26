@@ -8,7 +8,6 @@ authentication. This enables per-user OAuth in Resource Server mode.
 import base64
 import json
 import logging
-import os
 import time
 from datetime import datetime
 from typing import Optional
@@ -98,9 +97,6 @@ class ArkISPAuthFromToken(ArkISPAuth):
             claims.get("unique_name"),
         )
 
-        # Determine env from platform_domain or default to prod
-        env = os.environ.get("DEPLOY_ENV", "prod")
-
         # Build ArkToken with metadata compatible with PCloud service initialization
         ark_token = ArkToken(
             token=SecretStr(jwt_token),
@@ -112,7 +108,7 @@ class ArkISPAuthFromToken(ArkISPAuth):
                 datetime.fromtimestamp(exp) if exp else None
             ),
             refresh_token=refresh_token,
-            metadata={"env": env},
+            metadata={},
         )
 
         # Initialize parent with pre-existing token, no caching

@@ -134,9 +134,26 @@ CyberArk Identity's OIDC app configuration does not appear to support the standa
 | `CYBERARK_CLIENT_ID` | OAuth client_id returned in DCR response | Falls back to `CYBERARK_OIDC_APP_ID` |
 | `CYBERARK_CLIENT_SECRET` | OAuth client_secret returned in DCR (confidential client) | None (public client) |
 
-## Next Steps to Unblock
+## Likely Resolution: DCR Client ID Fix
 
-1. **CyberArk Identity investigation** — Determine the exact OIDC app configuration required for custom apps to issue authorization codes. This may require:
+**Update (2026-02-26)**: CyberArk Identity OAuth2 Client apps do NOT provide their own client_id/client_secret. Instead, the `client_id` and `client_secret` come from a **service user** marked as "OAuth 2.0 confidential client". The service user's login name IS the `client_id` (format: `<name>@cyberark.cloud.<suffix>`), and the password IS the `client_secret`.
+
+This means `CYBERARK_CLIENT_ID` was already the correct value for DCR all along. The `invalid_client` error from Step 7 may instead be caused by:
+- Missing trusted DNS domains (most likely)
+- Client ID Type misconfiguration on the OAuth2 Client app
+- Service user not properly marked as OAuth 2.0 confidential client
+
+Code changes made:
+- `CYBERARK_OAUTH_CLIENT_ID`/`CYBERARK_OAUTH_CLIENT_SECRET` added as optional overrides (for cases where different credentials are needed for DCR vs legacy mode)
+- DCR priority chain: `CYBERARK_OAUTH_CLIENT_ID` > `CYBERARK_CLIENT_ID` > `CYBERARK_OIDC_APP_ID`
+- Token verifier audience uses same priority chain
+- `DEPLOY_ENV` removed as dead code
+
+**To verify**: Ensure `CYBERARK_CLIENT_ID` is a service user marked as "OAuth 2.0 confidential client", trusted DNS domains are configured, then test the full claude.ai OAuth flow.
+
+## Other Next Steps
+
+1. **CyberArk Identity investigation** — If the DCR fix doesn't fully resolve the issue, determine the exact OIDC app configuration required:
    - CyberArk support engagement
    - Reviewing CyberArk Identity API documentation for OIDC app configuration
    - Testing with CyberArk Identity's own OAuth playground/test tools

@@ -149,20 +149,28 @@ except ImportError:
 def _build_dcr_response(body: dict) -> dict:
     """Build RFC 7591 Dynamic Client Registration response.
 
-    Returns pre-configured CyberArk Identity OIDC app credentials
+    Returns pre-configured CyberArk Identity OAuth2 app credentials
     so MCP clients can obtain a client_id without manual configuration.
-    Uses CYBERARK_CLIENT_ID/SECRET for confidential client auth.
+
+    Client ID priority: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID > CYBERARK_OIDC_APP_ID
+    Secret priority: CYBERARK_OAUTH_CLIENT_SECRET > CYBERARK_CLIENT_SECRET
     """
-    client_id = os.getenv("CYBERARK_CLIENT_ID")
+    client_id = (
+        os.getenv("CYBERARK_OAUTH_CLIENT_ID")
+        or os.getenv("CYBERARK_CLIENT_ID")
+    )
     if not client_id:
         logger.warning(
-            "CYBERARK_CLIENT_ID not set; falling back to OIDC app ID '%s'. "
-            "Set CYBERARK_CLIENT_ID to the auto-generated OpenID Connect Client ID "
-            "from the CyberArk Identity app configuration.",
+            "CYBERARK_OAUTH_CLIENT_ID not set; falling back to OIDC app ID '%s'. "
+            "Set CYBERARK_OAUTH_CLIENT_ID to the auto-generated OAuth2 Client ID "
+            "from the CyberArk Identity app Trust tab.",
             CYBERARK_OIDC_APP_ID,
         )
         client_id = CYBERARK_OIDC_APP_ID
-    client_secret = os.getenv("CYBERARK_CLIENT_SECRET")
+    client_secret = (
+        os.getenv("CYBERARK_OAUTH_CLIENT_SECRET")
+        or os.getenv("CYBERARK_CLIENT_SECRET")
+    )
 
     response: Dict[str, Any] = {
         "client_id": client_id,

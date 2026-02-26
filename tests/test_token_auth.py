@@ -91,8 +91,8 @@ class TestArkISPAuthFromToken:
         actual = auth.token.expires_in
         assert abs((expected - actual).total_seconds()) < 5
 
-    def test_token_metadata_env(self):
-        """Token metadata should contain env for PCloud service initialization."""
+    def test_token_metadata_empty(self):
+        """Token metadata should be an empty dict (DEPLOY_ENV removed as dead code)."""
         from mcp_privilege_cloud.token_auth import ArkISPAuthFromToken
 
         claims = _default_claims()
@@ -103,7 +103,7 @@ class TestArkISPAuthFromToken:
             username=claims["unique_name"],
         )
 
-        assert "env" in auth.token.metadata
+        assert auth.token.metadata == {}
 
     def test_active_auth_profile_set(self):
         """_active_auth_profile must be set for service compatibility."""

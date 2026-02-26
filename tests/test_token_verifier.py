@@ -404,19 +404,20 @@ class TestCyberArkTokenVerifierJWKS:
 
 
 class TestCyberArkTokenVerifierAudience:
-    """Test audience resolution: CYBERARK_OAUTH_AUDIENCE > CYBERARK_CLIENT_ID > app ID."""
+    """Test audience resolution: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OAUTH_AUDIENCE > CYBERARK_CLIENT_ID > app ID."""
 
     @pytest.mark.asyncio
-    async def test_audience_prefers_oauth_audience_env_var(self):
-        """CYBERARK_OAUTH_AUDIENCE should take priority over CYBERARK_CLIENT_ID."""
+    async def test_audience_prefers_oauth_client_id(self):
+        """CYBERARK_OAUTH_CLIENT_ID should take highest priority."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
-        oauth_audience = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
-        claims = _default_claims(aud=oauth_audience)
+        oauth_client_id = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
+        claims = _default_claims(aud=oauth_client_id)
         jwt_token = _make_jwt(claims)
 
         env = {
-            "CYBERARK_OAUTH_AUDIENCE": oauth_audience,
+            "CYBERARK_OAUTH_CLIENT_ID": oauth_client_id,
+            "CYBERARK_OAUTH_AUDIENCE": "old-audience",
             "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
         }
         with patch.dict(os.environ, env):
@@ -424,7 +425,7 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == oauth_audience
+        assert verifier._expected_audience == oauth_client_id
 
         mock_key = MagicMock()
         mock_key.key = "mock-public-key"
@@ -439,10 +440,29 @@ class TestCyberArkTokenVerifierAudience:
                 jwt_token,
                 mock_key.key,
                 algorithms=["RS256"],
-                audience=oauth_audience,
+                audience=oauth_client_id,
                 issuer=f"{verifier._identity_tenant_url}/{verifier._expected_app_id}/",
                 options={"require": ["exp", "iss", "sub", "aud"]},
             )
+
+    @pytest.mark.asyncio
+    async def test_audience_prefers_oauth_audience_env_var(self):
+        """CYBERARK_OAUTH_AUDIENCE should take priority over CYBERARK_CLIENT_ID (backward compat)."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+
+        oauth_audience = "backward-compat-audience"
+
+        env = {
+            "CYBERARK_OAUTH_AUDIENCE": oauth_audience,
+            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
+        }
+        with patch.dict(os.environ, env):
+            os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
+            verifier = CyberArkTokenVerifier(
+                identity_tenant_url="https://abc1234.id.cyberark.cloud",
+            )
+
+        assert verifier._expected_audience == oauth_audience
 
     @pytest.mark.asyncio
     async def test_audience_falls_back_to_client_id(self):

@@ -1,30 +1,75 @@
-# CyberArk Identity OAuth Setup Guide
+# CyberArk Identity Setup Guide
 
-This guide explains how to configure a CyberArk Identity OAuth2 application for use with the MCP Privilege Cloud server in per-user OAuth mode.
+This guide explains how to configure CyberArk Identity for use with the MCP Privilege Cloud server.
 
 ## Prerequisites
 
 - CyberArk Identity administrator access
 - CyberArk Privilege Cloud tenant
 
-## Step 1: Create an OIDC Application in CyberArk Identity
+## Part A: Create a Service User (OAuth Confidential Client)
+
+CyberArk Identity OAuth2 apps do NOT provide their own client_id/client_secret. Instead, credentials come from a **service user** marked as an OAuth 2.0 confidential client.
+
+### Step 1: Create the Service User
+
+1. Navigate to **Core Services** > **Users** > **Add User**
+2. Fill in:
+   - Login name (e.g., `mcp-service@cyberark.cloud.XXXX`)
+   - Display name
+   - Password
+3. In Status checklist, select **"Is OAuth confidential client"**
+   - This auto-selects: "Is Service User", "Password never expires"
+4. Click **Create User**
+
+### Step 2: Assign Roles
+
+1. Navigate to **Core Services** > **Roles** > select the required role
+2. Add the service user as a member
+3. Typical roles: Privilege Cloud Administrator, Safe Management, etc.
+
+### Step 3: Note Credentials
+
+- Login name = `CYBERARK_CLIENT_ID` (e.g., `mcp-service@cyberark.cloud.3240`)
+- Password = `CYBERARK_CLIENT_SECRET`
+- These credentials are used for:
+  - Legacy service account mode (`/oauth2/platformtoken` client_credentials grant)
+  - DCR response (returned to MCP clients for the authorization_code flow)
+
+## Part B: Create the OAuth2 Client Application
+
+The OAuth2 Client app defines the OAuth endpoints, redirect URIs, and token settings.
+
+### Step 1: Create the App
 
 1. Navigate to **Apps & Widgets** > **Add Web Apps** > **Custom** > **OAuth2 Client**
-2. Create an app named `mcpprivilegecloud` (this is the default `CYBERARK_OIDC_APP_ID`)
-3. On the **Trust** tab, add the redirect URIs for your MCP clients:
+2. Name the app `mcpprivilegecloud` (this is the default `CYBERARK_OIDC_APP_ID`)
+
+### Step 2: Configure General Usage Tab
+
+- **Client ID Type**: Set to **"Anything"**
+  - "Anything" supports BOTH PKCE (claude.ai) and confidential (Copilot Studio) clients
+  - "List" = PKCE only, "Confidential" = secret required
+  - If only using PKCE clients (claude.ai): "List" also works
+
+### Step 3: Configure Trust Tab (Redirect URIs)
+
+Add redirect URIs for each MCP client:
 
 | Client | Redirect URI |
 |--------|-------------|
 | claude.ai | `https://claude.ai/api/mcp/auth_callback` |
+| Copilot Studio | (Copilot Studio's callback URL) |
 | Local development | `http://localhost:8000/oauth/callback` |
-| Production | `https://your-server.example.com/oauth/callback` |
 
-4. On the **Tokens** tab, configure token settings as needed
-5. Note the auto-generated **Client ID** — set this as `CYBERARK_CLIENT_ID`
+### Step 4: Configure Tokens Tab
 
-## Step 2: Add Trusted DNS Domains (Required for PKCE Clients)
+- Token lifetime: 1 hour (3600s) recommended
+- Scopes: `openid profile` minimum
 
-CyberArk Identity requires clients using PKCE to have their domain added to trusted DNS domains:
+### Step 5: Add Trusted DNS Domains (Required for PKCE Clients)
+
+CyberArk Identity requires PKCE clients to have their domain added to trusted DNS domains:
 
 1. Navigate to **Settings** > **Authentication** > **Security Settings** > **API Security**
 2. Under **Trusted DNS Domains for API Calls**, add:
@@ -34,7 +79,13 @@ CyberArk Identity requires clients using PKCE to have their domain added to trus
 
 **Without this step, CyberArk Identity will return `invalid_client` errors during the authorization code flow.**
 
-## Step 3: Verify Per-App OIDC Discovery
+### Step 6: Assign Users/Roles
+
+1. Navigate to the application's **Permissions** tab
+2. Add the users or roles that should have access to the MCP server
+3. Users must also have appropriate **Privilege Cloud** permissions (safe access, platform admin, etc.)
+
+### Step 7: Verify OIDC Discovery
 
 Verify the OIDC discovery endpoint is accessible for your app:
 
@@ -44,50 +95,47 @@ curl https://YOUR_TENANT.id.cyberark.cloud/mcpprivilegecloud/.well-known/openid-
 
 This should return JSON with `authorization_endpoint`, `token_endpoint`, and `jwks_uri` that include the app ID in the path (e.g., `/OAuth2/Authorize/mcpprivilegecloud`).
 
-## Step 4: Assign Users/Roles
+## Part C: MCP Server Environment Variables
 
-1. Navigate to the application's **Permissions** tab
-2. Add the users or roles that should have access to the MCP server
-3. Users must also have appropriate **Privilege Cloud** permissions (safe access, platform admin, etc.)
-
-## Step 5: Configure the MCP Server
-
-Set the following environment variables:
+### OAuth Per-User Mode (Recommended)
 
 ```bash
-# Required
+# Required: triggers OAuth mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
-# Optional
-MCP_HOST=127.0.0.1        # Server bind address
-MCP_PORT=8000              # Server port
-MCP_MAX_SESSIONS=100       # Max concurrent user sessions
-MCP_SESSION_TTL=3600       # Session lifetime in seconds
+# Service user credentials (used in DCR response for MCP clients)
+CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
+CYBERARK_CLIENT_SECRET=service-user-password
 ```
 
-## Step 6: Verify Configuration
+### Legacy Service Account Mode
 
-Start the server and verify it initializes in OAuth mode:
+Uses the same service user credentials but authenticates all requests under a single identity:
 
 ```bash
-uv run mcp-privilege-cloud
+CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
+CYBERARK_CLIENT_SECRET=service-user-password
 ```
 
-You should see log output indicating OAuth per-user mode:
-```
-Initializing in OAuth per-user mode...
-Token verifier initialized (tenant: https://abc1234.id.cyberark.cloud)
-Session manager initialized (max=100, ttl=3600s)
+### Optional: Separate OAuth Client Credentials
+
+If you need different credentials for DCR (OAuth mode) vs legacy mode, use these override env vars:
+
+```bash
+# These take priority over CYBERARK_CLIENT_ID/SECRET for DCR and JWT audience
+CYBERARK_OAUTH_CLIENT_ID=oauth-client@cyberark.cloud.XXXX
+CYBERARK_OAUTH_CLIENT_SECRET=oauth-client-password
 ```
 
 ## How It Works
 
-1. **User connects** to the MCP server via an MCP client
-2. **MCP client** obtains a JWT from CyberArk Identity via OAuth Authorization Code flow
-3. **MCP server** receives the Bearer token with each request
-4. **CyberArkTokenVerifier** validates the JWT signature against the JWKS endpoint at `{tenant_url}/oauth2/certs`
-5. **UserSessionManager** creates (or retrieves) an isolated `CyberArkMCPServer` instance for that user
-6. **Tools execute** with the user's own CyberArk permissions and audit trail
+1. **User connects** to the MCP server via an MCP client (claude.ai, Copilot Studio, etc.)
+2. **MCP client** calls DCR (`/register`) and receives client_id/secret from the service user
+3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code + PKCE)
+4. **MCP server** receives the Bearer JWT token with each request
+5. **CyberArkTokenVerifier** validates the JWT signature against the JWKS endpoint
+6. **UserSessionManager** creates (or retrieves) an isolated `CyberArkMCPServer` instance for that user
+7. **Tools execute** with the user's own CyberArk permissions and audit trail
 
 ## Security Considerations
 
@@ -95,13 +143,15 @@ Session manager initialized (max=100, ttl=3600s)
 - Sessions are keyed by SHA-256 hash of the access token
 - Expired sessions are automatically evicted
 - Each user gets an isolated SDK session with their own permissions
-- No service account credentials are stored or shared
+- Service user credentials are only sent via DCR; per-user operations use the user's own JWT
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
+| `invalid_client` during auth | Verify trusted DNS domains include the MCP client's domain (Part B, Step 5) and that `CYBERARK_CLIENT_ID` is a service user marked as "OAuth 2.0 confidential client" |
 | "Token verification failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is correct and the user has a valid token |
-| "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable and correct |
+| "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable |
 | "Session limit reached" | Increase `MCP_MAX_SESSIONS` or decrease `MCP_SESSION_TTL` |
 | Server starts in legacy mode | Ensure `CYBERARK_IDENTITY_TENANT_URL` is set |
+| Copilot Studio auth fails | Ensure `CYBERARK_CLIENT_SECRET` is set and Client ID Type is "Anything" or "Confidential" |

@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **OAUTH + STREAMABLE HTTP MIGRATION COMPLETE** - All implementation phases complete: Streamable HTTP transport, token auth bridge, token verifier + session manager, full OAuth wiring, and documentation.
 **Last Updated**: February 25, 2026
-**Recent Achievement**: RFC 8414 `/.well-known/oauth-authorization-server` endpoint via FastMCP `custom_route()`, proxying CyberArk Identity OIDC discovery. Enables claude.ai OAuth discovery flow. Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 289 passing tests with zero regression.
+**Recent Achievement**: RFC 8414 `/.well-known/oauth-authorization-server` endpoint via FastMCP `custom_route()`, proxying CyberArk Identity OIDC discovery. Enables claude.ai OAuth discovery flow. Explicit transport selection via `MCP_TRANSPORT` env var (default: `stdio`; supports `sse`, `streamable-http`). Full OAuth per-user authentication pipeline: CyberArkTokenVerifier (JWKS), UserSessionManager (per-user sessions), dual-mode FastMCP (OAuth + legacy), per-user session resolution in execute_tool(). Hardcoded well-known OIDC app ID (`__idaptive_cybr_user_oidc`), reducing OAuth config to single env var. 315 passing tests with zero regression.
 
 ## Architecture
 
@@ -345,8 +345,13 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 **Required Environment Variables** (OAuth per-user mode):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_CLIENT_ID` - Service user login name (must be marked "OAuth 2.0 confidential client")
+- `CYBERARK_CLIENT_SECRET` - Service user password
 
 **Optional Environment Variables**:
+- `CYBERARK_OAUTH_CLIENT_ID` - Override client_id for DCR/audience (if different from `CYBERARK_CLIENT_ID`)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - Override client_secret for DCR (if different from `CYBERARK_CLIENT_SECRET`)
+- `CYBERARK_OIDC_APP_ID` - OIDC app name in URL paths (default: `mcpprivilegecloud`)
 - `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)
@@ -354,8 +359,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `MCP_MAX_SESSIONS` - Max concurrent user sessions (default: `100`)
 - `MCP_SESSION_TTL` - Session TTL in seconds (default: `3600`)
 
-**Legacy Environment Variables** (service account mode — fallback):
-- `CYBERARK_CLIENT_ID` - OAuth service account username
+**Legacy Environment Variables** (service account mode -- fallback):
+- `CYBERARK_CLIENT_ID` - Service account login name
 - `CYBERARK_CLIENT_SECRET` - Service account password
 
 *See README.md for complete configuration details*
@@ -419,6 +424,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `tests/test_session_manager.py` - UserSessionManager session lifecycle tests
 - `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
 - `tests/test_oauth_metadata.py` - RFC 8414 `/.well-known/oauth-authorization-server` endpoint tests
+- `tests/test_env_var_resolution.py` - Environment variable priority chain tests (DCR + audience)
 - Additional test files for comprehensive coverage of all 53 tools
 
 **Key Commands**: 

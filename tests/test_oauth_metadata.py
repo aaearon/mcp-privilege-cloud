@@ -199,8 +199,8 @@ class TestBuildOAuthMetadata:
 class TestDynamicClientRegistration:
     """Test the /register DCR proxy endpoint."""
 
-    def test_dcr_returns_client_id_from_env(self):
-        """DCR should return CYBERARK_CLIENT_ID from env when set."""
+    def test_dcr_returns_oauth_client_id_from_env(self):
+        """DCR should return CYBERARK_OAUTH_CLIENT_ID when set."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
 
         body = {
@@ -208,13 +208,31 @@ class TestDynamicClientRegistration:
             "redirect_uris": ["https://claude.ai/api/mcp/auth_callback"],
         }
 
-        with patch.dict(os.environ, {"CYBERARK_CLIENT_ID": "myuser@tenant", "CYBERARK_CLIENT_SECRET": "s3cret"}):
+        env = {
+            "CYBERARK_OAUTH_CLIENT_ID": "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
+            "CYBERARK_OAUTH_CLIENT_SECRET": "oauth-secret",
+        }
+        with patch.dict(os.environ, env, clear=True):
             response = _build_dcr_response(body)
+
+        assert response["client_id"] == "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
+        assert response["client_secret"] == "oauth-secret"
+        assert response["token_endpoint_auth_method"] == "client_secret_post"
+        assert response["grant_types"] == ["authorization_code", "refresh_token"]
+
+    def test_dcr_falls_back_to_legacy_client_id(self):
+        """DCR should fall back to CYBERARK_CLIENT_ID when CYBERARK_OAUTH_CLIENT_ID not set."""
+        from mcp_privilege_cloud.mcp_server import _build_dcr_response
+
+        env = {
+            "CYBERARK_CLIENT_ID": "myuser@tenant",
+            "CYBERARK_CLIENT_SECRET": "s3cret",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            response = _build_dcr_response({})
 
         assert response["client_id"] == "myuser@tenant"
         assert response["client_secret"] == "s3cret"
-        assert response["token_endpoint_auth_method"] == "client_secret_post"
-        assert response["grant_types"] == ["authorization_code", "refresh_token"]
 
     def test_dcr_public_client_when_no_secret(self):
         """DCR should return public client (no secret) when CYBERARK_CLIENT_SECRET is unset."""
@@ -253,8 +271,8 @@ class TestDynamicClientRegistration:
         assert response["client_name"] == "MCP Client"
         assert response["redirect_uris"] == []
 
-    def test_dcr_logs_warning_when_client_id_not_set(self):
-        """DCR should log a warning when CYBERARK_CLIENT_ID is not set."""
+    def test_dcr_logs_warning_when_no_client_id_set(self):
+        """DCR should log a warning when neither OAuth nor legacy client ID is set."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
         from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
         import logging
@@ -265,7 +283,7 @@ class TestDynamicClientRegistration:
 
         mock_logger.warning.assert_called_once()
         warning_msg = mock_logger.warning.call_args[0][0]
-        assert "CYBERARK_CLIENT_ID" in warning_msg
+        assert "CYBERARK_OAUTH_CLIENT_ID" in warning_msg
         assert response["client_id"] == CYBERARK_OIDC_APP_ID
 
 
