@@ -347,6 +347,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 - `CYBERARK_CLIENT_ID` - Service user login name (must be marked "OAuth 2.0 confidential client")
 - `CYBERARK_CLIENT_SECRET` - Service user password
+- `CYBERARK_SUBDOMAIN` - Privilege Cloud tenant subdomain (from `https://<subdomain>.privilegecloud.cyberark.cloud`)
 
 **Optional Environment Variables**:
 - `CYBERARK_OAUTH_CLIENT_ID` - Override client_id for DCR/audience (if different from `CYBERARK_CLIENT_ID`)

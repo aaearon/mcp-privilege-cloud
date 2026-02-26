@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Optional, Dict, Any, List, Union
@@ -347,8 +348,49 @@ class CyberArkMCPServer:
         instance.applications_service = ArkPCloudApplicationsService(token_auth)
         instance.sm_service = ArkSMService(token_auth)
 
+        # Override PCloud base URL if CYBERARK_SUBDOMAIN is set.
+        # OAuth JWTs from CyberArk Identity may lack subdomain/platform_domain
+        # claims, causing the SDK to resolve the wrong PCloud URL.
+        subdomain = os.environ.get("CYBERARK_SUBDOMAIN")
+        if subdomain:
+            for svc in [
+                instance.accounts_service,
+                instance.safes_service,
+                instance.platforms_service,
+                instance.applications_service,
+            ]:
+                cls._override_pcloud_base_url(svc, subdomain)
+            instance.logger.info(
+                "PCloud base URL overridden with subdomain: %s", subdomain
+            )
+
         instance.logger.info("Server initialized from token for user: %s", username)
         return instance
+
+    @staticmethod
+    def _override_pcloud_base_url(service: Any, subdomain: str) -> None:
+        """Override a PCloud service's base URL with the correct subdomain.
+
+        The SDK resolves the PCloud URL from JWT claims (subdomain,
+        platform_domain, unique_name). OAuth JWTs from CyberArk Identity
+        authorization_code flow may lack these claims, causing the SDK to
+        resolve the wrong subdomain. This patches the service client's
+        base URL directly.
+
+        Args:
+            service: An ArkPCloud*Service instance with a _client attribute.
+            subdomain: The correct PCloud tenant subdomain (e.g., 'cyberiam').
+        """
+        correct_url = (
+            f"https://{subdomain}.privilegecloud.cyberark.cloud/passwordvault/api/"
+        )
+        client = service._client
+        old_url = client.base_url
+        # ArkClient stores base_url in name-mangled __base_url
+        client._ArkClient__base_url = correct_url
+        logging.getLogger(__name__).debug(
+            "PCloud URL override: %s -> %s", old_url, correct_url
+        )
 
     async def _run_in_executor(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Run synchronous SDK calls in ThreadPoolExecutor to avoid blocking the event loop."""

@@ -130,6 +130,7 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
 | `CYBERARK_CLIENT_ID` | Yes | Service user login name (must be marked "OAuth 2.0 confidential client") |
 | `CYBERARK_CLIENT_SECRET` | Yes | Service user password |
+| `CYBERARK_SUBDOMAIN` | Yes | Privilege Cloud tenant subdomain (from your PCloud URL) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |

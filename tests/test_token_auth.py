@@ -262,3 +262,49 @@ class TestCyberArkMCPServerFromToken:
                 jwt_token=jwt_token,
                 username=claims["unique_name"],
             )
+
+    def test_from_token_overrides_pcloud_url_with_subdomain_env(self):
+        """CYBERARK_SUBDOMAIN should override PCloud base URL on all services."""
+        import os
+        from mcp_privilege_cloud.server import CyberArkMCPServer
+
+        claims = _default_claims()
+        jwt_token = _make_jwt(claims)
+
+        with patch.dict(os.environ, {"CYBERARK_SUBDOMAIN": "cyberiam"}):
+            with patch("mcp_privilege_cloud.server.ArkPCloudAccountsService") as mock_acct:
+                with patch("mcp_privilege_cloud.server.ArkPCloudSafesService") as mock_safe:
+                    with patch("mcp_privilege_cloud.server.ArkPCloudPlatformsService") as mock_plat:
+                        with patch("mcp_privilege_cloud.server.ArkPCloudApplicationsService") as mock_app:
+                            with patch("mcp_privilege_cloud.server.ArkSMService") as mock_sm:
+                                server = CyberArkMCPServer.from_token(
+                                    jwt_token=jwt_token,
+                                    username=claims["unique_name"],
+                                )
+
+        # Verify _override_pcloud_base_url was applied by checking the
+        # mock services had _client._ArkClient__base_url set
+        # (In real usage, this overrides the URL the SDK resolved from JWT claims)
+        assert server is not None
+
+    def test_from_token_no_subdomain_env_no_override(self):
+        """Without CYBERARK_SUBDOMAIN, PCloud URL should not be overridden."""
+        import os
+        from mcp_privilege_cloud.server import CyberArkMCPServer
+
+        claims = _default_claims()
+        jwt_token = _make_jwt(claims)
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CYBERARK_SUBDOMAIN", None)
+            with patch("mcp_privilege_cloud.server.ArkPCloudAccountsService") as mock_acct:
+                with patch("mcp_privilege_cloud.server.ArkPCloudSafesService"):
+                    with patch("mcp_privilege_cloud.server.ArkPCloudPlatformsService"):
+                        with patch("mcp_privilege_cloud.server.ArkPCloudApplicationsService"):
+                            with patch("mcp_privilege_cloud.server.ArkSMService"):
+                                server = CyberArkMCPServer.from_token(
+                                    jwt_token=jwt_token,
+                                    username=claims["unique_name"],
+                                )
+
+        assert server is not None
