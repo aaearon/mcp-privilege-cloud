@@ -121,7 +121,7 @@ class CyberArkTokenVerifier(TokenVerifier):
             Exception,
         ) as e:
             logger.warning("Token verification failed: %s", e)
-            # Log token claims (without signature) for debugging audience/issuer mismatches
+            # Log token claims (without signature) for debugging
             try:
                 unverified = pyjwt.decode(token, options={"verify_signature": False})
                 logger.warning(

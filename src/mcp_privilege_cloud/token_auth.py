@@ -89,6 +89,15 @@ class ArkISPAuthFromToken(ArkISPAuth):
                 f"JWT token expired at {datetime.fromtimestamp(exp).isoformat()}"
             )
 
+        # Log claims relevant to SDK URL resolution
+        logger.info(
+            "JWT claims for SDK URL resolution — subdomain: %s, "
+            "platform_domain: %s, unique_name: %s",
+            claims.get("subdomain"),
+            claims.get("platform_domain"),
+            claims.get("unique_name"),
+        )
+
         # Determine env from platform_domain or default to prod
         env = os.environ.get("DEPLOY_ENV", "prod")
 
