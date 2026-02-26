@@ -107,6 +107,16 @@ class CyberArkTokenVerifier(TokenVerifier):
             Exception,
         ) as e:
             logger.warning("Token verification failed: %s", e)
+            # Log token claims (without signature) for debugging audience/issuer mismatches
+            try:
+                unverified = pyjwt.decode(token, options={"verify_signature": False})
+                logger.warning(
+                    "Token claims — iss: %s, aud: %s, sub: %s (expected aud: %s)",
+                    unverified.get("iss"), unverified.get("aud"), unverified.get("sub"),
+                    CYBERARK_OIDC_APP_ID,
+                )
+            except Exception:
+                pass
             return None
 
         # Validate required claims
