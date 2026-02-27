@@ -171,6 +171,37 @@ CYBERARK_CLIENT_SECRET=your-service-user-password
 # MCP_TRANSPORT=streamable-http
 ```
 
+## Reverse Proxy Deployment
+
+When deploying behind a reverse proxy with OAuth enabled, you **must** configure the proxy to strip trailing slashes from request paths. MCP clients (e.g. Copilot Studio) POST to `/mcp/` (trailing slash), which causes a 307 redirect to `/mcp`. HTTP clients strip the `Authorization` header on redirect, breaking OAuth Bearer token authentication.
+
+Also set `MCP_SERVER_URL` to the public URL of your server so that OAuth discovery metadata contains reachable URLs.
+
+**Traefik example** (dynamic config):
+```yaml
+http:
+  middlewares:
+    strip-trailing-slash:
+      replacePathRegex:
+        regex: "^(/.+?)/$"
+        replacement: "${1}"
+  routers:
+    mcp:
+      rule: "Host(`mcp.example.com`)"
+      entryPoints:
+        - web-secure
+      service: mcp
+      middlewares:
+        - strip-trailing-slash
+      tls:
+        certResolver: myresolver
+  services:
+    mcp:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"
+```
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -179,6 +210,7 @@ CYBERARK_CLIENT_SECRET=your-service-user-password
 | Authentication failed | Verify Service User credentials in CyberArk Identity |
 | Permission errors | Ensure the Service User has appropriate Identity roles and safe permissions |
 | Connection issues | Verify you're using the `.cloud` domain (not `.com`) |
+| OAuth 401 behind reverse proxy | Ensure the proxy strips trailing slashes (see Reverse Proxy Deployment above) |
 | `uvx` not found | Install uv: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
 **Verify MCP server manually:**

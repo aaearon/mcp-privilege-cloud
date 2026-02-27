@@ -1,3 +1,15 @@
+# IMPORTANT: When deploying behind a reverse proxy (e.g. Traefik, nginx),
+# configure the proxy to strip trailing slashes from request paths.
+# MCP clients like Copilot Studio POST to /mcp/ (trailing slash), which
+# causes a 307 redirect to /mcp. HTTP clients strip the Authorization
+# header on redirect, breaking OAuth Bearer token authentication.
+#
+# Traefik example (dynamic config):
+#   middlewares:
+#     strip-trailing-slash:
+#       replacePathRegex:
+#         regex: "^(/.+?)/$"
+#         replacement: "${1}"
 services:
   mcp-server:
     build: .
