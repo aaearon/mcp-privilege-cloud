@@ -167,20 +167,26 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     OIDC discovery response, which already contains the correct app-specific
     URLs. Only registration_endpoint is overridden to point to our server.
 
-    The issuer MUST match the authorization_servers URL that the MCP SDK puts
-    in the protected resource metadata (RFC 8414 section 3.3). Since the SDK
-    normalizes URLs through Pydantic AnyHttpUrl (which adds a trailing slash
-    to bare domains), we must use the same normalization here.
+    Args:
+        oidc_config: OIDC discovery response from CyberArk Identity.
+        server_url: The MCP endpoint URL (e.g. https://host/mcp). Used as the
+            issuer to match what the client derives from the well-known URL path
+            per RFC 8414 section 3.3.
     """
+    from urllib.parse import urlparse
+
     # Match the URL normalization used by MCP SDK's AuthSettings / AnyHttpUrl
     issuer = str(AnyHttpUrl(server_url))
-    base = issuer.rstrip("/")
+
+    # registration_endpoint is at the server root, not under /mcp
+    parsed = urlparse(issuer)
+    server_base = f"{parsed.scheme}://{parsed.netloc}"
 
     metadata = {
         "issuer": issuer,
         "authorization_endpoint": oidc_config["authorization_endpoint"],
         "token_endpoint": oidc_config["token_endpoint"],
-        "registration_endpoint": f"{base}/register",
+        "registration_endpoint": f"{server_base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
@@ -220,7 +226,8 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
             )
 
         server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
-        metadata = _build_oauth_metadata(oidc_config, server_url)
+        mcp_endpoint_url = server_url.rstrip("/") + "/mcp"
+        metadata = _build_oauth_metadata(oidc_config, mcp_endpoint_url)
         return JSONResponse(metadata, headers={
             "Cache-Control": "public, max-age=3600",
             "Access-Control-Allow-Origin": "*",
@@ -284,12 +291,20 @@ def create_mcp_server() -> FastMCP:
         tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"]
         server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
 
+        # The MCP endpoint path (/mcp) must be included in the URLs so that:
+        # 1. authorization_servers in protected resource metadata matches the
+        #    issuer the client derives from /.well-known/oauth-authorization-server/mcp
+        # 2. resource in protected resource metadata matches the actual endpoint
+        # 3. Protected resource route is at /.well-known/oauth-protected-resource/mcp
+        # This is required by RFC 8414 section 3.3 (issuer identity validation).
+        mcp_endpoint_url = server_url.rstrip("/") + "/mcp"
+
         kwargs["token_verifier"] = CyberArkTokenVerifier(
             identity_tenant_url=tenant_url,
         )
         kwargs["auth"] = AuthSettings(
-            issuer_url=AnyHttpUrl(server_url),
-            resource_server_url=AnyHttpUrl(server_url),
+            issuer_url=AnyHttpUrl(mcp_endpoint_url),
+            resource_server_url=AnyHttpUrl(mcp_endpoint_url),
         )
         logger.info("OAuth auth configured (tenant: %s)", tenant_url)
     else:

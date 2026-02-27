@@ -25,7 +25,9 @@ SAMPLE_OIDC_DISCOVERY = {
     "id_token_signing_alg_values_supported": ["RS256"],
 }
 
-SERVER_URL = "https://mcp.example.com"
+# _build_oauth_metadata now receives the MCP endpoint URL (with /mcp path)
+# to match RFC 8414 issuer derivation from /.well-known/oauth-authorization-server/mcp
+SERVER_URL = "https://mcp.example.com/mcp"
 
 
 class TestFetchOidcDiscovery:
@@ -141,8 +143,8 @@ class TestBuildOAuthMetadata:
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
-        # issuer uses AnyHttpUrl normalization to match SDK's authorization_servers
-        assert metadata["issuer"] == SERVER_URL + "/"
+        # issuer uses AnyHttpUrl normalization; URLs with path don't get trailing slash
+        assert metadata["issuer"] == SERVER_URL
         assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
         assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
@@ -150,12 +152,13 @@ class TestBuildOAuthMetadata:
         assert metadata["scopes_supported"] == ["openid", "profile", "email"]
 
     def test_includes_registration_endpoint(self):
-        """Should include registration_endpoint pointing to our server."""
+        """Should include registration_endpoint at server root (not under /mcp)."""
         from mcp_privilege_cloud.mcp_server import _build_oauth_metadata
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
-        assert metadata["registration_endpoint"] == f"{SERVER_URL}/register"
+        # registration_endpoint uses server base URL, not the MCP endpoint path
+        assert metadata["registration_endpoint"] == "https://mcp.example.com/register"
 
     def test_includes_grant_types_and_auth_methods(self):
         """Should include grant_types_supported and token_endpoint_auth_methods."""
@@ -185,24 +188,26 @@ class TestBuildOAuthMetadata:
     def test_issuer_matches_sdk_anyhttp_normalization(self):
         """Issuer MUST match the authorization_servers URL from SDK's protected resource metadata.
 
-        The MCP SDK normalizes URLs through Pydantic AnyHttpUrl which adds a trailing
-        slash to bare domains. Our issuer must use the same normalization so the client's
-        RFC 8414 section 3.3 issuer validation passes.
+        The MCP SDK normalizes URLs through Pydantic AnyHttpUrl. URLs with a path
+        (like /mcp) keep that path without a trailing slash. The issuer must match
+        what the client derives from /.well-known/oauth-authorization-server/mcp
+        per RFC 8414 section 3.3.
         """
         from mcp_privilege_cloud.mcp_server import _build_oauth_metadata
         from pydantic import AnyHttpUrl
 
-        # Bare domain without trailing slash
+        # URL with /mcp path — no trailing slash added
+        metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, "https://mcp.example.com/mcp")
+        assert metadata["issuer"] == "https://mcp.example.com/mcp"
+        assert metadata["issuer"] == str(AnyHttpUrl("https://mcp.example.com/mcp"))
+
+        # registration_endpoint at server root, not under /mcp
+        assert metadata["registration_endpoint"] == "https://mcp.example.com/register"
+
+        # Bare domain gets trailing slash from AnyHttpUrl
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, "https://mcp.example.com")
-        assert metadata["issuer"] == str(AnyHttpUrl("https://mcp.example.com"))
-        assert metadata["issuer"].endswith("/")
-
-        # Already has trailing slash
-        metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, "https://mcp.example.com/")
-        assert metadata["issuer"] == str(AnyHttpUrl("https://mcp.example.com/"))
-
-        # registration_endpoint should NOT have double slash
-        assert "//" not in metadata["registration_endpoint"].split("://")[1]
+        assert metadata["issuer"] == "https://mcp.example.com/"
+        assert metadata["registration_endpoint"] == "https://mcp.example.com/register"
 
     def test_excludes_none_scopes(self):
         """Should not include scopes_supported when not in OIDC config."""
