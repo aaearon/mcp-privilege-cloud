@@ -7,6 +7,8 @@ with the expected routes and settings.
 import pytest
 from unittest.mock import patch, MagicMock
 
+from mcp_privilege_cloud.mcp_server import TrailingSlashMiddleware
+
 
 class TestStreamableHTTPTransport:
     """Test Streamable HTTP transport configuration."""
@@ -77,13 +79,24 @@ class TestStreamableHTTPTransport:
                 mock_mcp.run.assert_called_once_with(transport="stdio")
 
     def test_main_uses_streamable_http_when_configured(self):
-        """Test that main() uses streamable-http when MCP_TRANSPORT is set."""
+        """Test that main() wraps app with TrailingSlashMiddleware for streamable-http."""
         with patch.dict("os.environ", {"MCP_TRANSPORT": "streamable-http"}):
             with patch("mcp_privilege_cloud.mcp_server.mcp") as mock_mcp:
-                from mcp_privilege_cloud.mcp_server import main
-                main()
+                mock_mcp.streamable_http_app.return_value = MagicMock()
+                with patch("asyncio.run"):
+                    with patch("uvicorn.Config") as mock_config:
+                        with patch("uvicorn.Server"):
+                            from mcp_privilege_cloud.mcp_server import main
+                            main()
 
-                mock_mcp.run.assert_called_once_with(transport="streamable-http")
+                            # Should create Starlette app and wrap it
+                            mock_mcp.streamable_http_app.assert_called_once()
+                            # Should NOT call mcp.run()
+                            mock_mcp.run.assert_not_called()
+                            # Should pass wrapped app to uvicorn
+                            mock_config.assert_called_once()
+                            app = mock_config.call_args[0][0]
+                            assert isinstance(app, TrailingSlashMiddleware)
 
     def test_main_rejects_invalid_transport(self):
         """Test that main() exits with error for invalid MCP_TRANSPORT value."""
@@ -92,3 +105,80 @@ class TestStreamableHTTPTransport:
                 from mcp_privilege_cloud.mcp_server import main
                 with pytest.raises(SystemExit):
                     main()
+
+
+class TestTrailingSlashMiddleware:
+    """Test that trailing slashes are stripped to prevent 307 redirects.
+
+    MCP clients (e.g. Copilot Studio) POST to /mcp/ (trailing slash).
+    Starlette's redirect_slashes returns a 307, which causes HTTP clients
+    to strip the Authorization header, breaking OAuth Bearer auth.
+    """
+
+    @pytest.mark.asyncio
+    async def test_strips_trailing_slash(self):
+        """Trailing slash should be stripped before reaching the inner app."""
+        received_path = None
+
+        async def inner_app(scope, receive, send):
+            nonlocal received_path
+            received_path = scope["path"]
+
+        app = TrailingSlashMiddleware(inner_app)
+        scope = {"type": "http", "path": "/mcp/"}
+        await app(scope, lambda: None, lambda msg: None)
+        assert received_path == "/mcp"
+
+    @pytest.mark.asyncio
+    async def test_preserves_path_without_trailing_slash(self):
+        """Paths without trailing slash should pass through unchanged."""
+        received_path = None
+
+        async def inner_app(scope, receive, send):
+            nonlocal received_path
+            received_path = scope["path"]
+
+        app = TrailingSlashMiddleware(inner_app)
+        scope = {"type": "http", "path": "/mcp"}
+        await app(scope, lambda: None, lambda msg: None)
+        assert received_path == "/mcp"
+
+    @pytest.mark.asyncio
+    async def test_preserves_root_path(self):
+        """Root path '/' should not be stripped."""
+        received_path = None
+
+        async def inner_app(scope, receive, send):
+            nonlocal received_path
+            received_path = scope["path"]
+
+        app = TrailingSlashMiddleware(inner_app)
+        scope = {"type": "http", "path": "/"}
+        await app(scope, lambda: None, lambda msg: None)
+        assert received_path == "/"
+
+    @pytest.mark.asyncio
+    async def test_passes_non_http_scopes_unchanged(self):
+        """Non-HTTP scopes (websocket, lifespan) should pass through."""
+        received_scope = None
+
+        async def inner_app(scope, receive, send):
+            nonlocal received_scope
+            received_scope = scope
+
+        app = TrailingSlashMiddleware(inner_app)
+        scope = {"type": "lifespan", "path": "/mcp/"}
+        await app(scope, lambda: None, lambda msg: None)
+        assert received_scope["path"] == "/mcp/"
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_original_scope(self):
+        """Original scope dict should not be modified."""
+        original_scope = {"type": "http", "path": "/mcp/"}
+
+        async def inner_app(scope, receive, send):
+            pass
+
+        app = TrailingSlashMiddleware(inner_app)
+        await app(original_scope, lambda: None, lambda msg: None)
+        assert original_scope["path"] == "/mcp/"

@@ -25,6 +25,8 @@ from mcp.server.auth.settings import AuthSettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from .server import CyberArkMCPServer
 from .token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
@@ -1796,6 +1798,30 @@ async def get_session_statistics(
     return await execute_tool("get_session_statistics", ctx=ctx)
 
 
+class TrailingSlashMiddleware:
+    """Strip trailing slashes to prevent Starlette 307 redirects.
+
+    MCP clients (e.g. Copilot Studio) POST to /mcp/ (trailing slash).
+    Starlette's default redirect_slashes returns a 307 redirect to /mcp,
+    which causes HTTP clients to strip the Authorization header per RFC 9110,
+    breaking OAuth Bearer token authentication.
+
+    This middleware normalizes the path at the ASGI level so the router
+    sees /mcp directly — no redirect, no header loss.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path != "/" and path.endswith("/"):
+                scope = dict(scope)
+                scope["path"] = path.rstrip("/")
+        await self.app(scope, receive, send)
+
+
 VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
 
 
@@ -1810,7 +1836,18 @@ def main() -> None:
         )
         sys.exit(1)
     logger.info("Starting CyberArk Privilege Cloud MCP Server (transport=%s)", transport)
-    mcp.run(transport=transport)
+
+    if transport == "streamable-http":
+        import asyncio
+        import uvicorn
+
+        app = TrailingSlashMiddleware(mcp.streamable_http_app())
+        config = uvicorn.Config(
+            app, host=MCP_HOST, port=MCP_PORT, log_level="info",
+        )
+        asyncio.run(uvicorn.Server(config).serve())
+    else:
+        mcp.run(transport=transport)
 
 
 if __name__ == "__main__":
