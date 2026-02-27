@@ -208,7 +208,7 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
                 status_code=502,
             )
 
-        server_url = os.getenv("MCP_SERVER_URL", f"http://{MCP_HOST}:{MCP_PORT}")
+        server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
         metadata = _build_oauth_metadata(oidc_config, server_url)
         return JSONResponse(metadata, headers={
             "Cache-Control": "public, max-age=3600",
@@ -263,7 +263,7 @@ def create_mcp_server() -> FastMCP:
 
     if is_oauth_mode():
         tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"]
-        server_url = os.getenv("MCP_SERVER_URL", f"http://{MCP_HOST}:{MCP_PORT}")
+        server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
 
         kwargs["token_verifier"] = CyberArkTokenVerifier(
             identity_tenant_url=tenant_url,
