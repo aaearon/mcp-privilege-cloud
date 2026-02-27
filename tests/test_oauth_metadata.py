@@ -141,7 +141,7 @@ class TestBuildOAuthMetadata:
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
-        assert metadata["issuer"] == SAMPLE_OIDC_DISCOVERY["issuer"]
+        assert metadata["issuer"] == SERVER_URL
         assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
         assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]

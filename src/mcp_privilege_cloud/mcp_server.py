@@ -170,7 +170,7 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     base = server_url.rstrip("/")
 
     metadata = {
-        "issuer": oidc_config["issuer"],
+        "issuer": base,
         "authorization_endpoint": oidc_config["authorization_endpoint"],
         "token_endpoint": oidc_config["token_endpoint"],
         "registration_endpoint": f"{base}/register",
@@ -188,9 +188,13 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
 def _register_oauth_routes(mcp_server: FastMCP) -> None:
     """Register OAuth discovery and DCR routes on the FastMCP server."""
 
-    @mcp_server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
-    async def oauth_authorization_server_metadata(request: Request) -> Response:
-        """Serve RFC 8414 metadata by proxying CyberArk Identity OIDC discovery."""
+    async def _serve_oauth_metadata(request: Request) -> Response:
+        """Serve RFC 8414 metadata by proxying CyberArk Identity OIDC discovery.
+
+        Handles both base path and path-suffixed forms per RFC 8414 section 3.1:
+          - /.well-known/oauth-authorization-server
+          - /.well-known/oauth-authorization-server/{path}
+        """
         if request.method == "OPTIONS":
             return Response(headers={
                 "Access-Control-Allow-Origin": "*",
@@ -214,6 +218,14 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
             "Cache-Control": "public, max-age=3600",
             "Access-Control-Allow-Origin": "*",
         })
+
+    @mcp_server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
+    async def oauth_metadata_base(request: Request) -> Response:
+        return await _serve_oauth_metadata(request)
+
+    @mcp_server.custom_route("/.well-known/oauth-authorization-server/{path:path}", methods=["GET", "OPTIONS"])
+    async def oauth_metadata_path(request: Request) -> Response:
+        return await _serve_oauth_metadata(request)
 
     @mcp_server.custom_route("/register", methods=["POST", "OPTIONS"])
     async def dynamic_client_registration(request: Request) -> Response:
