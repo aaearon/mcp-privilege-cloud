@@ -85,12 +85,10 @@ class TestDCRClientIdResolution:
 
 
 class TestTokenVerifierAudienceResolution:
-    """Test audience priority chain:
-    CYBERARK_OAUTH_AUDIENCE > CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID > CYBERARK_OIDC_APP_ID
-    """
+    """Test audience collection: all configured env vars are accepted."""
 
-    def test_oauth_audience_highest_priority(self):
-        """CYBERARK_OAUTH_AUDIENCE should take highest priority (explicit override)."""
+    def test_all_env_vars_collected(self):
+        """All three env vars should be collected into accepted audiences set."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         env = {
@@ -103,10 +101,14 @@ class TestTokenVerifierAudienceResolution:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
+        assert verifier._expected_audience == {
+            "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
+            "c21840a7-trust-tab-id",
+            "timtest@cyberark.cloud.3240",
+        }
 
-    def test_oauth_client_id_second_priority(self):
-        """CYBERARK_OAUTH_CLIENT_ID should be 2nd priority for audience."""
+    def test_subset_of_env_vars(self):
+        """Only set env vars should appear in audiences."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         env = {
@@ -119,10 +121,10 @@ class TestTokenVerifierAudienceResolution:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == "c21840a7-trust-tab-id"
+        assert verifier._expected_audience == {"c21840a7-trust-tab-id", "timtest@cyberark.cloud.3240"}
 
-    def test_legacy_client_id_fallback(self):
-        """CYBERARK_CLIENT_ID should be used as 3rd fallback for audience."""
+    def test_single_env_var(self):
+        """Single env var should produce a single-element set."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         env = {"CYBERARK_CLIENT_ID": "some-client-id"}
@@ -133,7 +135,7 @@ class TestTokenVerifierAudienceResolution:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == "some-client-id"
+        assert verifier._expected_audience == {"some-client-id"}
 
     def test_ultimate_fallback_to_oidc_app_id(self):
         """Without any env vars, audience should fall back to CYBERARK_OIDC_APP_ID."""
@@ -147,4 +149,4 @@ class TestTokenVerifierAudienceResolution:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == CYBERARK_OIDC_APP_ID
+        assert verifier._expected_audience == {CYBERARK_OIDC_APP_ID}

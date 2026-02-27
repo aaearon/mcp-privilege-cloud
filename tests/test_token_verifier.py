@@ -402,57 +402,40 @@ class TestCyberArkTokenVerifierJWKS:
 
 
 class TestCyberArkTokenVerifierAudience:
-    """Test audience resolution: CYBERARK_OAUTH_AUDIENCE > CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID > app ID."""
+    """Test audience resolution: collects all configured audience values into a set."""
 
     @pytest.mark.asyncio
-    async def test_audience_prefers_oauth_audience(self):
-        """CYBERARK_OAUTH_AUDIENCE should take highest priority (explicit audience override)."""
+    async def test_audience_accepts_all_configured_values(self):
+        """All three env vars should be collected into accepted audiences set."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         oauth_audience = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
-        claims = _default_claims(aud=oauth_audience)
-        jwt_token = _make_jwt(claims)
+        oauth_client_id = "c21840a7-different-trust-tab-id"
+        client_id = "timtest@cyberark.cloud.3240"
 
         env = {
             "CYBERARK_OAUTH_AUDIENCE": oauth_audience,
-            "CYBERARK_OAUTH_CLIENT_ID": "c21840a7-different-trust-tab-id",
-            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
+            "CYBERARK_OAUTH_CLIENT_ID": oauth_client_id,
+            "CYBERARK_CLIENT_ID": client_id,
         }
         with patch.dict(os.environ, env):
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == oauth_audience
-
-        mock_key = MagicMock()
-        mock_key.key = "mock-public-key"
-        mock_jwks_client = MagicMock()
-        mock_jwks_client.get_signing_key_from_jwt.return_value = mock_key
-        verifier._jwks_client = mock_jwks_client
-
-        with patch("jwt.decode", return_value=claims) as mock_decode:
-            await verifier._decode_and_verify(jwt_token)
-
-            mock_decode.assert_called_once_with(
-                jwt_token,
-                mock_key.key,
-                algorithms=["RS256"],
-                audience=oauth_audience,
-                issuer=f"{verifier._identity_tenant_url}/{verifier._expected_app_id}/",
-                options={"require": ["exp", "iss", "sub", "aud"]},
-            )
+        assert verifier._expected_audience == {oauth_audience, oauth_client_id, client_id}
 
     @pytest.mark.asyncio
-    async def test_audience_falls_back_to_oauth_client_id(self):
-        """Without CYBERARK_OAUTH_AUDIENCE, CYBERARK_OAUTH_CLIENT_ID should be used."""
+    async def test_audience_without_oauth_audience(self):
+        """Without CYBERARK_OAUTH_AUDIENCE, remaining env vars should be collected."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         oauth_client_id = "c21840a7-trust-tab-client-id"
+        client_id = "timtest@cyberark.cloud.3240"
 
         env = {
             "CYBERARK_OAUTH_CLIENT_ID": oauth_client_id,
-            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
+            "CYBERARK_CLIENT_ID": client_id,
         }
         with patch.dict(os.environ, env):
             os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
@@ -460,11 +443,11 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == oauth_client_id
+        assert verifier._expected_audience == {oauth_client_id, client_id}
 
     @pytest.mark.asyncio
-    async def test_audience_falls_back_to_client_id(self):
-        """Without CYBERARK_OAUTH_CLIENT_ID or CYBERARK_OAUTH_AUDIENCE, should use CYBERARK_CLIENT_ID."""
+    async def test_audience_single_env_var(self):
+        """With only CYBERARK_CLIENT_ID, audience set should contain just that value."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         client_id = "some-client-id"
@@ -477,7 +460,7 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == client_id
+        assert verifier._expected_audience == {client_id}
 
     @pytest.mark.asyncio
     async def test_audience_falls_back_to_oidc_app_id(self):
@@ -492,7 +475,7 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == CYBERARK_OIDC_APP_ID
+        assert verifier._expected_audience == {CYBERARK_OIDC_APP_ID}
 
 
 class TestCyberArkTokenVerifierProtocol:

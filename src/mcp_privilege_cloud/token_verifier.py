@@ -51,22 +51,23 @@ class CyberArkTokenVerifier(TokenVerifier):
         # The app name used for OIDC discovery and issuer validation
         self._expected_app_id = CYBERARK_OIDC_APP_ID
 
-        # The expected audience: CyberArk Identity tokens use the
-        # auto-generated OAuth2 Client ID as `aud`, not the app
-        # name. The Trust tab client_id (CYBERARK_OAUTH_CLIENT_ID) differs
-        # from the app's internal ID that appears in the JWT `aud` claim.
-        # Priority: CYBERARK_OAUTH_AUDIENCE (explicit audience override) >
-        # CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID (legacy) >
-        # CYBERARK_OIDC_APP_ID (ultimate fallback).
-        self._expected_audience = (
-            os.getenv("CYBERARK_OAUTH_AUDIENCE")
-            or os.getenv("CYBERARK_OAUTH_CLIENT_ID")
-            or os.getenv("CYBERARK_CLIENT_ID")
-            or CYBERARK_OIDC_APP_ID
-        )
+        # Accepted audiences for JWT validation. CyberArk Identity sets the
+        # `aud` claim to the client_id used in the authorization request.
+        # When DCR returns CYBERARK_OAUTH_CLIENT_ID, tokens will have that
+        # as the audience. The internal app ID (CYBERARK_OAUTH_AUDIENCE) may
+        # differ, so we accept both.
+        audiences = set()
+        for var in ("CYBERARK_OAUTH_AUDIENCE", "CYBERARK_OAUTH_CLIENT_ID",
+                     "CYBERARK_CLIENT_ID"):
+            val = os.getenv(var)
+            if val:
+                audiences.add(val)
+        if not audiences:
+            audiences.add(CYBERARK_OIDC_APP_ID)
+        self._expected_audience = audiences
 
         logger.info(
-            "Token verifier initialized (tenant: %s, audience: %s)",
+            "Token verifier initialized (tenant: %s, accepted audiences: %s)",
             self._identity_tenant_url,
             self._expected_audience,
         )
