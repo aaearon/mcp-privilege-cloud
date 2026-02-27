@@ -166,11 +166,18 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     Uses authorization_endpoint and token_endpoint directly from the per-app
     OIDC discovery response, which already contains the correct app-specific
     URLs. Only registration_endpoint is overridden to point to our server.
+
+    The issuer MUST match the authorization_servers URL that the MCP SDK puts
+    in the protected resource metadata (RFC 8414 section 3.3). Since the SDK
+    normalizes URLs through Pydantic AnyHttpUrl (which adds a trailing slash
+    to bare domains), we must use the same normalization here.
     """
-    base = server_url.rstrip("/")
+    # Match the URL normalization used by MCP SDK's AuthSettings / AnyHttpUrl
+    issuer = str(AnyHttpUrl(server_url))
+    base = issuer.rstrip("/")
 
     metadata = {
-        "issuer": base,
+        "issuer": issuer,
         "authorization_endpoint": oidc_config["authorization_endpoint"],
         "token_endpoint": oidc_config["token_endpoint"],
         "registration_endpoint": f"{base}/register",

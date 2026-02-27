@@ -141,7 +141,8 @@ class TestBuildOAuthMetadata:
 
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
-        assert metadata["issuer"] == SERVER_URL
+        # issuer uses AnyHttpUrl normalization to match SDK's authorization_servers
+        assert metadata["issuer"] == SERVER_URL + "/"
         assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
         assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
@@ -180,6 +181,28 @@ class TestBuildOAuthMetadata:
         assert metadata["response_types_supported"] == ["code"]
         assert metadata["code_challenge_methods_supported"] == ["S256"]
         assert "scopes_supported" not in metadata
+
+    def test_issuer_matches_sdk_anyhttp_normalization(self):
+        """Issuer MUST match the authorization_servers URL from SDK's protected resource metadata.
+
+        The MCP SDK normalizes URLs through Pydantic AnyHttpUrl which adds a trailing
+        slash to bare domains. Our issuer must use the same normalization so the client's
+        RFC 8414 section 3.3 issuer validation passes.
+        """
+        from mcp_privilege_cloud.mcp_server import _build_oauth_metadata
+        from pydantic import AnyHttpUrl
+
+        # Bare domain without trailing slash
+        metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, "https://mcp.example.com")
+        assert metadata["issuer"] == str(AnyHttpUrl("https://mcp.example.com"))
+        assert metadata["issuer"].endswith("/")
+
+        # Already has trailing slash
+        metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, "https://mcp.example.com/")
+        assert metadata["issuer"] == str(AnyHttpUrl("https://mcp.example.com/"))
+
+        # registration_endpoint should NOT have double slash
+        assert "//" not in metadata["registration_endpoint"].split("://")[1]
 
     def test_excludes_none_scopes(self):
         """Should not include scopes_supported when not in OIDC config."""
