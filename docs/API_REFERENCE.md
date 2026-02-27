@@ -43,25 +43,28 @@ The server supports two authentication modes, auto-detected from environment var
 
 ### OAuth Per-User Mode (Recommended)
 
-Each user authenticates with their own CyberArk Identity credentials. The server verifies JWTs against the CyberArk Identity JWKS endpoint and creates isolated per-user sessions.
+Each user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 
 ```bash
 # Required for OAuth per-user mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
+CYBERARK_CLIENT_SECRET=service-account-password
+CYBERARK_OAUTH_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+CYBERARK_OAUTH_CLIENT_SECRET=oidc-app-client-secret
+CYBERARK_OAUTH_AUDIENCE=your-jwt-audience-value
 
 # Optional
 MCP_HOST=127.0.0.1             # Server bind host
 MCP_PORT=8000                  # Server bind port
-MCP_MAX_SESSIONS=100           # Max concurrent sessions
-MCP_SESSION_TTL=3600           # Session TTL in seconds
 CYBERARK_LOG_LEVEL=INFO        # Logging level
 ```
 
-**Per-User Token Flow**:
+**Service Account Token Bridge Flow**:
 1. MCP client sends Bearer token in request
 2. `CyberArkTokenVerifier` validates JWT signature via JWKS
-3. `UserSessionManager` resolves or creates a per-user `CyberArkMCPServer`
-4. Tool executes with the user's own CyberArk permissions
+3. User identity (from JWT `sub` claim) is logged for audit
+4. Tool executes via shared service account platform token
 
 ### Legacy Service Account Mode
 
@@ -73,16 +76,15 @@ CYBERARK_CLIENT_SECRET=service-account-password
 ```
 
 ### Token Management
-- **Per-User Mode**: JWT verification via JWKS, sessions cached by token hash with TTL
+- **OAuth Mode**: JWT verification via JWKS; shared service account platform token for API calls
 - **Legacy Mode**: 15-minute token expiration with automatic refresh
-- **Caching**: Secure in-memory token/session caching
 - **Error Recovery**: Automatic retry on 401 authentication errors
 
 ## Tool Categories
 
 The server provides 53 enterprise-grade tools organized across all 5 CyberArk PCloud services:
 
-### Account Management Tools (17 tools)
+### Account Management Tools (18 tools)
 **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
 **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`

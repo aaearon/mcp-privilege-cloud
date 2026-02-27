@@ -36,23 +36,12 @@ class TestContextAccess:
         mock_server.get_account_details.assert_called_once_with(account_id="123")
 
     @pytest.mark.asyncio
-    async def test_tool_works_without_context_backwards_compatible(self):
-        """Tool should fall back to global server when context not provided"""
+    async def test_tool_requires_context(self):
+        """Tool should raise RuntimeError when context not provided"""
         from mcp_privilege_cloud.mcp_server import get_account_details
 
-        mock_server = AsyncMock()
-        mock_server.get_account_details.return_value = {
-            "id": "123",
-            "platformId": "WinServerLocal",
-            "safeName": "TestSafe"
-        }
-
-        # Use legacy pattern without context
-        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
-            result = await get_account_details("123")
-
-            assert result["id"] == "123"
-            mock_server.get_account_details.assert_called_once()
+        with pytest.raises(RuntimeError, match="No server context available"):
+            await get_account_details("123")
 
 
 class TestContextInjectionForHighUsageTools:
@@ -185,16 +174,9 @@ class TestContextWithErrors:
             await get_account_details("invalid_id", ctx=mock_ctx)
 
     @pytest.mark.asyncio
-    async def test_tool_handles_none_context_gracefully(self):
-        """Tools should handle None context by falling back to get_server()"""
+    async def test_tool_raises_on_none_context(self):
+        """Tools should raise RuntimeError when ctx=None is passed"""
         from mcp_privilege_cloud.mcp_server import list_accounts
 
-        mock_server = AsyncMock()
-        mock_server.list_accounts.return_value = []
-
-        with patch('mcp_privilege_cloud.mcp_server.get_server', return_value=mock_server):
-            # Explicitly pass None for ctx
-            result = await list_accounts(ctx=None)
-
-            assert result == []
-            mock_server.list_accounts.assert_called_once()
+        with pytest.raises(RuntimeError, match="No server context available"):
+            await list_accounts(ctx=None)

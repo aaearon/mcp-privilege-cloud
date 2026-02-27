@@ -122,19 +122,12 @@ class CyberArkTokenVerifier(TokenVerifier):
             pyjwt.DecodeError,
             pyjwt.InvalidTokenError,
             pyjwt.PyJWKClientConnectionError,
-            Exception,
         ) as e:
             logger.warning("Token verification failed: %s", e)
-            # Log token claims (without signature) for debugging
-            try:
-                unverified = pyjwt.decode(token, options={"verify_signature": False})
-                logger.warning(
-                    "Token claims — iss: %s, aud: %s, sub: %s (expected aud: %s)",
-                    unverified.get("iss"), unverified.get("aud"), unverified.get("sub"),
-                    self._expected_audience,
-                )
-            except Exception:
-                pass
+            self._log_unverified_claims(token)
+            return None
+        except Exception:
+            logger.exception("Unexpected error during token verification")
             return None
 
         # Validate required claims
@@ -153,6 +146,18 @@ class CyberArkTokenVerifier(TokenVerifier):
             scopes=scopes,
             expires_at=claims.get("exp"),
         )
+
+    def _log_unverified_claims(self, token: str) -> None:
+        """Log token claims (without signature) for debugging."""
+        try:
+            unverified = pyjwt.decode(token, options={"verify_signature": False})
+            logger.warning(
+                "Token claims — iss: %s, aud: %s, sub: %s (expected aud: %s)",
+                unverified.get("iss"), unverified.get("aud"), unverified.get("sub"),
+                self._expected_audience,
+            )
+        except Exception:
+            pass
 
     async def _decode_and_verify(self, token: str) -> dict:
         """Decode and verify a JWT using JWKS.

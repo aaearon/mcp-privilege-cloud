@@ -11,42 +11,24 @@ import os
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Literal
 
 import httpx
-
-# Import BaseModel for Pydantic model detection
+from dotenv import load_dotenv
 from pydantic import AnyHttpUrl, BaseModel
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.settings import AuthSettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-# Add the src directory to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from .server import CyberArkMCPServer
+from .token_verifier import CyberArkTokenVerifier
 
-try:
-    from .server import CyberArkMCPServer
-except ImportError:
-    # Fallback for direct execution
-    from mcp_privilege_cloud.server import CyberArkMCPServer
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    # python-dotenv not available, try manual loading
-    env_file = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
-    if os.path.exists(env_file):
-        with open(env_file) as f:
-            for line in f:
-                if '=' in line and not line.strip().startswith('#'):
-                    key, value = line.strip().split('=', 1)
-                    if key and value:
-                        os.environ[key] = value
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -54,20 +36,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-# OAuth imports
-from mcp.server.auth.provider import AccessToken, TokenVerifier
-from mcp.server.auth.settings import AuthSettings
-
-try:
-    from .token_verifier import CyberArkTokenVerifier
-except ImportError:
-    from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
-
-try:
-    from .session_manager import UserSessionManager
-except ImportError:
-    from mcp_privilege_cloud.session_manager import UserSessionManager
 
 # Streamable HTTP transport configuration
 MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
@@ -97,59 +65,37 @@ def get_access_token() -> Optional[AccessToken]:
 class AppContext:
     """Application context with typed dependencies for lifespan management."""
     server: Optional[CyberArkMCPServer] = None
-    session_manager: Optional[UserSessionManager] = None
+    is_oauth: bool = False
 
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Manage application lifecycle with type-safe context.
 
-    In OAuth mode: creates a UserSessionManager for per-user sessions.
+    In OAuth mode: creates a service account CyberArkMCPServer and verifies
+    user identity from OIDC JWTs on each request.
     In legacy mode: creates a single CyberArkMCPServer from env vars.
     """
-    if is_oauth_mode():
-        logger.info("Initializing in OAuth per-user mode...")
-        max_sessions = int(os.getenv("MCP_MAX_SESSIONS", "100"))
-        session_ttl = int(os.getenv("MCP_SESSION_TTL", "3600"))
-        session_manager = UserSessionManager(
-            max_sessions=max_sessions,
-            session_ttl=session_ttl,
-        )
-        logger.info("Session manager initialized (max=%d, ttl=%ds)", max_sessions, session_ttl)
+    oauth = is_oauth_mode()
+    mode = "OAuth service account bridge" if oauth else "legacy service account"
+    logger.info("Initializing in %s mode...", mode)
 
-        # Service account server for PCloud API access
-        cyberark_server = CyberArkMCPServer.from_environment()
-        logger.info("Service account bridge initialized for PCloud API access")
+    cyberark_server = CyberArkMCPServer.from_environment()
+    logger.info("CyberArk MCP Server initialized successfully")
 
-        try:
-            yield AppContext(server=cyberark_server, session_manager=session_manager)
-        finally:
-            logger.info("Shutting down session manager...")
-            await session_manager.shutdown()
-            if hasattr(cyberark_server, '_executor'):
-                cyberark_server._executor.shutdown(wait=True)
-            logger.info("OAuth mode shutdown complete")
-    else:
-        logger.info("Initializing in legacy service account mode...")
-        cyberark_server = CyberArkMCPServer.from_environment()
-        logger.info("CyberArk MCP Server initialized successfully")
-
-        try:
-            yield AppContext(server=cyberark_server, session_manager=None)
-        finally:
-            if hasattr(cyberark_server, '_executor'):
-                logger.info("Shutting down executor...")
-                cyberark_server._executor.shutdown(wait=True)
-            logger.info("CyberArk MCP Server shutdown complete")
+    try:
+        yield AppContext(server=cyberark_server, is_oauth=oauth)
+    finally:
+        if hasattr(cyberark_server, '_executor'):
+            cyberark_server._executor.shutdown(wait=True)
+        logger.info("CyberArk MCP Server shutdown complete")
 
 
 _oidc_discovery_cache: Optional[dict] = None
+_oidc_discovery_ts: float = 0.0
+_OIDC_CACHE_TTL = 3600  # 1 hour
 
-# Import OIDC app ID constant for DCR responses
-try:
-    from .token_verifier import CYBERARK_OIDC_APP_ID
-except ImportError:
-    from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
+from .token_verifier import CYBERARK_OIDC_APP_ID
 
 
 def _build_dcr_response(body: dict) -> dict:
@@ -196,9 +142,14 @@ def _build_dcr_response(body: dict) -> dict:
 
 
 async def _fetch_oidc_discovery(tenant_url: str) -> dict:
-    """Fetch and cache OIDC discovery from CyberArk Identity tenant."""
-    global _oidc_discovery_cache
-    if _oidc_discovery_cache is not None:
+    """Fetch and cache OIDC discovery from CyberArk Identity tenant.
+
+    Cache expires after _OIDC_CACHE_TTL seconds to pick up key rotations.
+    """
+    import time
+
+    global _oidc_discovery_cache, _oidc_discovery_ts
+    if _oidc_discovery_cache is not None and (time.time() - _oidc_discovery_ts) < _OIDC_CACHE_TTL:
         return _oidc_discovery_cache
 
     url = f"{tenant_url.rstrip('/')}/{CYBERARK_OIDC_APP_ID}/.well-known/openid-configuration"
@@ -206,6 +157,7 @@ async def _fetch_oidc_discovery(tenant_url: str) -> dict:
         resp = await client.get(url)
         resp.raise_for_status()
         _oidc_discovery_cache = resp.json()
+        _oidc_discovery_ts = time.time()
     logger.info("Fetched OIDC discovery from %s", tenant_url)
     return _oidc_discovery_cache
 
@@ -337,26 +289,6 @@ mcp = create_mcp_server()
 if is_oauth_mode():
     _register_oauth_routes(mcp)
 
-# Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
-server: Optional[CyberArkMCPServer] = None
-
-def get_server() -> CyberArkMCPServer:
-    """Get or create the server instance lazily."""
-    global server
-    if server is None:
-        try:
-            server = CyberArkMCPServer.from_environment()
-            logger.info("Successfully initialized CyberArk MCP Server")
-        except ValueError as e:
-            logger.error(f"Failed to initialize server: {e}")
-            raise
-    return server
-
-def reset_server() -> None:
-    """Reset the global server instance. Used for testing to ensure clean state."""
-    global server
-    server = None
-
 def _convert_to_dict(obj: Any) -> Any:
     """Convert Pydantic models to dictionaries for MCP boundary.
     
@@ -384,9 +316,9 @@ async def execute_tool(
     This function serves as the MCP boundary layer, converting Pydantic models
     returned by server methods to dictionaries for MCP client consumption.
 
-    In OAuth mode: resolves per-user server via session_manager using the
-    access token from MCP auth context.
-    In legacy mode: uses the shared server from lifespan context or get_server().
+    In OAuth mode: verifies user identity from OIDC JWT, then routes API calls
+    through the shared service account server.
+    In legacy mode: uses the shared server from lifespan context.
 
     Args:
         tool_name: The server method name to call
@@ -394,26 +326,20 @@ async def execute_tool(
         **kwargs: Parameters to pass to the server method
     """
     try:
-        server_instance = None
+        if ctx is None or not hasattr(ctx, 'request_context'):
+            raise RuntimeError("No server context available")
 
-        if ctx is not None and hasattr(ctx, 'request_context'):
-            app_ctx = ctx.request_context.lifespan_context
+        app_ctx = ctx.request_context.lifespan_context
 
-            # Try OAuth identity verification first
-            if app_ctx.session_manager is not None:
-                access_token = get_access_token()
-                if access_token is not None:
-                    logger.info("Authenticated user: %s", access_token.client_id)
-                    server_instance = app_ctx.server
-                else:
-                    raise PermissionError("OAuth mode requires authentication")
-            # Fall back to legacy shared server
-            elif app_ctx.server is not None:
-                server_instance = app_ctx.server
+        # In OAuth mode, verify user identity before allowing access
+        if app_ctx.is_oauth:
+            access_token = get_access_token()
+            if access_token is not None:
+                logger.info("Authenticated user: %s", access_token.client_id)
+            else:
+                raise PermissionError("OAuth mode requires authentication")
 
-        # Final fallback to legacy get_server()
-        if server_instance is None:
-            server_instance = get_server()
+        server_instance = app_ctx.server
 
         server_method = getattr(server_instance, tool_name)
         result = await server_method(**kwargs)

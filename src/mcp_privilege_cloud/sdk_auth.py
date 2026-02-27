@@ -115,9 +115,3 @@ class CyberArkSDKAuthenticator:
     def is_authenticated(self) -> bool:
         """Check if the client is currently authenticated"""
         return self._is_authenticated and self._sdk_auth is not None
-
-
-# Backward compatibility function for existing code
-def create_sdk_authenticator() -> CyberArkSDKAuthenticator:
-    """Create SDK authenticator from environment variables"""
-    return CyberArkSDKAuthenticator.from_environment()

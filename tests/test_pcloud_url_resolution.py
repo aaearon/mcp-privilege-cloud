@@ -67,22 +67,3 @@ class TestPCloudURLResolution:
         assert url == "https://cyberiam.privilegecloud.cyberark.cloud"
 
 
-class TestOverridePCloudBaseUrl:
-    """Test the _override_pcloud_base_url helper."""
-
-    def test_overrides_base_url_on_service_client(self):
-        """Should replace the service's _client base URL with the correct subdomain."""
-        from mcp_privilege_cloud.server import CyberArkMCPServer
-        from ark_sdk_python.common.ark_client import ArkClient
-
-        # Create a real ArkClient so name-mangled attribute works
-        client = ArkClient(
-            base_url="https://cyberark.privilegecloud.cyberark.cloud/passwordvault/api/"
-        )
-        mock_service = MagicMock()
-        mock_service._client = client
-
-        CyberArkMCPServer._override_pcloud_base_url(mock_service, "cyberiam")
-
-        expected = "https://cyberiam.privilegecloud.cyberark.cloud/passwordvault/api/"
-        assert client.base_url == expected

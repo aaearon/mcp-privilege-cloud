@@ -1,41 +1,13 @@
 """
 Shared pytest configuration and fixtures for test isolation.
 
-This file provides fixtures to ensure proper test isolation by resetting
-global state between tests, and provides modern context/lifespan fixtures.
+Provides modern context/lifespan fixtures for testing MCP tools
+via the execute_tool() code path with context injection.
 """
 
 import pytest
 import os
 from unittest.mock import patch, Mock, AsyncMock
-
-
-@pytest.fixture(autouse=True)
-def reset_global_state():
-    """
-    Automatically reset global state before each test to ensure isolation.
-
-    This fixture:
-    1. Resets the global server instance
-    2. Clears any cached authentication
-    3. Ensures clean state between tests
-    """
-    # Reset global server state before each test
-    try:
-        from mcp_privilege_cloud.mcp_server import reset_server
-        reset_server()
-    except ImportError:
-        # If mcp_server is not available, skip
-        pass
-
-    yield  # Run the test
-
-    # Clean up after each test
-    try:
-        from mcp_privilege_cloud.mcp_server import reset_server
-        reset_server()
-    except ImportError:
-        pass
 
 
 @pytest.fixture
@@ -61,9 +33,6 @@ def mock_server():
 @pytest.fixture
 def mock_context(mock_server):
     """Provide a mock MCP context with lifespan_context for testing tools.
-
-    This fixture creates a mock Context object that simulates the structure
-    used by FastMCP's context injection.
 
     Usage in tests:
         async def test_tool(mock_context):
@@ -97,53 +66,21 @@ def mock_context_with_server(mock_server):
 
 @pytest.fixture
 def mock_oauth_context(mock_server):
-    """Provide a mock MCP context with session_manager for OAuth-mode testing.
+    """Provide a mock MCP context for OAuth-mode testing.
+
+    Simulates the service account bridge where is_oauth=True
+    and user identity is verified before tool execution.
 
     Usage in tests:
         async def test_tool(mock_oauth_context):
-            ctx, server, manager = mock_oauth_context
+            ctx, server = mock_oauth_context
             server.list_accounts.return_value = [...]
             result = await some_tool(param, ctx=ctx)
     """
     from mcp_privilege_cloud.mcp_server import AppContext
 
-    mock_manager = AsyncMock()
-    mock_manager.get_or_create = AsyncMock(return_value=mock_server)
-
     ctx = Mock()
     ctx.request_context.lifespan_context = AppContext(
-        server=None, session_manager=mock_manager
+        server=mock_server, is_oauth=True
     )
-    return ctx, mock_server, mock_manager
-
-
-@pytest.fixture
-def isolated_server():
-    """
-    Provide a completely isolated server instance for testing.
-
-    This fixture mocks the SDK authenticator to prevent real authentication
-    and provides a clean server instance.
-    """
-    with patch.dict(os.environ, {
-        'CYBERARK_CLIENT_ID': 'test-client-id',
-        'CYBERARK_CLIENT_SECRET': 'test-client-secret'
-    }):
-        # Mock the SDK authenticator to prevent real authentication
-        with patch('src.mcp_privilege_cloud.server.CyberArkSDKAuthenticator') as mock_auth_class:
-            from src.mcp_privilege_cloud.server import CyberArkMCPServer
-
-            # Create mock authenticator
-            mock_auth = mock_auth_class.from_environment.return_value
-            mock_auth.get_authenticated_client.return_value = 'mock_sdk_client'
-
-            # Create server instance
-            server = CyberArkMCPServer()
-
-            # Clear any cache to ensure isolation
-            server.clear_cache()
-
-            yield server
-
-            # Clean up after test
-            server.clear_cache()
+    return ctx, mock_server

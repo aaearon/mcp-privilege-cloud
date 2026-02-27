@@ -4,7 +4,7 @@ Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Fo
 
 ## Current Test Status ✅ **VERIFIED**
 
-**Test Suite Results**: **144/144 tests passing** (100% success rate)  
+**Test Suite Results**: **292 tests passing**
 **Code Coverage**: Comprehensive coverage across all 53 tools  
 **Integration Testing**: All 53 MCP tools verified across all services with proper parameter passing  
 
@@ -23,15 +23,6 @@ uv run pytest --cov=src/mcp_privilege_cloud
 # Test categories
 pytest -m unit          # Unit tests only
 pytest -m integration   # Integration tests only
-
-# MCP Inspector CLI Testing (for LLMs)
-# Requires: npm install -g @modelcontextprotocol/inspector
-python test_mcp_cli.py health_check     # Server health check
-python test_mcp_cli.py list_tools       # List all 53 tools
-python test_mcp_cli.py call_tool list_accounts  # Test specific tool
-python test_mcp_cli.py capabilities     # Discover tool capabilities
-python test_mcp_cli.py validation_suite # Run comprehensive validation
-python test_mcp_cli.py generate_report  # Full test report
 ```
 
 ## Test Structure
@@ -95,28 +86,60 @@ The test suite is organized into specialized test files with comprehensive cover
 - Authentication method management workflows
 - Application statistics and lifecycle operations
 
-#### `tests/test_tools.py` (9+ tests)
-- Direct tool function testing
-- Parameter validation for all tools
-- Error handling for tool operations
-- Raw API data verification
-
-#### `tests/test_integration_tools.py` (2+ tests)
+#### `tests/test_integration_tools.py`
 - Tool integration testing with server methods
 - End-to-end tool workflow validation
 
-#### Legacy Test Files (Removed)
-- `tests/test_resources.py` - Removed (resources converted to tools)
-- `tests/test_integration_old.py` - Removed (legacy resource integration tests)
+#### `tests/test_applications_service.py`
+- Applications service CRUD operations
+- Authentication method management workflows
 
-The testing architecture has been simplified by converting to a tool-based architecture while maintaining comprehensive coverage for all tool functionality.
+#### `tests/test_context_injection.py`
+- Context injection and dual-mode lifespan testing
+
+#### `tests/test_token_verifier.py`
+- CyberArkTokenVerifier JWT verification tests
+- JWKS endpoint validation
+
+#### `tests/test_token_bridge.py`
+- Service account token bridge testing
+
+#### `tests/test_oauth_integration.py`
+- Full OAuth integration: dual-mode, execute_tool, lifespan
+
+#### `tests/test_oauth_metadata.py`
+- RFC 8414 `/.well-known/oauth-authorization-server` endpoint tests
+
+#### `tests/test_transport.py`
+- Streamable HTTP transport configuration tests
+
+#### `tests/test_lifespan.py`
+- App lifespan context manager testing
+
+#### `tests/test_env_var_resolution.py`
+- Environment variable priority chain tests
+
+#### `tests/test_pcloud_url_resolution.py`
+- PCloud URL resolution and subdomain override tests
+
+#### `tests/test_enhanced_error_handling.py`
+- Enhanced error handling validation
+
+#### `tests/test_enhanced_error_messages.py`
+- Error message consistency testing
+
+#### `tests/test_response_models.py`
+- Pydantic response model validation
+
+#### `tests/test_typed_tools.py`
+- Typed tool return value testing
 
 ### Test Coverage Metrics
-- **Total Tests**: 144+ tests across 6 test files
-- **Target Coverage**: Minimum 80% code coverage maintained across 45-tool expansion
+- **Total Tests**: 292 tests across 18 test files
+- **Target Coverage**: Minimum 80% code coverage maintained across 53 tools
 - **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
 - **Test Types**: Unit, integration, MCP tools tests across all 5 PCloud services
-- **Service Coverage**: Complete testing for ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService
+- **Service Coverage**: Complete testing for ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService, ArkSMService
 
 ## Testing Strategy
 
@@ -138,12 +161,13 @@ The testing architecture has been simplified by converting to a tool-based archi
 - **Performance Tests**: Response times, concurrent operations, memory usage
 
 ### Key Test Files for LLM Development
-- `tests/test_core_functionality.py` - Authentication, server core, platform management (88+ tests)
-- `tests/test_account_operations.py` - Complete account lifecycle management (85+ tests)  
-- `tests/test_mcp_integration.py` - MCP tool wrappers and integration across all 5 services (18+ tests)
-- `tests/test_integration.py` - End-to-end integration tests with enhanced platform operations (25+ tests)
-- `tests/test_performance.py` - Performance and optimization tests (11+ tests)
-- `tests/test_resources.py` - MCP resource implementation tests (42+ tests)
+- `tests/test_core_functionality.py` - Authentication, server core, platform management
+- `tests/test_account_operations.py` - Complete account lifecycle management
+- `tests/test_mcp_integration.py` - MCP tool wrappers and integration across all 5 services
+- `tests/test_integration_tools.py` - End-to-end integration tests
+- `tests/test_token_verifier.py` - CyberArkTokenVerifier JWT verification tests
+- `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
+- `tests/test_transport.py` - Streamable HTTP transport configuration tests
 
 ### Performance Testing
 ```bash
@@ -167,119 +191,14 @@ pytest -k platform     # Platform management tests
 pytest -k account      # Account management tests
 ```
 
-## MCP Inspector CLI Testing
+## MCP Inspector Testing
 
-### Overview
-
-The `test_mcp_cli.py` script provides a single-file solution for programmatic MCP server testing using the `@modelcontextprotocol/inspector` CLI. Designed specifically for LLM integration and ad-hoc validation testing.
-
-### Prerequisites
+For interactive testing of the MCP server against a live CyberArk environment, use the MCP Inspector:
 
 ```bash
-# Install MCP inspector (one-time setup)
-npm install @modelcontextprotocol/inspector
+# Run MCP Inspector
+npx @modelcontextprotocol/inspector
 
-# Ensure environment variables are set
-cp .env.example .env
-# Edit .env with your CyberArk credentials
+# Run all pytest tests (292 tests)
+uv run pytest
 ```
-
-### Command Line Usage
-
-```bash
-# Server health and connectivity
-python test_mcp_cli.py health_check
-
-# Tool discovery and validation
-python test_mcp_cli.py list_tools        # List all 53 available tools
-python test_mcp_cli.py capabilities      # Detailed tool capabilities analysis
-
-# Tool execution testing
-python test_mcp_cli.py call_tool list_accounts
-python test_mcp_cli.py call_tool list_safes
-python test_mcp_cli.py call_tool get_platform_statistics
-
-# Comprehensive validation
-python test_mcp_cli.py validation_suite  # Run complete test suite
-python test_mcp_cli.py generate_report   # Full diagnostic report
-```
-
-### Python API for LLMs
-
-```python
-from test_mcp_cli import MCPTester
-
-# Initialize tester
-tester = MCPTester(timeout=60, debug=True)
-
-# Basic operations
-tools = tester.list_tools()
-health = tester.test_server_health()
-capabilities = tester.discover_tool_capabilities()
-
-# Tool execution
-result = tester.call_tool("list_accounts", search="test")
-platforms = tester.call_tool("list_platforms")
-
-# Comprehensive testing
-validation = tester.run_basic_validation_suite()
-report = tester.generate_test_report()
-```
-
-### Test Functions
-
-**Core Testing Functions:**
-- `list_tools()` - Discovers all 45 available MCP tools
-- `call_tool(name, **kwargs)` - Executes specific tools with parameters
-- `test_server_health()` - Comprehensive server health assessment
-- `discover_tool_capabilities()` - Detailed tool analysis and categorization
-
-**Validation Functions:**
-- `run_basic_validation_suite()` - Tests core functionality across all services
-- `generate_test_report()` - Human-readable comprehensive test report
-
-### Error Handling and Diagnostics
-
-The testing script provides detailed error categorization:
-- **Authentication Issues**: Invalid credentials, token problems
-- **Permission Issues**: Insufficient CyberArk permissions
-- **Network Issues**: Connectivity, timeout problems
-- **Tool Issues**: Invalid parameters, tool execution failures
-
-### Integration with Existing Tests
-
-```bash
-# Run all testing approaches together
-uv run pytest                           # Unit/integration tests (144 tests)
-python test_mcp_cli.py validation_suite # MCP CLI validation
-python test_mcp_cli.py generate_report  # Comprehensive report
-```
-
-### LLM Usage Examples
-
-**Health Check:**
-```python
-tester = MCPTester()
-health = tester.test_server_health()
-if health["overall_status"] == "healthy":
-    print("✅ Server ready for operations")
-else:
-    print("❌ Issues found:", health["issues"])
-```
-
-**Tool Discovery:**
-```python
-capabilities = tester.discover_tool_capabilities()
-print(f"Total tools: {capabilities['total_tools']}")
-for category, tools in capabilities["tools_by_category"].items():
-    print(f"{category}: {len(tools)} tools")
-```
-
-**Validation Suite:**
-```python
-validation = tester.run_basic_validation_suite()
-print(f"Success rate: {validation['success_rate']:.1f}%")
-print(f"Tests passed: {validation['tests_passed']}/{validation['tests_passed'] + validation['tests_failed']}")
-```
-
-This approach enables LLMs to perform comprehensive, real-time validation of the MCP server functionality with actual CyberArk environments.

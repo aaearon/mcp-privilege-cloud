@@ -2,8 +2,8 @@
 
 Tests the full integration of:
 - FastMCP configured with CyberArkTokenVerifier and AuthSettings
-- AppContext with session_manager
-- execute_tool resolving per-user server via session manager
+- AppContext with is_oauth flag
+- execute_tool verifying user identity, then using shared service account server
 - OAuth env var configuration
 - Backward compatibility with legacy service account mode
 """
@@ -73,27 +73,23 @@ class TestOAuthEnvVarConfiguration:
             assert is_oauth_mode() is False
 
 
-class TestAppContextWithSessionManager:
-    """Test AppContext supports session_manager field."""
+class TestAppContextIsOAuth:
+    """Test AppContext supports is_oauth field."""
 
-    def test_app_context_has_session_manager(self):
-        """AppContext should accept session_manager parameter."""
+    def test_app_context_has_is_oauth(self):
+        """AppContext should accept is_oauth parameter."""
         from mcp_privilege_cloud.mcp_server import AppContext
-        from mcp_privilege_cloud.session_manager import UserSessionManager
 
-        manager = UserSessionManager()
-        ctx = AppContext(server=None, session_manager=manager)
+        ctx = AppContext(server=MagicMock(), is_oauth=True)
+        assert ctx.is_oauth is True
 
-        assert ctx.session_manager is manager
-
-    def test_app_context_session_manager_optional(self):
-        """AppContext.session_manager should be optional for backward compat."""
+    def test_app_context_is_oauth_defaults_false(self):
+        """AppContext.is_oauth should default to False for legacy compat."""
         from mcp_privilege_cloud.mcp_server import AppContext
 
         mock_server = MagicMock()
         ctx = AppContext(server=mock_server)
-
-        assert ctx.session_manager is None
+        assert ctx.is_oauth is False
 
     def test_app_context_backward_compat_server_field(self):
         """AppContext.server should still work for legacy mode."""
@@ -101,30 +97,26 @@ class TestAppContextWithSessionManager:
 
         mock_server = MagicMock()
         ctx = AppContext(server=mock_server)
-
         assert ctx.server is mock_server
 
 
 class TestExecuteToolOAuthResolution:
-    """Test execute_tool resolving per-user server via session manager."""
+    """Test execute_tool verifying identity and using service account server."""
 
     @pytest.mark.asyncio
     async def test_execute_tool_uses_service_account_server_in_oauth_mode(self):
         """execute_tool should verify identity via token, then use app_ctx.server."""
         from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
 
-        # Service account server (shared)
         mock_server = AsyncMock()
         mock_server.list_accounts = AsyncMock(return_value=[])
-
-        mock_manager = AsyncMock()
 
         claims = _default_claims()
         jwt_token = _make_jwt(claims)
 
         ctx = Mock()
         ctx.request_context.lifespan_context = AppContext(
-            server=mock_server, session_manager=mock_manager
+            server=mock_server, is_oauth=True
         )
 
         mock_access_token = Mock()
@@ -137,13 +129,11 @@ class TestExecuteToolOAuthResolution:
         ):
             result = await execute_tool("list_accounts", ctx=ctx)
 
-        # Should use service account server, NOT session_manager.get_or_create
         mock_server.list_accounts.assert_called_once()
-        mock_manager.get_or_create.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_execute_tool_falls_back_to_legacy_server(self):
-        """execute_tool should fall back to ctx.server when no session manager."""
+        """execute_tool should use ctx.server when is_oauth=False."""
         from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
 
         mock_server = AsyncMock()
@@ -152,13 +142,7 @@ class TestExecuteToolOAuthResolution:
         ctx = Mock()
         ctx.request_context.lifespan_context = AppContext(server=mock_server)
 
-        # No access token in context → should fall back to legacy server
-        with patch(
-            "mcp_privilege_cloud.mcp_server.get_access_token",
-            return_value=None,
-        ):
-            result = await execute_tool("list_accounts", ctx=ctx)
-
+        result = await execute_tool("list_accounts", ctx=ctx)
         mock_server.list_accounts.assert_called_once()
 
     @pytest.mark.asyncio
@@ -167,11 +151,10 @@ class TestExecuteToolOAuthResolution:
         from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
 
         mock_server = AsyncMock()
-        mock_manager = AsyncMock()
 
         ctx = Mock()
         ctx.request_context.lifespan_context = AppContext(
-            server=mock_server, session_manager=mock_manager
+            server=mock_server, is_oauth=True
         )
 
         with patch(
@@ -186,8 +169,8 @@ class TestAppLifespanOAuthMode:
     """Test app_lifespan behavior in OAuth mode."""
 
     @pytest.mark.asyncio
-    async def test_lifespan_creates_session_manager_in_oauth_mode(self):
-        """In OAuth mode, app_lifespan should create both session_manager AND server."""
+    async def test_lifespan_creates_oauth_context(self):
+        """In OAuth mode, app_lifespan should create context with is_oauth=True."""
         from mcp_privilege_cloud.mcp_server import app_lifespan
 
         with patch.dict(os.environ, {
@@ -203,7 +186,7 @@ class TestAppLifespanOAuthMode:
 
                     mock_fastmcp = MagicMock()
                     async with app_lifespan(mock_fastmcp) as app_ctx:
-                        assert app_ctx.session_manager is not None
+                        assert app_ctx.is_oauth is True
                         assert app_ctx.server is not None
 
     @pytest.mark.asyncio
@@ -222,35 +205,27 @@ class TestAppLifespanOAuthMode:
                 mock_fastmcp = MagicMock()
                 async with app_lifespan(mock_fastmcp) as app_ctx:
                     assert app_ctx.server is mock_server
-                    assert app_ctx.session_manager is None
+                    assert app_ctx.is_oauth is False
 
     @pytest.mark.asyncio
-    async def test_lifespan_shutdown_calls_session_manager_shutdown(self):
-        """On shutdown, lifespan should call session_manager.shutdown()."""
+    async def test_lifespan_shutdown_cleans_up_executor(self):
+        """On shutdown, lifespan should call executor.shutdown()."""
         from mcp_privilege_cloud.mcp_server import app_lifespan
 
-        with patch.dict(os.environ, {
-            "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-        }):
-            with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
-                with patch(
-                    "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
-                ) as mock_from_env:
-                    mock_server = MagicMock()
-                    mock_server._executor = MagicMock()
-                    mock_from_env.return_value = mock_server
+        with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
+            with patch(
+                "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
+            ) as mock_from_env:
+                mock_server = MagicMock()
+                mock_executor = MagicMock()
+                mock_server._executor = mock_executor
+                mock_from_env.return_value = mock_server
 
-                    with patch(
-                        "mcp_privilege_cloud.mcp_server.UserSessionManager"
-                    ) as MockManager:
-                        mock_manager = AsyncMock()
-                        MockManager.return_value = mock_manager
+                mock_fastmcp = MagicMock()
+                async with app_lifespan(mock_fastmcp) as app_ctx:
+                    pass
 
-                        mock_fastmcp = MagicMock()
-                        async with app_lifespan(mock_fastmcp) as app_ctx:
-                            pass
-
-                        mock_manager.shutdown.assert_called_once()
+                mock_executor.shutdown.assert_called_once_with(wait=True)
 
 
 class TestMCPServerOAuthInit:
@@ -269,7 +244,6 @@ class TestMCPServerOAuthInit:
                 with patch("mcp_privilege_cloud.mcp_server.FastMCP") as MockFastMCP:
                     create_mcp_server()
 
-                    # Verify FastMCP was called with token_verifier and auth
                     call_kwargs = MockFastMCP.call_args.kwargs
                     assert "token_verifier" in call_kwargs
                     assert call_kwargs["token_verifier"] is not None
@@ -285,6 +259,5 @@ class TestMCPServerOAuthInit:
                 create_mcp_server()
 
                 call_kwargs = MockFastMCP.call_args.kwargs
-                # In legacy mode, no token_verifier or auth
                 assert call_kwargs.get("token_verifier") is None
                 assert call_kwargs.get("auth") is None

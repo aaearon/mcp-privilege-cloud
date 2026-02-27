@@ -136,8 +136,6 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
-| `MCP_MAX_SESSIONS` | No | Max concurrent user sessions (default: `100`) |
-| `MCP_SESSION_TTL` | No | Session TTL in seconds (default: `3600`) |
 
 ### Legacy Service Account Mode
 

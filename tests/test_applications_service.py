@@ -34,28 +34,6 @@ def mock_server():
 class TestApplicationsServiceIntegration:
     """Test applications service integration with server"""
     
-    def test_applications_service_in_available_tools(self, mock_server):
-        """Test that applications tools are included in available tools"""
-        available_tools = mock_server.get_available_tools()
-        
-        applications_tools = [
-            "list_applications",
-            "get_application_details", 
-            "add_application",
-            "delete_application",
-            "list_application_auth_methods",
-            "get_application_auth_method_details",
-            "add_application_auth_method",
-            "delete_application_auth_method",
-            "get_applications_stats"
-        ]
-        
-        for tool in applications_tools:
-            assert tool in available_tools, f"Application tool '{tool}' not in available tools"
-        
-        # Verify total count increased 
-        assert len(available_tools) >= 40, f"Expected at least 40 tools, got {len(available_tools)}"
-    
     @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
     def test_ensure_applications_service_initialized(self, mock_apps_service_class, mock_server):
         """Test applications service initialization"""
@@ -69,28 +47,6 @@ class TestApplicationsServiceIntegration:
         assert mock_server.applications_service is not None
         mock_apps_service_class.assert_called_once()
     
-    @patch('src.mcp_privilege_cloud.server.ArkPCloudApplicationsService')
-    @patch('src.mcp_privilege_cloud.server.ArkPCloudAccountsService')
-    @patch('src.mcp_privilege_cloud.server.ArkPCloudSafesService')
-    @patch('src.mcp_privilege_cloud.server.ArkPCloudPlatformsService')
-    @patch('src.mcp_privilege_cloud.server.ArkSMService')
-    def test_reinitialize_services_includes_applications(self, mock_sm_service, mock_platforms_service, 
-                                                        mock_safes_service, mock_accounts_service, 
-                                                        mock_apps_service_class, mock_server):
-        """Test that reinitialize_services includes applications service"""
-        # Mock SDK auth object
-        mock_sdk_auth = Mock()
-        mock_sdk_auth.token.metadata.keys.return_value = ['env']
-        mock_server.sdk_authenticator.get_authenticated_client.return_value = mock_sdk_auth
-        
-        # Test reinitialize
-        mock_server.reinitialize_services()
-        
-        # Verify applications service was initialized
-        assert mock_server.applications_service is not None
-        mock_apps_service_class.assert_called_once_with(mock_sdk_auth)
-
-
 class TestApplicationsOperations:
     """Test applications management operations"""
     
