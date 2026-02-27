@@ -12,8 +12,6 @@ import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mcp_privilege_cloud.exceptions import OAuthError
-
 
 def _make_jwt(claims: dict, header: dict | None = None) -> str:
     """Create a minimal JWT string (unsigned) for testing."""

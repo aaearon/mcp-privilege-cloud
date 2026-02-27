@@ -20,13 +20,13 @@ from pydantic import AnyHttpUrl, BaseModel
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
-from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from .server import CyberArkMCPServer
-from .token_verifier import CyberArkTokenVerifier
+from .token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
 load_dotenv()
 
@@ -94,8 +94,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 _oidc_discovery_cache: Optional[dict] = None
 _oidc_discovery_ts: float = 0.0
 _OIDC_CACHE_TTL = 3600  # 1 hour
-
-from .token_verifier import CYBERARK_OIDC_APP_ID
 
 
 def _build_dcr_response(body: dict) -> dict:
