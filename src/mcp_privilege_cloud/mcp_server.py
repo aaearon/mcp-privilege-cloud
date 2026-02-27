@@ -163,9 +163,9 @@ async def _fetch_oidc_discovery(tenant_url: str) -> dict:
 def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     """Build RFC 8414 authorization server metadata from OIDC discovery.
 
-    Uses authorization_endpoint and token_endpoint directly from the per-app
-    OIDC discovery response, which already contains the correct app-specific
-    URLs. Only registration_endpoint is overridden to point to our server.
+    All endpoints are served through our server (same-origin) to avoid
+    cross-origin rejection by clients like Copilot Studio. The /authorize
+    route redirects to CyberArk Identity, and /token proxies token requests.
 
     Args:
         oidc_config: OIDC discovery response from CyberArk Identity.
@@ -178,14 +178,14 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
     # Match the URL normalization used by MCP SDK's AuthSettings / AnyHttpUrl
     issuer = str(AnyHttpUrl(server_url))
 
-    # registration_endpoint is at the server root, not under /mcp
+    # All endpoints at the server root (same-origin as issuer)
     parsed = urlparse(issuer)
     server_base = f"{parsed.scheme}://{parsed.netloc}"
 
     metadata = {
         "issuer": issuer,
-        "authorization_endpoint": oidc_config["authorization_endpoint"],
-        "token_endpoint": oidc_config["token_endpoint"],
+        "authorization_endpoint": f"{server_base}/authorize",
+        "token_endpoint": f"{server_base}/token",
         "registration_endpoint": f"{server_base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
         "grant_types_supported": ["authorization_code", "refresh_token"],
@@ -276,6 +276,74 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
             registration_response,
             status_code=201,
             headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    @mcp_server.custom_route("/authorize", methods=["GET", "OPTIONS"])
+    async def authorize_proxy(request: Request) -> Response:
+        """Redirect to CyberArk Identity authorization endpoint.
+
+        Proxies the authorization request so all OAuth endpoints appear
+        same-origin in the AS metadata. Passes all query parameters through.
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
+        try:
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery for /authorize redirect")
+            return JSONResponse({"error": "Failed to resolve authorization endpoint"}, status_code=502)
+
+        target = oidc_config["authorization_endpoint"]
+        qs = str(request.url.query)
+        redirect_url = f"{target}?{qs}" if qs else target
+        logger.info("Redirecting /authorize → %s", oidc_config["authorization_endpoint"])
+        return Response(status_code=302, headers={
+            "Location": redirect_url,
+            "Access-Control-Allow-Origin": "*",
+        })
+
+    @mcp_server.custom_route("/token", methods=["POST", "OPTIONS"])
+    async def token_proxy(request: Request) -> Response:
+        """Reverse-proxy token requests to CyberArk Identity token endpoint.
+
+        Proxies the token request so all OAuth endpoints appear same-origin
+        in the AS metadata. Forwards the request body and content-type.
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
+        try:
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery for /token proxy")
+            return JSONResponse({"error": "Failed to resolve token endpoint"}, status_code=502)
+
+        target = oidc_config["token_endpoint"]
+        body = await request.body()
+        content_type = request.headers.get("content-type", "application/x-www-form-urlencoded")
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(target, content=body, headers={"Content-Type": content_type})
+
+        logger.info("Token proxy: %s → %d", target, resp.status_code)
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers={
+                "Content-Type": resp.headers.get("content-type", "application/json"),
+                "Access-Control-Allow-Origin": "*",
+            },
         )
 
 

@@ -145,8 +145,9 @@ class TestBuildOAuthMetadata:
 
         # issuer uses AnyHttpUrl normalization; URLs with path don't get trailing slash
         assert metadata["issuer"] == SERVER_URL
-        assert metadata["authorization_endpoint"] == SAMPLE_OIDC_DISCOVERY["authorization_endpoint"]
-        assert metadata["token_endpoint"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
+        # authorization/token endpoints are same-origin (proxied through our server)
+        assert metadata["authorization_endpoint"] == "https://mcp.example.com/authorize"
+        assert metadata["token_endpoint"] == "https://mcp.example.com/token"
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
         assert metadata["code_challenge_methods_supported"] == ["S256"]
         assert metadata["scopes_supported"] == ["openid", "profile", "email"]
