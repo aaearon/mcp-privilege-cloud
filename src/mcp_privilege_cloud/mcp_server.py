@@ -192,6 +192,10 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
         "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
         "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
     }
+    # jwks_uri is REQUIRED per RFC 8414 for authorization_code grants
+    jwks_uri = oidc_config.get("jwks_uri")
+    if jwks_uri:
+        metadata["jwks_uri"] = jwks_uri
     scopes = oidc_config.get("scopes_supported")
     if scopes is not None:
         metadata["scopes_supported"] = scopes

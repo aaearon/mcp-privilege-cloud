@@ -150,6 +150,7 @@ class TestBuildOAuthMetadata:
         assert metadata["response_types_supported"] == ["code", "id_token", "code id_token"]
         assert metadata["code_challenge_methods_supported"] == ["S256"]
         assert metadata["scopes_supported"] == ["openid", "profile", "email"]
+        assert metadata["jwks_uri"] == SAMPLE_OIDC_DISCOVERY["jwks_uri"]
 
     def test_includes_registration_endpoint(self):
         """Should include registration_endpoint at server root (not under /mcp)."""
