@@ -27,34 +27,26 @@ from ark_sdk_python.models.services.pcloud.accounts import (
 
 # Try to import response model types - these may be generic Pydantic models
 try:
-    # These are the likely response model names based on SDK patterns
     from ark_sdk_python.models.services.pcloud.accounts import (
-        ArkPCloudAccount,  # Individual account response
-        ArkPCloudAccountsList,  # List accounts response
+        ArkPCloudAccount,
     )
 except ImportError:
-    # Fallback to BaseModel if specific response types aren't available
     ArkPCloudAccount = BaseModel
-    ArkPCloudAccountsList = BaseModel
 
 # Import common response types for proper type annotations
 try:
     from ark_sdk_python.models.services.pcloud.safes import (
-        ArkPCloudSafe,
         ArkPCloudSafeMember,
     )
 except ImportError:
-    ArkPCloudSafe = BaseModel
     ArkPCloudSafeMember = BaseModel
 
 try:
     from ark_sdk_python.models.services.pcloud.platforms import (
-        ArkPCloudPlatform,
         ArkPCloudPlatformStatistics,
         ArkPCloudTargetPlatformStatistics,
     )
 except ImportError:
-    ArkPCloudPlatform = BaseModel
     ArkPCloudPlatformStatistics = BaseModel
     ArkPCloudTargetPlatformStatistics = BaseModel
 
@@ -62,12 +54,10 @@ try:
     from ark_sdk_python.models.services.pcloud.applications import (
         ArkPCloudApplication,
         ArkPCloudApplicationAuthMethod,
-        ArkPCloudApplicationStatistics,
     )
 except ImportError:
     ArkPCloudApplication = BaseModel
     ArkPCloudApplicationAuthMethod = BaseModel
-    ArkPCloudApplicationStatistics = BaseModel
 
 try:
     from ark_sdk_python.models.services.sm import (
@@ -1268,7 +1258,6 @@ class CyberArkMCPServer:
     ) -> Any:
         """Import a platform package using ark-sdk-python"""
         import base64
-        import os
         
         # Handle file input - convert to base64 encoded bytes
         if isinstance(platform_package_file, str):
@@ -1359,8 +1348,6 @@ class CyberArkMCPServer:
         Returns:
             List of complete platform configurations with graceful degradation for failures
         """
-        import asyncio
-        
         # Get the basic platform list
         platforms_list = await self.list_platforms(**kwargs)
         if not platforms_list:

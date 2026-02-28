@@ -14,10 +14,9 @@ try:
         ArkPCloudException
     )
     from ark_sdk_python.models.auth.exceptions import ArkAuthException
-    _SDK_AVAILABLE = True
+    pass
 except ImportError:
     # Fallback classes if SDK not available
-    _SDK_AVAILABLE = False
     
     class ArkServiceException(Exception):  # type: ignore[no-redef]
         """Fallback class when SDK is not available"""

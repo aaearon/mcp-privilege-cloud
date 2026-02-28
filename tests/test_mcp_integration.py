@@ -155,8 +155,7 @@ class TestMCPAccountTools:
         assert "lastModifiedTime" in result
 
         mock_server.change_account_password.assert_called_once_with(
-            account_id=account_id,
-            new_password=None
+            account_id=account_id
         )
 
     @pytest.mark.asyncio
@@ -175,8 +174,7 @@ class TestMCPAccountTools:
             await change_account_password(account_id=account_id, ctx=ctx)
 
         mock_server.change_account_password.assert_called_once_with(
-            account_id=account_id,
-            new_password=None
+            account_id=account_id
         )
 
     @pytest.mark.asyncio

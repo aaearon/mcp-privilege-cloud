@@ -90,11 +90,11 @@ claude mcp add cyberark-privilege-cloud \
 - **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 - **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-**Safe Management (11 tools):**
+**Safe Management (10 tools):**
 - **Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
 - **Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
-**Platform Management (12 tools):**
+**Platform Management (10 tools):**
 - **Core Operations**: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
 - **Lifecycle Management**: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
 - **Statistics**: `get_platform_statistics`, `get_target_platform_statistics`
@@ -133,6 +133,7 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR) |
 | `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (used for DCR) |
 | `CYBERARK_OAUTH_AUDIENCE` | Yes | JWT audience claim (app's internal ID -- differs from Trust tab client_id) |
+| `CYBERARK_SUBDOMAIN` | No | PCloud subdomain (required when OAuth JWTs lack the subdomain claim) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |

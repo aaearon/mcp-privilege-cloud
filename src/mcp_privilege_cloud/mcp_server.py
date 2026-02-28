@@ -503,29 +503,26 @@ async def create_account(
 @mcp.tool()
 async def change_account_password(
     account_id: str,
-    new_password: Optional[str] = None,
     ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Change the password for an existing account in CyberArk Privilege Cloud.
-    
-    This operation initiates an immediate password change for the specified account.
-    If no new password is provided, the Central Password Manager (CPM) will generate
-    a new password according to the platform's password policy.
-    
+
+    This operation initiates an immediate CPM-managed password change for the specified account.
+    The Central Password Manager (CPM) will generate a new password according to the platform's
+    password policy.
+
     Args:
         account_id: The unique ID of the account to change password for (required)
-        new_password: Optional new password. If not provided, CPM will generate one automatically
-    
+
     Returns:
         Password change response containing status, timestamps, and account metadata
-        
+
     Security Notes:
         - This operation requires appropriate permissions for password management
         - Password changes are audited and logged in CyberArk
-        - Use CPM-generated passwords when possible for better security compliance
     """
-    return await execute_tool("change_account_password", ctx=ctx, account_id=account_id, new_password=new_password)
+    return await execute_tool("change_account_password", ctx=ctx, account_id=account_id)
 
 @mcp.tool()
 async def set_next_password(

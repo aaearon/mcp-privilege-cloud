@@ -4,7 +4,7 @@ Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Fo
 
 ## Current Test Status ✅ **VERIFIED**
 
-**Test Suite Results**: **292 tests passing**
+**Test Suite Results**: **269 tests passing**
 **Code Coverage**: Comprehensive coverage across all 53 tools  
 **Integration Testing**: All 53 MCP tools verified across all services with proper parameter passing  
 
@@ -60,19 +60,19 @@ The test suite is organized into specialized test files with comprehensive cover
 - **Password Management**: Complete password operations (change, set, verify, reconcile)
 - **Account Analytics**: Distribution analysis, pattern searching, criteria-based counting
 - **Grouping Operations**: Safe-based and platform-based account organization
-- **Error Handling**: Comprehensive error scenarios across all 17 account management tools
+- **Error Handling**: Comprehensive error scenarios across all 18 account management tools
 - **Special Character Handling**: Account data validation and security testing
 
 #### `tests/test_mcp_integration.py` (18+ tests)
 **TestMCPAccountTools** - Complete account management MCP tools (enhanced coverage)
-- All 17 account management tool wrappers
+- All 18 account management tool wrappers
 - Advanced search and analytics tool testing
 - Password management MCP tool wrappers (change, set, verify, reconcile)
 - Parameter passing and validation across expanded tool set
 - Error handling and response formatting
 
 **TestMCPSafeTools** - Safe management MCP tools integration (enhanced coverage)
-- All 11 safe management tools including member management
+- All 10 safe management tools including member management
 - Safe CRUD operations and member management workflows
 - Permission and access validation testing
 
@@ -128,14 +128,8 @@ The test suite is organized into specialized test files with comprehensive cover
 #### `tests/test_enhanced_error_messages.py`
 - Error message consistency testing
 
-#### `tests/test_response_models.py`
-- Pydantic response model validation
-
-#### `tests/test_typed_tools.py`
-- Typed tool return value testing
-
 ### Test Coverage Metrics
-- **Total Tests**: 292 tests across 18 test files
+- **Total Tests**: 269 tests across 16 test files
 - **Target Coverage**: Minimum 80% code coverage maintained across 53 tools
 - **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
 - **Test Types**: Unit, integration, MCP tools tests across all 5 PCloud services
@@ -199,6 +193,6 @@ For interactive testing of the MCP server against a live CyberArk environment, u
 # Run MCP Inspector
 npx @modelcontextprotocol/inspector
 
-# Run all pytest tests (292 tests)
+# Run all pytest tests (269 tests)
 uv run pytest
 ```

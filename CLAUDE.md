@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 292+ passing tests
+2. **Check current test status** - All changes must maintain 269+ passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **SERVICE ACCOUNT TOKEN BRIDGE COMPLETE** - OAuth mode verifies user identity via OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 **Last Updated**: February 27, 2026
-**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 292 passing tests with zero regression.
+**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 269 passing tests with zero regression.
 
 ## Architecture
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 292+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 269+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -329,11 +329,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `token_verifier.py` - JWT verification via CyberArk Identity JWKS (MCP TokenVerifier protocol)
 - `server.py` - Business logic with @handle_sdk_errors decorator + `from_token()` factory
 - `mcp_server.py` - MCP tools with dual-mode lifespan, context injection, Streamable HTTP transport, RFC 8414 metadata route
-- `models.py` - Pydantic response models for typed returns
-- `exceptions.py` - Custom exceptions: OAuthError, SessionExpiredError, CyberArkAPIError
+- `exceptions.py` - Custom exceptions: CyberArkAPIError, SDK compatibility layer
 
 ### Testing Validation ✅ **VERIFIED**
-- **292+ tests passing** - Zero functionality regression across all phases
+- **269+ tests passing** - Zero functionality regression across all phases
 - **Test Coverage Maintained** - 16 token verifier + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
@@ -406,7 +405,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 ## Testing Strategy
 
-**Test Files**: 292+ total tests across 18 test files
+**Test Files**: 269+ total tests across 16 test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (comprehensive error handling)
 - `tests/test_account_operations.py` - Account lifecycle management with CRUD operations
 - `tests/test_applications_service.py` - Applications service testing with authentication methods
@@ -484,7 +483,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 292+ tests must continue passing
+5. **Preserve test coverage** - All 269+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -495,7 +494,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 292+ tests still pass
+4. Verify all 269+ tests still pass
 ```
 
 ## References
@@ -503,7 +502,6 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 - **README.md** - Complete setup and configuration documentation
 - **docs/ARCHITECTURE.md** - System architecture and component details
 - **DEVELOPMENT.md** - Development workflows and procedures
-- **INSTRUCTIONS.md** - Development workflow and coding standards
 - **docs/API_REFERENCE.md** - Complete tool specifications and examples
 - **docs/TESTING.md** - Comprehensive testing guidelines and procedures
 - **docs/CYBERARK_IDENTITY_SETUP.md** - CyberArk Identity OAuth app configuration guide

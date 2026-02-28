@@ -405,10 +405,9 @@ python3 -c "from mcp_privilege_cloud.server import CyberArkMCPServer"
 # Test authentication separately
 python3 -c "
 from mcp_privilege_cloud.sdk_auth import CyberArkSDKAuthenticator
-import asyncio
-auth = CyberArkAuthenticator.from_environment()
-result = asyncio.run(auth.get_auth_header())
-print('Auth header obtained:', bool(result))
+auth = CyberArkSDKAuthenticator.from_environment()
+client = auth.get_authenticated_client()
+print('Authenticated:', bool(client))
 "
 ```
 

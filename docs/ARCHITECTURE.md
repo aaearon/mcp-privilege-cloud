@@ -80,7 +80,7 @@ The server supports two authentication modes:
 
 **Key Features**:
 - **FastMCP Server**: MCP protocol implementation
-- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+12+8+5)
+- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+10+9+6)
 - **SDK-Powered Reliability**: All tools leverage official ark-sdk-python services
 - **Parameter Validation**: Enhanced input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
@@ -162,6 +162,12 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 **OAuth Per-User Mode Environment Variables** (recommended):
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token)
+- `CYBERARK_CLIENT_SECRET` - Service account password
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
+- `CYBERARK_OAUTH_AUDIENCE` - JWT audience claim (app's internal ID, differs from Trust tab client_id)
+- `CYBERARK_SUBDOMAIN` - PCloud subdomain (required if not derivable from tenant URL)
 - `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)

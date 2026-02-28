@@ -15,11 +15,6 @@ from ark_sdk_python.models.auth import (
 logger = logging.getLogger(__name__)
 
 
-class SDKAuthenticationError(Exception):
-    """Raised when SDK authentication with CyberArk fails"""
-    pass
-
-
 class CyberArkSDKAuthenticator:
     """Handles authentication with CyberArk using the official ark-sdk-python"""
 
@@ -100,18 +95,13 @@ class CyberArkSDKAuthenticator:
 
         except Exception as e:
             logger.error(f"SDK authentication failed: {e}")
-            raise SDKAuthenticationError(f"Failed to authenticate with CyberArk SDK: {e}")
+            from .exceptions import CyberArkAPIError
+            raise CyberArkAPIError(f"Failed to authenticate with CyberArk SDK: {e}")
 
     def get_authenticated_client(self) -> ArkISPAuth:
         """Get an authenticated SDK client, authenticating if necessary"""
         if not self._is_authenticated or self._sdk_auth is None:
             return self.authenticate()
 
-        # TODO: Add token validity check and re-authentication logic
-        # The SDK should handle this internally, but we may want to add explicit checks
-
         return self._sdk_auth
 
-    def is_authenticated(self) -> bool:
-        """Check if the client is currently authenticated"""
-        return self._is_authenticated and self._sdk_auth is not None
