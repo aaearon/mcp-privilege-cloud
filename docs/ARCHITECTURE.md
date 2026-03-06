@@ -167,7 +167,6 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 - `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR)
 - `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
 - `CYBERARK_OAUTH_AUDIENCE` - JWT audience claim (app's internal ID, differs from Trust tab client_id)
-- `CYBERARK_SUBDOMAIN` - PCloud subdomain (required if not derivable from tenant URL)
 - `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)

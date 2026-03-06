@@ -130,10 +130,9 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
 | `CYBERARK_CLIENT_ID` | Yes | Service account login name (used for PCloud platform token) |
 | `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
-| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR) |
-| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (used for DCR) |
-| `CYBERARK_OAUTH_AUDIENCE` | Yes | JWT audience claim (app's internal ID -- differs from Trust tab client_id) |
-| `CYBERARK_SUBDOMAIN` | No | PCloud subdomain (required when OAuth JWTs lack the subdomain claim) |
+| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR and JWT audience validation) |
+| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (injected server-side in /token proxy) |
+| `CYBERARK_OAUTH_AUDIENCE` | No | JWT audience override (only if `aud` claim differs from `CYBERARK_OAUTH_CLIENT_ID`) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |

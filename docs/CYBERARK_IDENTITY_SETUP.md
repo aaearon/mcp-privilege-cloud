@@ -32,17 +32,16 @@ CyberArk Identity OAuth2 apps do NOT provide their own client_id/client_secret. 
 
 - Login name = `CYBERARK_CLIENT_ID` (e.g., `mcp-service@cyberark.cloud.3240`)
 - Password = `CYBERARK_CLIENT_SECRET`
-- These credentials are used for:
-  - PCloud API access via `/oauth2/platformtoken` (client_credentials grant)
-  - Returned to MCP clients via DCR for the authorization_code flow
+- These credentials are used **only** for PCloud API access via `/oauth2/platformtoken` (client_credentials grant)
+- They are NOT used for the OAuth authorization flow — that uses the OIDC app credentials from Part B
 
-## Part B: Create the OAuth2 Client Application
+## Part B: Create the OIDC Application
 
-The OAuth2 Client app defines the OAuth endpoints, redirect URIs, and token settings.
+The OIDC app defines the OAuth/OIDC endpoints, redirect URIs, token settings, and issues the JWTs that the MCP server validates on every request.
 
 ### Step 1: Create the App
 
-1. Navigate to **Apps & Widgets** > **Add Web Apps** > **Custom** > **OAuth2 Client**
+1. Navigate to **Apps & Widgets** > **Add Web Apps** > **Custom** > select the **OpenID Connect** template
 2. Name the app `mcpprivilegecloud` (this is the default `CYBERARK_OIDC_APP_ID`)
    - This name becomes the **ServiceName** and appears in OIDC URL paths (e.g., `/OAuth2/Authorize/mcpprivilegecloud`)
 
@@ -81,8 +80,25 @@ This value = `CYBERARK_OAUTH_AUDIENCE`
 
 ### Step 5: Configure Tokens Tab
 
-- Token lifetime: 1 hour (3600s) recommended
-- Scopes: `openid profile` minimum
+**Signing Algorithm**: Must be **RS256** (the only algorithm the MCP server accepts for JWT signature verification).
+
+**Token Lifetime**: 1 hour (3600s) recommended.
+
+**Scopes**: Configure at least `openid profile`:
+
+| Scope | Required | Why |
+|-------|----------|-----|
+| `openid` | Yes | Produces the `sub` claim (user identity) — the MCP server requires this claim and rejects tokens without it |
+| `profile` | Recommended | Adds `unique_name` and display name claims for richer audit logging |
+
+**Required JWT Claims**: The MCP server validates these claims on every request. All are standard OIDC claims produced automatically by CyberArk Identity when the scopes above are configured:
+
+| Claim | Set By | Validated Against |
+|-------|--------|-------------------|
+| `sub` | `openid` scope | Must be non-empty (used as user identity for audit logging) |
+| `exp` | Always present | Must not be expired |
+| `iss` | Always present | Must match `{tenant_url}/{app_name}/` (e.g., `https://abc1234.id.cyberark.cloud/mcpprivilegecloud/`) |
+| `aud` | Set to the `client_id` used in the authorization request | Must match `CYBERARK_OAUTH_AUDIENCE` or `CYBERARK_OAUTH_CLIENT_ID` (see [JWT Validation](#jwt-validation) below) |
 
 ### Step 6: Add Trusted DNS Domains (Required for PKCE Clients)
 
@@ -120,20 +136,17 @@ This should return JSON with `authorization_endpoint`, `token_endpoint`, and `jw
 # Required: triggers OAuth mode
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
-# Service account -- for PCloud API access via platform token
+# Service account (Part A) -- for PCloud API access via platform token
 CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-user-password
 
-# OIDC app -- from Trust tab, for DCR
+# OIDC app (Part B, Step 3) -- injected server-side in /token proxy, never exposed via DCR
 CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
 CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
 
-# JWT audience -- the app's internal ID (differs from Trust tab client_id)
+# JWT audience (Part B, Step 4) -- the app's internal ID (often differs from Trust tab client_id).
+# Only needed if CYBERARK_OAUTH_CLIENT_ID alone doesn't match the JWT aud claim.
 CYBERARK_OAUTH_AUDIENCE=your-oidc-app-internal-id
-
-# PCloud subdomain -- required when OAuth JWTs lack the subdomain claim
-# the SDK needs to resolve the PCloud API URL
-CYBERARK_SUBDOMAIN=your-pcloud-subdomain
 ```
 
 ### Legacy Service Account Mode
@@ -148,8 +161,8 @@ CYBERARK_CLIENT_SECRET=service-user-password
 ## How It Works
 
 1. **User connects** to the MCP server via an MCP client (claude.ai, Copilot Studio, etc.)
-2. **MCP client** calls DCR (`/register`) and receives OIDC app credentials from `CYBERARK_OAUTH_CLIENT_ID`/`SECRET`
-3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code flow)
+2. **MCP client** calls DCR (`/register`) and receives the `client_id` (public client, no secret)
+3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code flow with PKCE)
 4. **MCP server** receives the Bearer JWT token with each request
 5. **CyberArkTokenVerifier** validates the JWT signature against the JWKS endpoint (`/OAuth2/Keys/mcpprivilegecloud`, RS256)
 6. **execute_tool()** verifies user identity from the OIDC JWT, then routes API calls through the service account's platform token
@@ -157,18 +170,49 @@ CYBERARK_CLIENT_SECRET=service-user-password
 
 **Architecture note**: All API calls use a single shared service account platform token. The OIDC JWT is used solely for identity verification and audit logging -- it is not used for PCloud API authorization.
 
+## JWT Validation
+
+The MCP server validates every incoming Bearer JWT against CyberArk Identity's JWKS endpoint. Understanding these checks helps diagnose authentication failures.
+
+**Signature**: RS256 only, verified against keys from `{tenant}/{app_name}/.well-known/openid-configuration` → `jwks_uri`. Keys are cached after first fetch.
+
+**Required claims** (token is rejected if any are missing):
+
+| Claim | Validation Rule | Common Failure |
+|-------|----------------|----------------|
+| `sub` | Must be non-empty | Missing when `openid` scope is not configured on the app |
+| `exp` | Must be in the future | Token has expired — check token lifetime in Tokens tab |
+| `iss` | Must equal `{tenant_url}/{app_name}/` | Wrong app name or tenant URL in `CYBERARK_IDENTITY_TENANT_URL` |
+| `aud` | Must match a configured audience value | See audience resolution below |
+
+**Audience resolution**: The server accepts any of these values as a valid `aud` claim, checked in order:
+
+1. `CYBERARK_OAUTH_AUDIENCE` — explicit override (set this if tokens have an unexpected `aud`)
+2. `CYBERARK_OAUTH_CLIENT_ID` — the Trust tab client ID (Part B, Step 3)
+3. Fallback: `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`)
+
+CyberArk Identity sets `aud` to the `client_id` used in the authorization request. When DCR returns `CYBERARK_OAUTH_CLIENT_ID`, tokens will have that UUID as the audience. However, the app's **internal ID** (visible in the admin portal URL) may differ — if so, set `CYBERARK_OAUTH_AUDIENCE` to match.
+
+**Debugging token issues**: Set `CYBERARK_LOG_LEVEL=DEBUG` to see the actual `iss`, `aud`, and `sub` claims from rejected tokens. You can also decode a token manually:
+
+```bash
+# Decode JWT payload (no verification) to inspect claims
+echo "<token>" | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool
+```
+
 ## OIDC App Configuration Reference
 
-The following details describe the expected configuration of the CyberArk Identity OIDC app as queried from the Identity API:
+The following details describe the expected configuration of the CyberArk Identity OIDC app created in Part B.
 
 | Setting | Value |
 |---------|-------|
-| App Name | `MCP Privilege Cloud` |
+| App Name | `MCP Privilege Cloud` (display name) |
 | App Type | Web (OpenID Connect) |
-| Template | Generic OpenID Connect |
 | ServiceName (URL slug) | `mcpprivilegecloud` |
-| State | Active |
+| Client ID Type | Anything (supports PKCE + confidential clients) |
 | Signing Algorithm | RS256 |
+| Scopes | `openid profile` minimum |
+| State | Active |
 | OIDC Discovery | `https://{tenant}/mcpprivilegecloud/.well-known/openid-configuration` |
 | JWKS Endpoint | `https://{tenant}/OAuth2/Keys/mcpprivilegecloud` |
 | Authorization Endpoint | `https://{tenant}/OAuth2/Authorize/mcpprivilegecloud` |
@@ -176,7 +220,9 @@ The following details describe the expected configuration of the CyberArk Identi
 
 ### Tenant-Level OIDC Discovery
 
-The tenant-level discovery document (at `/.well-known/openid-configuration`) exposes:
+The tenant-level discovery document (at `/.well-known/openid-configuration`) is NOT used by the MCP server — it exposes generic endpoints that don't resolve the app context. The MCP server uses the app-specific discovery at `/{app_name}/.well-known/openid-configuration` instead.
+
+For reference, the tenant-level discovery exposes:
 
 | Field | Value |
 |-------|-------|
@@ -190,22 +236,35 @@ The tenant-level discovery document (at `/.well-known/openid-configuration`) exp
 | `response_types_supported` | `code`, `id_token`, `id_token token`, `code id_token`, `code token`, `code id_token token` |
 | `code_challenge_methods_supported` | `plain`, `S256` |
 
+## Security Limitations
+
+> **Important**: All authenticated users share the same service account's PCloud permissions. The OIDC JWT verifies *who* the user is, but API calls are executed using the service account's platform token. This means:
+>
+> - Any authenticated user can perform any operation the service account is authorized for
+> - Per-user permission enforcement is **not** supported — CyberArk PCloud does not accept OIDC tokens for API authorization
+> - The service account's roles and safe permissions define the ceiling for all users
+> - User identity is logged for audit purposes only
+>
+> **Recommendation**: Grant the service account the minimum PCloud permissions required, and restrict which users can authenticate by limiting the OIDC app's assigned users/roles in CyberArk Identity (Part B, Step 7).
+
 ## Security Considerations
 
 - JWTs are verified against the JWKS endpoint on every request (keys are cached)
 - All PCloud API calls use a shared service account platform token (not per-user tokens)
 - The OIDC JWT establishes user identity for audit logging only
 - Service user credentials are stored server-side and never exposed to end users
+- DCR (`/register`) returns public client only (`token_endpoint_auth_method: "none"`) -- secrets are injected server-side by the `/token` proxy
 - Token verification uses RS256 signature validation via CyberArk Identity's public keys
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| `invalid_client` during auth | Verify trusted DNS domains include the MCP client's domain (Part B, Step 6) and that `CYBERARK_CLIENT_ID` is a service user marked as "OAuth 2.0 confidential client" |
-| "Token verification failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is correct and the user has a valid token |
-| "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable and the app's JWKS endpoint responds |
+| `invalid_client` during auth | Verify trusted DNS domains include the MCP client's domain (Part B, Step 6) and that Client ID Type is set to "Anything" |
+| "Token verification failed" | Set `CYBERARK_LOG_LEVEL=DEBUG` to see actual vs expected claims. Verify `CYBERARK_IDENTITY_TENANT_URL` is correct |
+| "Token missing required 'sub' claim" | Ensure `openid` scope is configured on the Tokens tab (Part B, Step 5) |
+| "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable and the app's OIDC discovery endpoint responds |
 | Server starts in legacy mode | Ensure `CYBERARK_IDENTITY_TENANT_URL` is set |
-| Copilot Studio auth fails | Ensure `CYBERARK_CLIENT_SECRET` is set and Client ID Type is "Anything" or "Confidential" |
-| PCloud URL resolution fails | Set `CYBERARK_SUBDOMAIN` to your PCloud subdomain |
-| JWT `aud` claim mismatch | Set `CYBERARK_OAUTH_AUDIENCE` to the app's internal ID (not the Trust tab client_id) |
+| Copilot Studio auth fails | Ensure `CYBERARK_OAUTH_CLIENT_SECRET` is set and Client ID Type is "Anything" or "Confidential" |
+| JWT `aud` claim mismatch | Set `CYBERARK_OAUTH_AUDIENCE` to the value from the JWT `aud` claim (decode the token to check — see [JWT Validation](#jwt-validation)) |
+| JWT `iss` claim mismatch | The issuer must be `{tenant_url}/{app_name}/` — verify the app name matches `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`) |
