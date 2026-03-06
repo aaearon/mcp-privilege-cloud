@@ -4,23 +4,13 @@ Tests JWT verification against CyberArk Identity JWKS endpoint,
 implementing the MCP SDK's TokenVerifier protocol.
 """
 
-import base64
-import json
 import os
 import time
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
-def _make_jwt(claims: dict, header: dict | None = None) -> str:
-    """Create a minimal JWT string (unsigned) for testing."""
-    if header is None:
-        header = {"alg": "RS256", "typ": "JWT", "kid": "test-key-id"}
-    h = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b"=").decode()
-    p = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
-    s = base64.urlsafe_b64encode(b"fakesig").rstrip(b"=").decode()
-    return f"{h}.{p}.{s}"
+from helpers import _make_jwt
 
 
 def _default_claims(**overrides: object) -> dict:
@@ -406,36 +396,35 @@ class TestCyberArkTokenVerifierAudience:
 
     @pytest.mark.asyncio
     async def test_audience_accepts_all_configured_values(self):
-        """All three env vars should be collected into accepted audiences set."""
+        """Both audience env vars should be collected into accepted audiences set."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         oauth_audience = "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
         oauth_client_id = "c21840a7-different-trust-tab-id"
-        client_id = "timtest@cyberark.cloud.3240"
 
         env = {
             "CYBERARK_OAUTH_AUDIENCE": oauth_audience,
             "CYBERARK_OAUTH_CLIENT_ID": oauth_client_id,
-            "CYBERARK_CLIENT_ID": client_id,
+            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
         }
         with patch.dict(os.environ, env):
             verifier = CyberArkTokenVerifier(
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == {oauth_audience, oauth_client_id, client_id}
+        # CYBERARK_CLIENT_ID (service account username) is never a valid JWT audience
+        assert verifier._expected_audience == {oauth_audience, oauth_client_id}
 
     @pytest.mark.asyncio
     async def test_audience_without_oauth_audience(self):
-        """Without CYBERARK_OAUTH_AUDIENCE, remaining env vars should be collected."""
+        """Without CYBERARK_OAUTH_AUDIENCE, only CYBERARK_OAUTH_CLIENT_ID should be collected."""
         from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
 
         oauth_client_id = "c21840a7-trust-tab-client-id"
-        client_id = "timtest@cyberark.cloud.3240"
 
         env = {
             "CYBERARK_OAUTH_CLIENT_ID": oauth_client_id,
-            "CYBERARK_CLIENT_ID": client_id,
+            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
         }
         with patch.dict(os.environ, env):
             os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
@@ -443,16 +432,14 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == {oauth_client_id, client_id}
+        assert verifier._expected_audience == {oauth_client_id}
 
     @pytest.mark.asyncio
-    async def test_audience_single_env_var(self):
-        """With only CYBERARK_CLIENT_ID, audience set should contain just that value."""
-        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
+    async def test_audience_ignores_service_account_client_id(self):
+        """CYBERARK_CLIENT_ID (service account) should NOT be in audience set."""
+        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
-        client_id = "some-client-id"
-
-        env = {"CYBERARK_CLIENT_ID": client_id}
+        env = {"CYBERARK_CLIENT_ID": "svc@cyberark.cloud.3240"}
         with patch.dict(os.environ, env):
             os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
             os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
@@ -460,7 +447,8 @@ class TestCyberArkTokenVerifierAudience:
                 identity_tenant_url="https://abc1234.id.cyberark.cloud",
             )
 
-        assert verifier._expected_audience == {client_id}
+        # Should fall back to OIDC app ID, not use service account username
+        assert verifier._expected_audience == {CYBERARK_OIDC_APP_ID}
 
     @pytest.mark.asyncio
     async def test_audience_falls_back_to_oidc_app_id(self):
