@@ -169,7 +169,7 @@ class TestBuildOAuthMetadata:
         metadata = _build_oauth_metadata(SAMPLE_OIDC_DISCOVERY, SERVER_URL)
 
         assert metadata["grant_types_supported"] == ["authorization_code", "refresh_token"]
-        assert "client_secret_post" in metadata["token_endpoint_auth_methods_supported"]
+        assert metadata["token_endpoint_auth_methods_supported"] == ["none"]
 
     def test_defaults_when_oidc_fields_missing(self):
         """Should use sensible defaults when OIDC discovery omits optional fields."""
@@ -230,7 +230,7 @@ class TestDynamicClientRegistration:
     """Test the /register DCR proxy endpoint."""
 
     def test_dcr_returns_oauth_client_id_from_env(self):
-        """DCR should return CYBERARK_OAUTH_CLIENT_ID when set."""
+        """DCR should return CYBERARK_OAUTH_CLIENT_ID when set, but never secrets."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
 
         body = {
@@ -246,13 +246,14 @@ class TestDynamicClientRegistration:
             response = _build_dcr_response(body)
 
         assert response["client_id"] == "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
-        assert response["client_secret"] == "oauth-secret"
-        assert response["token_endpoint_auth_method"] == "client_secret_post"
+        assert "client_secret" not in response
+        assert response["token_endpoint_auth_method"] == "none"
         assert response["grant_types"] == ["authorization_code", "refresh_token"]
 
-    def test_dcr_falls_back_to_legacy_client_id(self):
-        """DCR should fall back to CYBERARK_CLIENT_ID when CYBERARK_OAUTH_CLIENT_ID not set."""
+    def test_dcr_falls_back_to_oidc_app_id(self):
+        """DCR should fall back to CYBERARK_OIDC_APP_ID, not CYBERARK_CLIENT_ID (service account)."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response
+        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
 
         env = {
             "CYBERARK_CLIENT_ID": "myuser@tenant",
@@ -261,8 +262,8 @@ class TestDynamicClientRegistration:
         with patch.dict(os.environ, env, clear=True):
             response = _build_dcr_response({})
 
-        assert response["client_id"] == "myuser@tenant"
-        assert response["client_secret"] == "s3cret"
+        assert response["client_id"] == CYBERARK_OIDC_APP_ID
+        assert "client_secret" not in response
 
     def test_dcr_public_client_when_no_secret(self):
         """DCR should return public client (no secret) when CYBERARK_CLIENT_SECRET is unset."""
@@ -315,6 +316,187 @@ class TestDynamicClientRegistration:
         warning_msg = mock_logger.warning.call_args[0][0]
         assert "CYBERARK_OAUTH_CLIENT_ID" in warning_msg
         assert response["client_id"] == CYBERARK_OIDC_APP_ID
+
+
+class TestTokenProxyCredentialInjection:
+    """Test that /token proxy injects server-side credentials."""
+
+    @pytest.mark.asyncio
+    async def test_injects_credentials(self):
+        """Token proxy should inject server-side client_id and client_secret."""
+        from mcp_privilege_cloud.mcp_server import _get_oauth_credentials
+        from urllib.parse import parse_qs, urlencode
+
+        env = {
+            "CYBERARK_OAUTH_CLIENT_ID": "injected-client-id",
+            "CYBERARK_OAUTH_CLIENT_SECRET": "injected-secret",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            client_id, client_secret = _get_oauth_credentials()
+
+        # Simulate what token_proxy does: parse client body, inject creds
+        client_body = urlencode({"grant_type": "authorization_code", "code": "abc123"})
+        params = parse_qs(client_body, keep_blank_values=True)
+        flat_params = {k: v[0] for k, v in params.items()}
+        flat_params["client_id"] = client_id
+        flat_params["client_secret"] = client_secret
+        forwarded = urlencode(flat_params)
+
+        parsed = parse_qs(forwarded)
+        assert parsed["client_id"] == ["injected-client-id"]
+        assert parsed["client_secret"] == ["injected-secret"]
+        assert parsed["grant_type"] == ["authorization_code"]
+        assert parsed["code"] == ["abc123"]
+
+    @pytest.mark.asyncio
+    async def test_overwrites_client_credentials(self):
+        """Token proxy should overwrite any client-supplied credentials."""
+        from mcp_privilege_cloud.mcp_server import _get_oauth_credentials
+        from urllib.parse import parse_qs, urlencode
+
+        env = {
+            "CYBERARK_OAUTH_CLIENT_ID": "server-id",
+            "CYBERARK_OAUTH_CLIENT_SECRET": "server-secret",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            client_id, client_secret = _get_oauth_credentials()
+
+        # Client tries to send its own credentials
+        client_body = urlencode({
+            "grant_type": "authorization_code",
+            "client_id": "attacker-id",
+            "client_secret": "attacker-secret",
+        })
+        params = parse_qs(client_body, keep_blank_values=True)
+        flat_params = {k: v[0] for k, v in params.items()}
+        flat_params["client_id"] = client_id
+        flat_params["client_secret"] = client_secret
+        forwarded = urlencode(flat_params)
+
+        parsed = parse_qs(forwarded)
+        assert parsed["client_id"] == ["server-id"]
+        assert parsed["client_secret"] == ["server-secret"]
+
+    @pytest.mark.asyncio
+    async def test_preserves_other_params(self):
+        """Token proxy should preserve grant_type, code, redirect_uri, code_verifier."""
+        from mcp_privilege_cloud.mcp_server import _get_oauth_credentials
+        from urllib.parse import parse_qs, urlencode
+
+        env = {"CYBERARK_OAUTH_CLIENT_ID": "id", "CYBERARK_OAUTH_CLIENT_SECRET": "secret"}
+        with patch.dict(os.environ, env, clear=True):
+            client_id, client_secret = _get_oauth_credentials()
+
+        client_body = urlencode({
+            "grant_type": "authorization_code",
+            "code": "authcode",
+            "redirect_uri": "https://example.com/callback",
+            "code_verifier": "pkce_verifier_value",
+        })
+        params = parse_qs(client_body, keep_blank_values=True)
+        flat_params = {k: v[0] for k, v in params.items()}
+        flat_params["client_id"] = client_id
+        flat_params["client_secret"] = client_secret
+        forwarded = urlencode(flat_params)
+
+        parsed = parse_qs(forwarded)
+        assert parsed["grant_type"] == ["authorization_code"]
+        assert parsed["code"] == ["authcode"]
+        assert parsed["redirect_uri"] == ["https://example.com/callback"]
+        assert parsed["code_verifier"] == ["pkce_verifier_value"]
+
+
+class TestTokenProxyEndToEnd:
+    """End-to-end test for /token proxy: body parsing, credential injection, upstream forwarding."""
+
+    @pytest.mark.asyncio
+    async def test_token_proxy_full_flow(self):
+        """Token proxy should parse body, inject creds, forward to upstream, and return response."""
+        from mcp_privilege_cloud.mcp_server import _register_oauth_routes, _fetch_oidc_discovery
+        from starlette.testclient import TestClient
+        from starlette.applications import Starlette
+        from starlette.routing import Route
+        from urllib.parse import parse_qs
+
+        import mcp_privilege_cloud.mcp_server as mod
+
+        # Clear OIDC discovery cache
+        mod._oidc_discovery_cache = None
+
+        env = {
+            "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
+            "CYBERARK_OAUTH_CLIENT_ID": "server-client-id",
+            "CYBERARK_OAUTH_CLIENT_SECRET": "server-secret",
+        }
+
+        # Mock OIDC discovery
+        mock_oidc_response = AsyncMock()
+        mock_oidc_response.status_code = 200
+        mock_oidc_response.json = lambda: SAMPLE_OIDC_DISCOVERY
+        mock_oidc_response.raise_for_status = lambda: None
+
+        # Mock upstream token response
+        upstream_response = httpx.Response(
+            200,
+            json={"access_token": "tok_123", "token_type": "Bearer"},
+            request=httpx.Request("POST", SAMPLE_OIDC_DISCOVERY["token_endpoint"]),
+        )
+
+        # Capture the body forwarded to upstream
+        captured_body = {}
+
+        async def mock_post(url, content=None, headers=None):
+            captured_body["url"] = url
+            captured_body["params"] = parse_qs(content)
+            return upstream_response
+
+        mock_http_client = AsyncMock()
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=False)
+        mock_http_client.get = AsyncMock(return_value=mock_oidc_response)
+        mock_http_client.post = mock_post
+
+        with patch.dict(os.environ, env, clear=False):
+            with patch("mcp_privilege_cloud.mcp_server.httpx.AsyncClient", return_value=mock_http_client):
+                # Register routes on a mock FastMCP that stores them
+                routes = {}
+
+                class MockMCP:
+                    def custom_route(self, path, methods=None):
+                        def decorator(fn):
+                            routes[path] = fn
+                            return fn
+                        return decorator
+
+                mock_mcp = MockMCP()
+                _register_oauth_routes(mock_mcp)
+
+                # Build a Starlette Request with form body
+                from starlette.requests import Request as StarletteRequest
+
+                scope = {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/token",
+                    "query_string": b"",
+                    "headers": [(b"content-type", b"application/x-www-form-urlencoded")],
+                }
+
+                body_bytes = b"grant_type=authorization_code&code=auth_code_123&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback"
+
+                async def receive():
+                    return {"type": "http.request", "body": body_bytes}
+
+                request = StarletteRequest(scope, receive)
+                response = await routes["/token"](request)
+
+        # Verify upstream received correct params
+        assert captured_body["url"] == SAMPLE_OIDC_DISCOVERY["token_endpoint"]
+        assert captured_body["params"]["client_id"] == ["server-client-id"]
+        assert captured_body["params"]["client_secret"] == ["server-secret"]
+        assert captured_body["params"]["grant_type"] == ["authorization_code"]
+        assert captured_body["params"]["code"] == ["auth_code_123"]
+        assert response.status_code == 200
 
 
 class TestOAuthRouteRegistration:

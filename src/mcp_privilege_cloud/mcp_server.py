@@ -98,47 +98,50 @@ _oidc_discovery_ts: float = 0.0
 _OIDC_CACHE_TTL = 3600  # 1 hour
 
 
+def _get_oauth_credentials() -> tuple:
+    """Resolve OAuth credentials for the CyberArk Identity token endpoint.
+
+    Injected server-side in /token proxy -- never exposed to clients.
+    Client ID: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OIDC_APP_ID
+    Secret: CYBERARK_OAUTH_CLIENT_SECRET only (no legacy fallback)
+    """
+    client_id = os.getenv("CYBERARK_OAUTH_CLIENT_ID") or CYBERARK_OIDC_APP_ID
+    client_secret = os.getenv("CYBERARK_OAUTH_CLIENT_SECRET") or ""
+    if not client_secret and os.getenv("CYBERARK_OAUTH_CLIENT_ID"):
+        logger.warning(
+            "CYBERARK_OAUTH_CLIENT_ID is set but CYBERARK_OAUTH_CLIENT_SECRET is not; "
+            "the /token proxy will forward requests without a client secret"
+        )
+    return client_id, client_secret
+
+
 def _build_dcr_response(body: dict) -> dict:
     """Build RFC 7591 Dynamic Client Registration response.
 
-    Returns pre-configured CyberArk Identity OAuth2 app credentials
-    so MCP clients can obtain a client_id without manual configuration.
+    Returns pre-configured CyberArk Identity OAuth2 app client_id
+    so MCP clients can complete the OAuth flow. Secrets are NEVER returned;
+    they are injected server-side by the /token proxy.
 
-    Client ID priority: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_CLIENT_ID > CYBERARK_OIDC_APP_ID
-    Secret priority: CYBERARK_OAUTH_CLIENT_SECRET > CYBERARK_CLIENT_SECRET
+    Client ID priority: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OIDC_APP_ID
     """
-    client_id = (
-        os.getenv("CYBERARK_OAUTH_CLIENT_ID")
-        or os.getenv("CYBERARK_CLIENT_ID")
-    )
+    client_id = os.getenv("CYBERARK_OAUTH_CLIENT_ID")
     if not client_id:
         logger.warning(
             "CYBERARK_OAUTH_CLIENT_ID not set; falling back to OIDC app ID '%s'. "
-            "Set CYBERARK_OAUTH_CLIENT_ID to the auto-generated OAuth2 Client ID "
+            "Set CYBERARK_OAUTH_CLIENT_ID to the auto-generated client ID "
             "from the CyberArk Identity app Trust tab.",
             CYBERARK_OIDC_APP_ID,
         )
         client_id = CYBERARK_OIDC_APP_ID
-    client_secret = (
-        os.getenv("CYBERARK_OAUTH_CLIENT_SECRET")
-        or os.getenv("CYBERARK_CLIENT_SECRET")
-    )
 
-    response: Dict[str, Any] = {
+    return {
         "client_id": client_id,
         "client_name": body.get("client_name", "MCP Client"),
         "redirect_uris": body.get("redirect_uris", []),
         "grant_types": ["authorization_code", "refresh_token"],
         "response_types": ["code"],
+        "token_endpoint_auth_method": "none",
     }
-
-    if client_secret:
-        response["client_secret"] = client_secret
-        response["token_endpoint_auth_method"] = "client_secret_post"
-    else:
-        response["token_endpoint_auth_method"] = "none"
-
-    return response
 
 
 async def _fetch_oidc_discovery(tenant_url: str) -> dict:
@@ -191,7 +194,7 @@ def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
         "registration_endpoint": f"{server_base}/register",
         "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
         "grant_types_supported": ["authorization_code", "refresh_token"],
-        "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
+        "token_endpoint_auth_methods_supported": ["none"],
         "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
     }
     # jwks_uri is REQUIRED per RFC 8414 for authorization_code grants
@@ -304,7 +307,12 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
         target = oidc_config["authorization_endpoint"]
         qs = str(request.url.query)
         redirect_url = f"{target}?{qs}" if qs else target
-        logger.info("Redirecting /authorize → %s", oidc_config["authorization_endpoint"])
+        # CyberArk Identity validates redirect_uri against the app's registered URIs
+        logger.info(
+            "Redirecting /authorize → %s (redirect_uri=%s)",
+            oidc_config["authorization_endpoint"],
+            request.query_params.get("redirect_uri", "<not provided>"),
+        )
         return Response(status_code=302, headers={
             "Location": redirect_url,
             "Access-Control-Allow-Origin": "*",
@@ -315,8 +323,11 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
         """Reverse-proxy token requests to CyberArk Identity token endpoint.
 
         Proxies the token request so all OAuth endpoints appear same-origin
-        in the AS metadata. Forwards the request body and content-type.
+        in the AS metadata. Injects server-side client_id and client_secret
+        so secrets never leave the server (clients use token_endpoint_auth_method=none).
         """
+        from urllib.parse import parse_qs, urlencode
+
         if request.method == "OPTIONS":
             return Response(headers={
                 "Access-Control-Allow-Origin": "*",
@@ -333,12 +344,40 @@ def _register_oauth_routes(mcp_server: FastMCP) -> None:
 
         target = oidc_config["token_endpoint"]
         body = await request.body()
-        content_type = request.headers.get("content-type", "application/x-www-form-urlencoded")
+
+        # Parse form body, inject server-side credentials, re-encode
+        params = parse_qs(body.decode("utf-8"), keep_blank_values=True)
+        flat_params = {k: v[0] for k, v in params.items()}
+        client_id, client_secret = _get_oauth_credentials()
+        flat_params["client_id"] = client_id
+        flat_params["client_secret"] = client_secret
+        forwarded_body = urlencode(flat_params)
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post(target, content=body, headers={"Content-Type": content_type})
+            resp = await client.post(
+                target,
+                content=forwarded_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
 
-        logger.info("Token proxy: %s → %d", target, resp.status_code)
+        grant_type = flat_params.get("grant_type", "<missing>")
+        if resp.status_code >= 400:
+            # Log error body for debugging but never log secrets
+            safe_body = resp.text
+            for sensitive_key in ("client_secret", "code", "code_verifier"):
+                # Redact any echoed sensitive values from error responses
+                if sensitive_key in flat_params:
+                    safe_body = safe_body.replace(flat_params[sensitive_key], "[REDACTED]")
+            logger.warning(
+                "Token proxy error: %s → %d (grant_type=%s): %s",
+                target, resp.status_code, grant_type, safe_body,
+            )
+        else:
+            logger.info(
+                "Token proxy: %s → %d (grant_type=%s)", target, resp.status_code, grant_type,
+            )
+        # CORS * is acceptable here: the auth code + PKCE code_verifier prevent
+        # abuse, and MCP SDK clients need cross-origin access to the token endpoint.
         return Response(
             content=resp.content,
             status_code=resp.status_code,

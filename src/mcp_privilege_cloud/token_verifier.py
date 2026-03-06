@@ -57,8 +57,7 @@ class CyberArkTokenVerifier(TokenVerifier):
         # as the audience. The internal app ID (CYBERARK_OAUTH_AUDIENCE) may
         # differ, so we accept both.
         audiences = set()
-        for var in ("CYBERARK_OAUTH_AUDIENCE", "CYBERARK_OAUTH_CLIENT_ID",
-                     "CYBERARK_CLIENT_ID"):
+        for var in ("CYBERARK_OAUTH_AUDIENCE", "CYBERARK_OAUTH_CLIENT_ID"):
             val = os.getenv(var)
             if val:
                 audiences.add(val)
