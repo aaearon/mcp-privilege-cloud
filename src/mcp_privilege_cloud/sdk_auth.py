@@ -33,13 +33,6 @@ class CyberArkSDKAuthenticator:
     @classmethod
     def from_environment(cls) -> "CyberArkSDKAuthenticator":
         """Create authenticator from environment variables"""
-        # Debug: log all environment variables for debugging
-        logger.debug(f"Environment variables check:")
-        logger.debug(f"CYBERARK_CLIENT_ID: {bool(os.getenv('CYBERARK_CLIENT_ID'))}")
-        logger.debug(f"CYBERARK_CLIENT_SECRET: {bool(os.getenv('CYBERARK_CLIENT_SECRET'))}")
-        logger.debug(f"CYBERARK_IDENTITY_TENANT_ID: {bool(os.getenv('CYBERARK_IDENTITY_TENANT_ID'))}")
-        logger.debug(f"CYBERARK_SUBDOMAIN: {bool(os.getenv('CYBERARK_SUBDOMAIN'))}")
-
         client_id = os.getenv("CYBERARK_CLIENT_ID")
         client_secret = os.getenv("CYBERARK_CLIENT_SECRET")
 

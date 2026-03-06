@@ -14,7 +14,6 @@ try:
         ArkPCloudException
     )
     from ark_sdk_python.models.auth.exceptions import ArkAuthException
-    pass
 except ImportError:
     # Fallback classes if SDK not available
     

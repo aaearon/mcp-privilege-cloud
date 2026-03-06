@@ -20,12 +20,16 @@ RUN uv sync --frozen
 
 FROM python:3.12-slim
 
+RUN useradd --create-home --no-log-init appuser
+
 WORKDIR /app
 
 # Copy the entire virtual environment and project from builder
 COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+USER appuser
 
 EXPOSE 8000
 

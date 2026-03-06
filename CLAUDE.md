@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **SERVICE ACCOUNT TOKEN BRIDGE COMPLETE** - OAuth mode verifies user identity via OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 **Last Updated**: February 27, 2026
-**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 269 passing tests with zero regression.
+**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 276 passing tests with zero regression.
 
 ## Architecture
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 269+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 276+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -332,7 +332,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `exceptions.py` - Custom exceptions: CyberArkAPIError, SDK compatibility layer
 
 ### Testing Validation ✅ **VERIFIED**
-- **269+ tests passing** - Zero functionality regression across all phases
+- **276+ tests passing** - Zero functionality regression across all phases
 - **Test Coverage Maintained** - 16 token verifier + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
@@ -343,8 +343,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 - `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token access)
 - `CYBERARK_CLIENT_SECRET` - Service account password
-- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR)
-- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR and /token proxy)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (injected server-side by /token proxy, never exposed via DCR)
 - `CYBERARK_OAUTH_AUDIENCE` - JWT audience claim (the app's internal ID, differs from Trust tab client_id)
 
 **Optional Environment Variables**:
@@ -483,7 +483,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 269+ tests must continue passing
+5. **Preserve test coverage** - All 276+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
