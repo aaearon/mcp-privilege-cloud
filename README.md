@@ -90,11 +90,11 @@ claude mcp add cyberark-privilege-cloud \
 - **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 - **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-**Safe Management (11 tools):**
+**Safe Management (10 tools):**
 - **Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
 - **Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
-**Platform Management (12 tools):**
+**Platform Management (10 tools):**
 - **Core Operations**: `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`
 - **Lifecycle Management**: `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`
 - **Statistics**: `get_platform_statistics`, `get_target_platform_statistics`
@@ -119,20 +119,84 @@ claude mcp add cyberark-privilege-cloud \
 
 ## Configuration
 
-The MCP server requires two environment variables for authentication:
+The server supports two authentication modes. It auto-detects which mode to use based on the environment variables present.
 
-| Variable | Description |
-|----------|-------------|
-| `CYBERARK_CLIENT_ID` | Your Service User username |
-| `CYBERARK_CLIENT_SECRET` | Your Service User password |
+### OAuth Per-User Mode (Recommended)
+
+Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a **service account platform token** for all PCloud API calls. Requires an OAuth2 app configured in CyberArk Identity (see [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
+| `CYBERARK_CLIENT_ID` | Yes | Service account login name (used for PCloud platform token) |
+| `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
+| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR and JWT audience validation) |
+| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (injected server-side in /token proxy) |
+| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
+| `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
+| `MCP_PORT` | No | Server bind port (default: `8000`) |
+
+### Legacy Service Account Mode
+
+A single shared service account authenticates all requests. Simpler setup but all operations run under one identity.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_CLIENT_ID` | Yes | Your Service User username |
+| `CYBERARK_CLIENT_SECRET` | Yes | Your Service User password |
+| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 
 **For Claude Desktop/Claude Code**: Pass these directly in the configuration (see [Client Integration](#client-integration)). No `.env` file is needed.
 
 **For local development/testing**: Create a `.env` file in the project root directory:
 
 ```bash
+# OAuth per-user mode (recommended)
+# Service account — for PCloud API access via platform token
+CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
+CYBERARK_CLIENT_SECRET=service-user-password
+# OIDC app — from Trust tab, for DCR
+CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
+CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
+CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+
+# OR legacy service account mode
 CYBERARK_CLIENT_ID=your-service-user-username
 CYBERARK_CLIENT_SECRET=your-service-user-password
+
+# Transport: stdio (default), sse, or streamable-http
+# MCP_TRANSPORT=streamable-http
+```
+
+## Reverse Proxy Deployment
+
+When deploying behind a reverse proxy with OAuth enabled, you **must** configure the proxy to strip trailing slashes from request paths. MCP clients (e.g. Copilot Studio) POST to `/mcp/` (trailing slash), which causes a 307 redirect to `/mcp`. HTTP clients strip the `Authorization` header on redirect, breaking OAuth Bearer token authentication.
+
+Also set `MCP_SERVER_URL` to the public URL of your server so that OAuth discovery metadata contains reachable URLs.
+
+**Traefik example** (dynamic config):
+```yaml
+http:
+  middlewares:
+    strip-trailing-slash:
+      replacePathRegex:
+        regex: "^(/.+?)/$"
+        replacement: "${1}"
+  routers:
+    mcp:
+      rule: "Host(`mcp.example.com`)"
+      entryPoints:
+        - web-secure
+      service: mcp
+      middlewares:
+        - strip-trailing-slash
+      tls:
+        certResolver: myresolver
+  services:
+    mcp:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"
 ```
 
 ## Troubleshooting
@@ -143,6 +207,7 @@ CYBERARK_CLIENT_SECRET=your-service-user-password
 | Authentication failed | Verify Service User credentials in CyberArk Identity |
 | Permission errors | Ensure the Service User has appropriate Identity roles and safe permissions |
 | Connection issues | Verify you're using the `.cloud` domain (not `.com`) |
+| OAuth 401 behind reverse proxy | Ensure the proxy strips trailing slashes (see Reverse Proxy Deployment above) |
 | `uvx` not found | Install uv: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
 **Verify MCP server manually:**
@@ -186,7 +251,8 @@ Configure with command `uv run mcp-privilege-cloud` and your credentials.
 ## Documentation
 
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications and parameters
-- **[Architecture](ARCHITECTURE.md)** - System design and components
+- **[Architecture](docs/ARCHITECTURE.md)** - System design and components
+- **[CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)** - OAuth app configuration guide
 - **[Development Guide](DEVELOPMENT.md)** - Contributing and development workflows
 - **[Testing Guide](docs/TESTING.md)** - Detailed testing instructions
 

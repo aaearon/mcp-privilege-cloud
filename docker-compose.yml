@@ -1,0 +1,37 @@
+# IMPORTANT: When deploying behind a reverse proxy (e.g. Traefik, nginx),
+# configure the proxy to strip trailing slashes from request paths.
+# MCP clients like Copilot Studio POST to /mcp/ (trailing slash), which
+# causes a 307 redirect to /mcp. HTTP clients strip the Authorization
+# header on redirect, breaking OAuth Bearer token authentication.
+#
+# Traefik example (dynamic config):
+#   middlewares:
+#     strip-trailing-slash:
+#       replacePathRegex:
+#         regex: "^(/.+?)/$"
+#         replacement: "${1}"
+services:
+  mcp-server:
+    build: .
+    ports:
+      - "${MCP_PORT:-8000}:8000"
+    environment:
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-}
+      CYBERARK_IDENTITY_TENANT_URL: ${CYBERARK_IDENTITY_TENANT_URL:-}
+      CYBERARK_CLIENT_ID: ${CYBERARK_CLIENT_ID:-}
+      CYBERARK_CLIENT_SECRET: ${CYBERARK_CLIENT_SECRET:-}
+      CYBERARK_OAUTH_CLIENT_ID: ${CYBERARK_OAUTH_CLIENT_ID:-}
+      CYBERARK_OAUTH_CLIENT_SECRET: ${CYBERARK_OAUTH_CLIENT_SECRET:-}
+    env_file:
+      - path: .env
+        required: false
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/mcp')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

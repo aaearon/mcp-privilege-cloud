@@ -12,33 +12,52 @@ The CyberArk Privilege Cloud MCP Server follows a **simplified, streamlined arch
 
 ## Core Components
 
-The project is structured around four main modules leveraging the official ark-sdk-python:
+The project is structured around these core modules leveraging the official ark-sdk-python:
 
 ```
 src/mcp_privilege_cloud/
-├── sdk_auth.py      # Official SDK authentication wrapper
-├── server.py        # Core CyberArk API integration via SDK
-├── mcp_server.py    # MCP protocol implementation  
-└── exceptions.py    # Custom exception handling
+├── sdk_auth.py          # Legacy service account authentication
+├── token_verifier.py    # JWT verification via CyberArk Identity JWKS
+├── server.py            # Core CyberArk API integration via SDK
+├── mcp_server.py        # MCP protocol implementation (Streamable HTTP)
+└── exceptions.py        # Custom exception handling
 ```
 
-### 1. SDK Authentication Module (`sdk_auth.py`)
+### Authentication Architecture (Dual-Mode)
 
-**Purpose**: Official CyberArk SDK authentication wrapper for enterprise-grade security
+The server supports two authentication modes:
+
+**OAuth Per-User Mode** (recommended for multi-user deployments):
+- Users authenticate via CyberArk Identity OAuth Authorization Code flow
+- Each user's JWT is verified against the JWKS endpoint by `CyberArkTokenVerifier`
+- A shared service account platform token is used for all PCloud API calls
+- User identity from the JWT is logged for audit purposes
+
+**Legacy Service Account Mode** (single shared identity):
+- A single service account authenticates via `CYBERARK_CLIENT_ID`/`CYBERARK_CLIENT_SECRET`
+- All requests share one `CyberArkMCPServer` instance
+- Authentication handled by `CyberArkSDKAuthenticator` in `sdk_auth.py`
+
+### 1. Token Verifier (`token_verifier.py`)
+
+**Purpose**: MCP SDK `TokenVerifier` protocol implementation for CyberArk Identity JWTs
+
+**Key Features**:
+- **JWKS Validation**: Verifies JWT signatures against CyberArk Identity `/oauth2/certs`
+- **MCP Protocol Compliance**: Returns `AccessToken` for MCP auth middleware
+- **Claim Validation**: Enforces `exp`, `iss`, `sub`, `aud` with RS256 algorithm
+- **Graceful Failures**: Returns `None` on any verification failure (no exceptions)
+
+### 2. Legacy SDK Authentication (`sdk_auth.py`)
+
+**Purpose**: Service account authentication wrapper (legacy mode)
 
 **Key Features**:
 - **Official SDK Integration**: Uses ark-sdk-python for authenticated API access
 - **Automatic Token Management**: SDK handles token lifecycle automatically
-- **Enterprise Security**: CyberArk-tested authentication patterns
 - **Environment Configuration**: Seamless integration with existing credential management
-- **Future-Proof Design**: Automatic compatibility with SDK updates
 
-**Implementation Details**:
-- Wraps ark-sdk-python authentication client
-- Provides consistent interface for server methods
-- Leverages SDK's built-in token management and error handling
-
-### 2. Server Module (`server.py`)
+### 3. Server Module (`server.py`)
 
 **Purpose**: Core business logic using official ark-sdk-python services
 
@@ -55,13 +74,13 @@ src/mcp_privilege_cloud/
 - Direct SDK method invocation with enhanced error handling
 - Response normalization while preserving data integrity
 
-### 3. MCP Integration (`mcp_server.py`)
+### 4. MCP Integration (`mcp_server.py`)
 
 **Purpose**: Model Context Protocol implementation with enhanced SDK-powered tools
 
 **Key Features**:
 - **FastMCP Server**: MCP protocol implementation
-- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+12+8+5)
+- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+10+9+6)
 - **SDK-Powered Reliability**: All tools leverage official ark-sdk-python services
 - **Parameter Validation**: Enhanced input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
@@ -74,8 +93,20 @@ src/mcp_privilege_cloud/
 
 ## API Integration Architecture
 
-### SDK-Enhanced Authentication Flow
+### Authentication Flows
 
+**OAuth Per-User Mode:**
+```
+MCP Client → Bearer Token → CyberArkTokenVerifier (JWKS) → AccessToken
+                                                               ↓
+execute_tool() → get_access_token() → verify user identity (audit log)
+                                              ↓
+                              Shared CyberArkMCPServer (service account)
+                                              ↓
+                              SDK Services → CyberArk PCloud API
+```
+
+**Legacy Service Account Mode:**
 ```
 Client Request → MCP Tool → Server Method → SDK Auth → ark-sdk-python → CyberArk Identity
                                       ↓                      ↓
@@ -129,26 +160,39 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 
 ### Configuration Management
 
-**Environment Variables**:
+**OAuth Per-User Mode Environment Variables** (recommended):
+- `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token)
+- `CYBERARK_CLIENT_SECRET` - Service account password
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
+- `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
+- `MCP_HOST` - Server bind host (default: `127.0.0.1`)
+- `MCP_PORT` - Server bind port (default: `8000`)
+- `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)
+
+**Legacy Service Account Mode Environment Variables**:
 - `CYBERARK_CLIENT_ID` - OAuth service account username
 - `CYBERARK_CLIENT_SECRET` - Service account password
+
+**Mode Detection**: The server automatically selects OAuth mode when `CYBERARK_IDENTITY_TENANT_URL` is set; otherwise falls back to legacy mode.
 
 **Security Principles**:
 - Never log sensitive information (tokens, passwords)
 - Environment variable-based configuration only
-- OAuth token caching with automatic refresh
+- JWT verification via JWKS for per-user tokens
 - Principle of least privilege for service accounts
 
 ## Tool Architecture
 
-The server exposes 45 enterprise-grade MCP tools organized by functionality across all 5 PCloud services, all powered by ark-sdk-python:
+The server exposes 53 enterprise-grade MCP tools organized by functionality across all 5 PCloud services, all powered by ark-sdk-python:
 
-**Account Management Tools (17 tools)**:
+**Account Management Tools (18 tools)**:
 - Core Operations: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
 - Password Management: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 - Advanced Search: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-**Safe Management Tools (11 tools)**:
+**Safe Management Tools (10 tools)**:
 - Core Operations: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
 - Member Management: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
@@ -161,6 +205,10 @@ The server exposes 45 enterprise-grade MCP tools organized by functionality acro
 - Core Operations: `list_applications`, `get_application_details`, `add_application`, `delete_application`
 - Auth Methods: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
 - Statistics: `get_applications_stats`
+
+**Session Monitoring Tools (6 tools)**:
+- Session Management: `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `count_sessions`
+- Activity Tracking: `list_session_activities`, `get_session_statistics`
 
 All tools follow consistent SDK-powered patterns:
 - Direct SDK service method invocation
@@ -186,10 +234,10 @@ async def server_method(self, *args, **kwargs):
 
 **2. Streamlined Tool Execution**:
 ```python
-async def execute_tool(tool_name: str, *args, **kwargs):
-    server_instance = get_server()
-    server_method = getattr(server_instance, tool_name)
-    return await server_method(*args, **kwargs)
+async def execute_tool(tool_name: str, ctx=None, **kwargs):
+    app_ctx = ctx.request_context.lifespan_context
+    server_method = getattr(app_ctx.server, tool_name)
+    return await server_method(**kwargs)
 ```
 
 **3. Simplified Service Management**:

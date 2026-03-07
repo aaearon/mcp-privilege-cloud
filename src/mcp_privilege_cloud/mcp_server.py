@@ -14,35 +14,23 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Literal
 
-# Import BaseModel for Pydantic model detection
-from pydantic import BaseModel
+import httpx
+from dotenv import load_dotenv
+from pydantic import AnyHttpUrl, BaseModel
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
+from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.settings import AuthSettings
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
-# Add the src directory to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-try:
-    from .server import CyberArkMCPServer
-except ImportError:
-    # Fallback for direct execution
-    from mcp_privilege_cloud.server import CyberArkMCPServer
+from .server import CyberArkMCPServer
+from .token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
 
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    # python-dotenv not available, try manual loading
-    env_file = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
-    if os.path.exists(env_file):
-        with open(env_file) as f:
-            for line in f:
-                if '=' in line and not line.strip().startswith('#'):
-                    key, value = line.strip().split('=', 1)
-                    if key and value:
-                        os.environ[key] = value
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -51,56 +39,400 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Streamable HTTP transport configuration
+MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
+
+
+def is_oauth_mode() -> bool:
+    """Check if OAuth per-user mode is configured via environment variables."""
+    return bool(os.getenv("CYBERARK_IDENTITY_TENANT_URL"))
+
+
+def get_access_token() -> Optional[AccessToken]:
+    """Get the access token from the current MCP auth context.
+
+    Returns None if no auth context is available (legacy mode).
+    """
+    try:
+        from mcp.server.auth.middleware.auth_context import (
+            get_access_token as _get_access_token,
+        )
+        return _get_access_token()
+    except Exception:
+        return None
+
 
 @dataclass
 class AppContext:
     """Application context with typed dependencies for lifespan management."""
-    server: CyberArkMCPServer
+    server: Optional[CyberArkMCPServer] = None
+    is_oauth: bool = False
 
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Manage application lifecycle with type-safe context.
 
-    Initializes CyberArkMCPServer on startup and cleans up resources on shutdown.
-    The yielded AppContext provides typed access to the server instance.
+    In OAuth mode: creates a service account CyberArkMCPServer and verifies
+    user identity from OIDC JWTs on each request.
+    In legacy mode: creates a single CyberArkMCPServer from env vars.
     """
-    logger.info("Initializing CyberArk MCP Server via lifespan...")
+    oauth = is_oauth_mode()
+    mode = "OAuth service account bridge" if oauth else "legacy service account"
+    logger.info("Initializing in %s mode...", mode)
+
     cyberark_server = CyberArkMCPServer.from_environment()
     logger.info("CyberArk MCP Server initialized successfully")
 
     try:
-        yield AppContext(server=cyberark_server)
+        yield AppContext(server=cyberark_server, is_oauth=oauth)
     finally:
-        # Cleanup resources on shutdown
         if hasattr(cyberark_server, '_executor'):
-            logger.info("Shutting down executor...")
             cyberark_server._executor.shutdown(wait=True)
         logger.info("CyberArk MCP Server shutdown complete")
 
 
-# Initialize the MCP server with lifespan management
-mcp = FastMCP("CyberArk Privilege Cloud MCP Server", lifespan=app_lifespan)
+_oidc_discovery_cache: Optional[dict] = None
+_oidc_discovery_ts: float = 0.0
+_OIDC_CACHE_TTL = 3600  # 1 hour
 
-# Server instance will be created lazily by tools (legacy pattern, kept for backwards compatibility)
-server: Optional[CyberArkMCPServer] = None
 
-def get_server() -> CyberArkMCPServer:
-    """Get or create the server instance lazily."""
-    global server
-    if server is None:
+def _get_oauth_credentials() -> tuple:
+    """Resolve OAuth credentials for the CyberArk Identity token endpoint.
+
+    Injected server-side in /token proxy -- never exposed to clients.
+    Client ID: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OIDC_APP_ID
+    Secret: CYBERARK_OAUTH_CLIENT_SECRET only (no legacy fallback)
+    """
+    client_id = os.getenv("CYBERARK_OAUTH_CLIENT_ID") or CYBERARK_OIDC_APP_ID
+    client_secret = os.getenv("CYBERARK_OAUTH_CLIENT_SECRET") or ""
+    if not client_secret and os.getenv("CYBERARK_OAUTH_CLIENT_ID"):
+        logger.warning(
+            "CYBERARK_OAUTH_CLIENT_ID is set but CYBERARK_OAUTH_CLIENT_SECRET is not; "
+            "the /token proxy will forward requests without a client secret"
+        )
+    return client_id, client_secret
+
+
+def _build_dcr_response(body: dict) -> dict:
+    """Build RFC 7591 Dynamic Client Registration response.
+
+    Returns pre-configured CyberArk Identity OAuth2 app client_id
+    so MCP clients can complete the OAuth flow. Secrets are NEVER returned;
+    they are injected server-side by the /token proxy.
+
+    Client ID priority: CYBERARK_OAUTH_CLIENT_ID > CYBERARK_OIDC_APP_ID
+    """
+    client_id = os.getenv("CYBERARK_OAUTH_CLIENT_ID")
+    if not client_id:
+        logger.warning(
+            "CYBERARK_OAUTH_CLIENT_ID not set; falling back to OIDC app ID '%s'. "
+            "Set CYBERARK_OAUTH_CLIENT_ID to the auto-generated client ID "
+            "from the CyberArk Identity app Trust tab.",
+            CYBERARK_OIDC_APP_ID,
+        )
+        client_id = CYBERARK_OIDC_APP_ID
+
+    return {
+        "client_id": client_id,
+        "client_name": body.get("client_name", "MCP Client"),
+        "redirect_uris": body.get("redirect_uris", []),
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"],
+        "token_endpoint_auth_method": "none",
+    }
+
+
+async def _fetch_oidc_discovery(tenant_url: str) -> dict:
+    """Fetch and cache OIDC discovery from CyberArk Identity tenant.
+
+    Cache expires after _OIDC_CACHE_TTL seconds to pick up key rotations.
+    """
+    import time
+
+    global _oidc_discovery_cache, _oidc_discovery_ts
+    if _oidc_discovery_cache is not None and (time.time() - _oidc_discovery_ts) < _OIDC_CACHE_TTL:
+        return _oidc_discovery_cache
+
+    url = f"{tenant_url.rstrip('/')}/{CYBERARK_OIDC_APP_ID}/.well-known/openid-configuration"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        _oidc_discovery_cache = resp.json()
+        _oidc_discovery_ts = time.time()
+    logger.info("Fetched OIDC discovery from %s", tenant_url)
+    return _oidc_discovery_cache
+
+
+def _build_oauth_metadata(oidc_config: dict, server_url: str) -> dict:
+    """Build RFC 8414 authorization server metadata from OIDC discovery.
+
+    All endpoints are served through our server (same-origin) to avoid
+    cross-origin rejection by clients like Copilot Studio. The /authorize
+    route redirects to CyberArk Identity, and /token proxies token requests.
+
+    Args:
+        oidc_config: OIDC discovery response from CyberArk Identity.
+        server_url: The MCP endpoint URL (e.g. https://host/mcp). Used as the
+            issuer to match what the client derives from the well-known URL path
+            per RFC 8414 section 3.3.
+    """
+    from urllib.parse import urlparse
+
+    # Match the URL normalization used by MCP SDK's AuthSettings / AnyHttpUrl
+    issuer = str(AnyHttpUrl(server_url))
+
+    # All endpoints at the server root (same-origin as issuer)
+    parsed = urlparse(issuer)
+    server_base = f"{parsed.scheme}://{parsed.netloc}"
+
+    metadata = {
+        "issuer": issuer,
+        "authorization_endpoint": f"{server_base}/authorize",
+        "token_endpoint": f"{server_base}/token",
+        "registration_endpoint": f"{server_base}/register",
+        "response_types_supported": oidc_config.get("response_types_supported", ["code"]),
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["none"],
+        "code_challenge_methods_supported": oidc_config.get("code_challenge_methods_supported", ["S256"]),
+    }
+    # jwks_uri is REQUIRED per RFC 8414 for authorization_code grants
+    jwks_uri = oidc_config.get("jwks_uri")
+    if jwks_uri:
+        metadata["jwks_uri"] = jwks_uri
+    scopes = oidc_config.get("scopes_supported")
+    if scopes is not None:
+        metadata["scopes_supported"] = scopes
+    return metadata
+
+
+def _register_oauth_routes(mcp_server: FastMCP) -> None:
+    """Register OAuth discovery and DCR routes on the FastMCP server."""
+
+    async def _serve_oauth_metadata(request: Request) -> Response:
+        """Serve RFC 8414 metadata by proxying CyberArk Identity OIDC discovery.
+
+        Handles both base path and path-suffixed forms per RFC 8414 section 3.1:
+          - /.well-known/oauth-authorization-server
+          - /.well-known/oauth-authorization-server/{path}
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
         try:
-            server = CyberArkMCPServer.from_environment()
-            logger.info("Successfully initialized CyberArk MCP Server")
-        except ValueError as e:
-            logger.error(f"Failed to initialize server: {e}")
-            raise
-    return server
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery from %s", tenant_url)
+            return JSONResponse(
+                {"error": "Failed to fetch OIDC discovery"},
+                status_code=502,
+            )
 
-def reset_server() -> None:
-    """Reset the global server instance. Used for testing to ensure clean state."""
-    global server
-    server = None
+        server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
+        mcp_endpoint_url = server_url.rstrip("/") + "/mcp"
+        metadata = _build_oauth_metadata(oidc_config, mcp_endpoint_url)
+        return JSONResponse(metadata, headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+        })
+
+    @mcp_server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
+    async def oauth_metadata_base(request: Request) -> Response:
+        return await _serve_oauth_metadata(request)
+
+    @mcp_server.custom_route("/.well-known/oauth-authorization-server/{path:path}", methods=["GET", "OPTIONS"])
+    async def oauth_metadata_path(request: Request) -> Response:
+        return await _serve_oauth_metadata(request)
+
+    @mcp_server.custom_route("/register", methods=["POST", "OPTIONS"])
+    async def dynamic_client_registration(request: Request) -> Response:
+        """RFC 7591 Dynamic Client Registration proxy.
+
+        Returns the pre-configured CyberArk Identity OIDC app client ID
+        so MCP clients (e.g. claude.ai) can obtain credentials automatically.
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        registration_response = _build_dcr_response(body)
+
+        logger.info(
+            "DCR: registered client_name=%s redirect_uris=%s",
+            registration_response["client_name"],
+            registration_response["redirect_uris"],
+        )
+
+        return JSONResponse(
+            registration_response,
+            status_code=201,
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    @mcp_server.custom_route("/authorize", methods=["GET", "OPTIONS"])
+    async def authorize_proxy(request: Request) -> Response:
+        """Redirect to CyberArk Identity authorization endpoint.
+
+        Proxies the authorization request so all OAuth endpoints appear
+        same-origin in the AS metadata. Passes all query parameters through.
+        """
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
+        try:
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery for /authorize redirect")
+            return JSONResponse({"error": "Failed to resolve authorization endpoint"}, status_code=502)
+
+        target = oidc_config["authorization_endpoint"]
+        qs = str(request.url.query)
+        redirect_url = f"{target}?{qs}" if qs else target
+        # CyberArk Identity validates redirect_uri against the app's registered URIs
+        logger.info(
+            "Redirecting /authorize → %s (redirect_uri=%s)",
+            oidc_config["authorization_endpoint"],
+            request.query_params.get("redirect_uri", "<not provided>"),
+        )
+        return Response(status_code=302, headers={
+            "Location": redirect_url,
+            "Access-Control-Allow-Origin": "*",
+        })
+
+    @mcp_server.custom_route("/token", methods=["POST", "OPTIONS"])
+    async def token_proxy(request: Request) -> Response:
+        """Reverse-proxy token requests to CyberArk Identity token endpoint.
+
+        Proxies the token request so all OAuth endpoints appear same-origin
+        in the AS metadata. Injects server-side client_id and client_secret
+        so secrets never leave the server (clients use token_endpoint_auth_method=none).
+        """
+        from urllib.parse import parse_qs, urlencode
+
+        if request.method == "OPTIONS":
+            return Response(headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            })
+
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"].rstrip("/")
+        try:
+            oidc_config = await _fetch_oidc_discovery(tenant_url)
+        except Exception:
+            logger.exception("Failed to fetch OIDC discovery for /token proxy")
+            return JSONResponse({"error": "Failed to resolve token endpoint"}, status_code=502)
+
+        target = oidc_config["token_endpoint"]
+        body = await request.body()
+
+        # Parse form body, inject server-side credentials, re-encode
+        params = parse_qs(body.decode("utf-8"), keep_blank_values=True)
+        flat_params = {k: v[0] for k, v in params.items()}
+        client_id, client_secret = _get_oauth_credentials()
+        flat_params["client_id"] = client_id
+        flat_params["client_secret"] = client_secret
+        forwarded_body = urlencode(flat_params)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                target,
+                content=forwarded_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+        grant_type = flat_params.get("grant_type", "<missing>")
+        if resp.status_code >= 400:
+            # Log error body for debugging but never log secrets
+            safe_body = resp.text
+            for sensitive_key in ("client_secret", "code", "code_verifier"):
+                # Redact any echoed sensitive values from error responses
+                if sensitive_key in flat_params:
+                    safe_body = safe_body.replace(flat_params[sensitive_key], "[REDACTED]")
+            logger.warning(
+                "Token proxy error: %s → %d (grant_type=%s): %s",
+                target, resp.status_code, grant_type, safe_body,
+            )
+        else:
+            logger.info(
+                "Token proxy: %s → %d (grant_type=%s)", target, resp.status_code, grant_type,
+            )
+        # CORS * is acceptable here: the auth code + PKCE code_verifier prevent
+        # abuse, and MCP SDK clients need cross-origin access to the token endpoint.
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers={
+                "Content-Type": resp.headers.get("content-type", "application/json"),
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+
+def create_mcp_server() -> FastMCP:
+    """Create and configure the FastMCP server instance.
+
+    In OAuth mode: configures token_verifier and AuthSettings.
+    In legacy mode: no auth configuration.
+    """
+    kwargs: Dict[str, Any] = {
+        "lifespan": app_lifespan,
+        "host": MCP_HOST,
+        "port": MCP_PORT,
+    }
+
+    if is_oauth_mode():
+        tenant_url = os.environ["CYBERARK_IDENTITY_TENANT_URL"]
+        server_url = os.getenv("MCP_SERVER_URL") or f"http://{MCP_HOST}:{MCP_PORT}"
+
+        # The MCP endpoint path (/mcp) must be included in the URLs so that:
+        # 1. authorization_servers in protected resource metadata matches the
+        #    issuer the client derives from /.well-known/oauth-authorization-server/mcp
+        # 2. resource in protected resource metadata matches the actual endpoint
+        # 3. Protected resource route is at /.well-known/oauth-protected-resource/mcp
+        # This is required by RFC 8414 section 3.3 (issuer identity validation).
+        mcp_endpoint_url = server_url.rstrip("/") + "/mcp"
+
+        kwargs["token_verifier"] = CyberArkTokenVerifier(
+            identity_tenant_url=tenant_url,
+        )
+        kwargs["auth"] = AuthSettings(
+            issuer_url=AnyHttpUrl(mcp_endpoint_url),
+            resource_server_url=AnyHttpUrl(mcp_endpoint_url),
+        )
+        logger.info("OAuth auth configured (tenant: %s)", tenant_url)
+    else:
+        kwargs["token_verifier"] = None
+        kwargs["auth"] = None
+
+    return FastMCP("CyberArk Privilege Cloud MCP Server", **kwargs)
+
+
+# Initialize the MCP server
+mcp = create_mcp_server()
+
+# Register OAuth discovery and DCR routes in OAuth mode
+if is_oauth_mode():
+    _register_oauth_routes(mcp)
 
 def _convert_to_dict(obj: Any) -> Any:
     """Convert Pydantic models to dictionaries for MCP boundary.
@@ -129,17 +461,30 @@ async def execute_tool(
     This function serves as the MCP boundary layer, converting Pydantic models
     returned by server methods to dictionaries for MCP client consumption.
 
+    In OAuth mode: verifies user identity from OIDC JWT, then routes API calls
+    through the shared service account server.
+    In legacy mode: uses the shared server from lifespan context.
+
     Args:
         tool_name: The server method name to call
         ctx: Optional MCP context with lifespan_context containing the server
         **kwargs: Parameters to pass to the server method
     """
     try:
-        # Get server from context if available, otherwise use legacy get_server()
-        if ctx is not None and hasattr(ctx, 'request_context'):
-            server_instance = ctx.request_context.lifespan_context.server
-        else:
-            server_instance = get_server()
+        if ctx is None or not hasattr(ctx, 'request_context'):
+            raise RuntimeError("No server context available")
+
+        app_ctx = ctx.request_context.lifespan_context
+
+        # In OAuth mode, verify user identity before allowing access
+        if app_ctx.is_oauth:
+            access_token = get_access_token()
+            if access_token is not None:
+                logger.info("Authenticated user: %s", access_token.client_id)
+            else:
+                raise PermissionError("OAuth mode requires authentication")
+
+        server_instance = app_ctx.server
 
         server_method = getattr(server_instance, tool_name)
         result = await server_method(**kwargs)
@@ -197,34 +542,33 @@ async def create_account(
 @mcp.tool()
 async def change_account_password(
     account_id: str,
-    new_password: Optional[str] = None
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Change the password for an existing account in CyberArk Privilege Cloud.
-    
-    This operation initiates an immediate password change for the specified account.
-    If no new password is provided, the Central Password Manager (CPM) will generate
-    a new password according to the platform's password policy.
-    
+
+    This operation initiates an immediate CPM-managed password change for the specified account.
+    The Central Password Manager (CPM) will generate a new password according to the platform's
+    password policy.
+
     Args:
         account_id: The unique ID of the account to change password for (required)
-        new_password: Optional new password. If not provided, CPM will generate one automatically
-    
+
     Returns:
         Password change response containing status, timestamps, and account metadata
-        
+
     Security Notes:
         - This operation requires appropriate permissions for password management
         - Password changes are audited and logged in CyberArk
-        - Use CPM-generated passwords when possible for better security compliance
     """
-    return await execute_tool("change_account_password", account_id=account_id, new_password=new_password)
+    return await execute_tool("change_account_password", ctx=ctx, account_id=account_id)
 
 @mcp.tool()
 async def set_next_password(
     account_id: str,
     new_password: str,
-    change_immediately: bool = True
+    change_immediately: bool = True,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Set the next password for an existing account in CyberArk Privilege Cloud.
@@ -245,11 +589,12 @@ async def set_next_password(
         - Password changes are audited and logged in CyberArk
         - Use strong passwords that comply with your organization's policy
     """
-    return await execute_tool("set_next_password", account_id=account_id, new_password=new_password, change_immediately=change_immediately)
+    return await execute_tool("set_next_password", ctx=ctx, account_id=account_id, new_password=new_password, change_immediately=change_immediately)
 
 @mcp.tool()
 async def verify_account_password(
-    account_id: str
+    account_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Verify the password for an existing account in CyberArk Privilege Cloud.
@@ -269,11 +614,12 @@ async def verify_account_password(
         - Password verifications are audited and logged in CyberArk
         - This operation does not expose the actual password, only verification status
     """
-    return await execute_tool("verify_account_password", account_id=account_id)
+    return await execute_tool("verify_account_password", ctx=ctx, account_id=account_id)
 
 @mcp.tool()
 async def reconcile_account_password(
-    account_id: str
+    account_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Reconcile the password for an existing account in CyberArk Privilege Cloud.
@@ -294,7 +640,7 @@ async def reconcile_account_password(
         - This operation may take longer to complete as it involves communication with target systems
         - The operation synchronizes credentials between vault and target without exposing passwords
     """
-    return await execute_tool("reconcile_account_password", account_id=account_id)
+    return await execute_tool("reconcile_account_password", ctx=ctx, account_id=account_id)
 
 @mcp.tool()
 async def update_account(
@@ -304,7 +650,8 @@ async def update_account(
     user_name: Optional[str] = None,
     platform_account_properties: Optional[Dict[str, Any]] = None,
     secret_management: Optional[Dict[str, Any]] = None,
-    remote_machines_access: Optional[Dict[str, Any]] = None
+    remote_machines_access: Optional[Dict[str, Any]] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Update an existing account in CyberArk Privilege Cloud.
@@ -334,13 +681,14 @@ async def update_account(
         update_account("123_456", name="updated-web-server", address="web02.corp.com", 
                       platform_account_properties={"Port": "8080"})
     """
-    return await execute_tool("update_account", account_id=account_id, name=name, address=address,
+    return await execute_tool("update_account", ctx=ctx, account_id=account_id, name=name, address=address,
                              user_name=user_name, platform_account_properties=platform_account_properties,
                              secret_management=secret_management, remote_machines_access=remote_machines_access)
 
 @mcp.tool()
 async def delete_account(
-    account_id: str
+    account_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Delete an existing account from CyberArk Privilege Cloud.
@@ -367,7 +715,7 @@ async def delete_account(
     Example:
         delete_account("123_456")  # Permanently removes account with ID 123_456
     """
-    return await execute_tool("delete_account", account_id=account_id)
+    return await execute_tool("delete_account", ctx=ctx, account_id=account_id)
 
 
 
@@ -382,7 +730,8 @@ async def delete_account(
 
 @mcp.tool()
 async def import_platform_package(
-    platform_package_file: str
+    platform_package_file: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Import a platform package ZIP file to CyberArk Privilege Cloud to add new platform types.
@@ -404,13 +753,14 @@ async def import_platform_package(
         
     Note: Requires Privilege Cloud Administrator role for platform management operations
     """
-    return await execute_tool("import_platform_package", platform_package_file=platform_package_file)
+    return await execute_tool("import_platform_package", ctx=ctx, platform_package_file=platform_package_file)
 
 
 @mcp.tool()
 async def export_platform(
     platform_id: str,
-    output_folder: str
+    output_folder: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Export a platform configuration package from CyberArk Privilege Cloud.
@@ -432,14 +782,15 @@ async def export_platform(
         
     Note: Exports platform configuration as a ZIP package to the specified folder
     """
-    return await execute_tool("export_platform", platform_id=platform_id, output_folder=output_folder)
+    return await execute_tool("export_platform", ctx=ctx, platform_id=platform_id, output_folder=output_folder)
 
 
 @mcp.tool()
 async def duplicate_target_platform(
     target_platform_id: int,
     name: str,
-    description: Optional[str] = None
+    description: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Duplicate/clone an existing target platform in CyberArk Privilege Cloud.
@@ -462,12 +813,13 @@ async def duplicate_target_platform(
         
     Note: Creates a copy of an existing target platform with new name and optional description
     """
-    return await execute_tool("duplicate_target_platform", target_platform_id=target_platform_id, name=name, description=description)
+    return await execute_tool("duplicate_target_platform", ctx=ctx, target_platform_id=target_platform_id, name=name, description=description)
 
 
 @mcp.tool()
 async def activate_target_platform(
-    target_platform_id: int
+    target_platform_id: int,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Activate/enable a target platform in CyberArk Privilege Cloud.
@@ -488,12 +840,13 @@ async def activate_target_platform(
         
     Note: Activates the platform making it available for account creation and management
     """
-    return await execute_tool("activate_target_platform", target_platform_id=target_platform_id)
+    return await execute_tool("activate_target_platform", ctx=ctx, target_platform_id=target_platform_id)
 
 
 @mcp.tool()
 async def deactivate_target_platform(
-    target_platform_id: int
+    target_platform_id: int,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Deactivate/disable a target platform in CyberArk Privilege Cloud.
@@ -515,12 +868,13 @@ async def deactivate_target_platform(
         
     Note: Deactivates the platform preventing new account creation with this platform
     """
-    return await execute_tool("deactivate_target_platform", target_platform_id=target_platform_id)
+    return await execute_tool("deactivate_target_platform", ctx=ctx, target_platform_id=target_platform_id)
 
 
 @mcp.tool()
 async def delete_target_platform(
-    target_platform_id: int
+    target_platform_id: int,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """
     Delete a target platform from CyberArk Privilege Cloud.
@@ -542,10 +896,12 @@ async def delete_target_platform(
         
     Warning: This operation permanently removes the platform and cannot be undone
     """
-    return await execute_tool("delete_target_platform", target_platform_id=target_platform_id)
+    return await execute_tool("delete_target_platform", ctx=ctx, target_platform_id=target_platform_id)
 
 @mcp.tool()
-async def get_platform_statistics() -> Any:
+async def get_platform_statistics(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """
     Calculate comprehensive platform statistics from CyberArk Privilege Cloud.
     
@@ -571,10 +927,12 @@ async def get_platform_statistics() -> Any:
         
     Note: Statistics are calculated from all visible platforms based on user permissions
     """
-    return await execute_tool("get_platform_statistics")
+    return await execute_tool("get_platform_statistics", ctx=ctx)
 
 @mcp.tool()
-async def get_target_platform_statistics() -> Any:
+async def get_target_platform_statistics(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """
     Calculate comprehensive target platform statistics from CyberArk Privilege Cloud.
     
@@ -601,7 +959,7 @@ async def get_target_platform_statistics() -> Any:
         
     Note: Statistics are calculated from all visible target platforms based on user permissions
     """
-    return await execute_tool("get_target_platform_statistics")
+    return await execute_tool("get_target_platform_statistics", ctx=ctx)
 
 
 # Data access tools - return raw API data
@@ -637,7 +995,8 @@ async def search_accounts(
     safe_name: Optional[str] = None,
     username: Optional[str] = None,
     address: Optional[str] = None,
-    platform_id: Optional[str] = None
+    platform_id: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Search for accounts with various criteria.
     
@@ -651,12 +1010,14 @@ async def search_accounts(
     Returns:
         List of matching account objects with exact API fields
     """
-    return await execute_tool("search_accounts", query=query, safe_name=safe_name, 
+    return await execute_tool("search_accounts", ctx=ctx, query=query, safe_name=safe_name, 
                              username=username, address=address, platform_id=platform_id)
 
 # Advanced Account Search and Filtering Tools
 @mcp.tool()
-async def filter_accounts_by_platform_group(platform_group: str) -> Any:
+async def filter_accounts_by_platform_group(platform_group: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Filter accounts by platform type grouping (Windows, Linux, Database, etc.).
     
     Args:
@@ -665,10 +1026,12 @@ async def filter_accounts_by_platform_group(platform_group: str) -> Any:
     Returns:
         List of accounts matching the platform group with exact API fields
     """
-    return await execute_tool("filter_accounts_by_platform_group", platform_group=platform_group)
+    return await execute_tool("filter_accounts_by_platform_group", ctx=ctx, platform_group=platform_group)
 
 @mcp.tool()
-async def filter_accounts_by_environment(environment: str) -> Any:
+async def filter_accounts_by_environment(environment: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Filter accounts by environment (production, staging, development, etc.).
     
     Args:
@@ -677,10 +1040,12 @@ async def filter_accounts_by_environment(environment: str) -> Any:
     Returns:
         List of accounts in the specified environment with exact API fields
     """
-    return await execute_tool("filter_accounts_by_environment", environment=environment)
+    return await execute_tool("filter_accounts_by_environment", ctx=ctx, environment=environment)
 
 @mcp.tool()
-async def filter_accounts_by_management_status(auto_managed: bool = True) -> Any:
+async def filter_accounts_by_management_status(auto_managed: bool = True,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Filter accounts by automatic password management status.
     
     Args:
@@ -689,41 +1054,48 @@ async def filter_accounts_by_management_status(auto_managed: bool = True) -> Any
     Returns:
         List of accounts with the specified management status and exact API fields
     """
-    return await execute_tool("filter_accounts_by_management_status", auto_managed=auto_managed)
+    return await execute_tool("filter_accounts_by_management_status", ctx=ctx, auto_managed=auto_managed)
 
 @mcp.tool()
-async def group_accounts_by_safe() -> Any:
+async def group_accounts_by_safe(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Group all accounts by their safe name.
     
     Returns:
         Dictionary with safe names as keys and lists of accounts as values
     """
-    return await execute_tool("group_accounts_by_safe")
+    return await execute_tool("group_accounts_by_safe", ctx=ctx)
 
 @mcp.tool()
-async def group_accounts_by_platform() -> Any:
+async def group_accounts_by_platform(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Group all accounts by their platform type.
     
     Returns:
         Dictionary with platform IDs as keys and lists of accounts as values
     """
-    return await execute_tool("group_accounts_by_platform")
+    return await execute_tool("group_accounts_by_platform", ctx=ctx)
 
 @mcp.tool()
-async def analyze_account_distribution() -> Any:
+async def analyze_account_distribution(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Analyze distribution of accounts across safes, platforms, and environments.
     
     Returns:
         Analysis report with counts and percentages for various account categories
     """
-    return await execute_tool("analyze_account_distribution")
+    return await execute_tool("analyze_account_distribution", ctx=ctx)
 
 @mcp.tool()
 async def search_accounts_by_pattern(
     username_pattern: Optional[str] = None,
     address_pattern: Optional[str] = None, 
     environment: Optional[str] = None,
-    platform_group: Optional[str] = None
+    platform_group: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Search accounts using multiple pattern criteria.
     
@@ -736,20 +1108,22 @@ async def search_accounts_by_pattern(
     Returns:
         List of accounts matching all specified criteria with exact API fields
     """
-    return await execute_tool("search_accounts_by_pattern", 
+    return await execute_tool("search_accounts_by_pattern", ctx=ctx, 
                              username_pattern=username_pattern,
                              address_pattern=address_pattern,
                              environment=environment,
                              platform_group=platform_group)
 
 @mcp.tool()
-async def count_accounts_by_criteria() -> Any:
+async def count_accounts_by_criteria(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Count accounts by various criteria (platform, safe, management status).
     
     Returns:
         Count summary with totals for different account categories
     """
-    return await execute_tool("count_accounts_by_criteria")
+    return await execute_tool("count_accounts_by_criteria", ctx=ctx)
 
 @mcp.tool()
 async def get_safe_details(
@@ -767,18 +1141,21 @@ async def get_safe_details(
     return await execute_tool("get_safe_details", ctx=ctx, safe_name=safe_name)
 
 @mcp.tool()
-async def list_safes() -> Any:
+async def list_safes(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List all accessible safes in CyberArk Privilege Cloud.
     
     Returns:
         List of safe objects with their exact API fields
     """
-    return await execute_tool("list_safes")
+    return await execute_tool("list_safes", ctx=ctx)
 
 @mcp.tool()
 async def add_safe(
     safe_name: str,
-    description: Optional[str] = None
+    description: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Add a new safe to CyberArk Privilege Cloud.
     
@@ -789,7 +1166,7 @@ async def add_safe(
     Returns:
         Safe object with its exact API fields after creation
     """
-    return await execute_tool("add_safe", safe_name=safe_name, description=description)
+    return await execute_tool("add_safe", ctx=ctx, safe_name=safe_name, description=description)
 
 @mcp.tool()
 async def update_safe(
@@ -801,7 +1178,8 @@ async def update_safe(
     number_of_versions_retention: Optional[int] = None,
     auto_purge_enabled: Optional[bool] = None,
     olac_enabled: Optional[bool] = None,
-    managing_cpm: Optional[str] = None
+    managing_cpm: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Update properties of an existing safe in CyberArk Privilege Cloud.
     
@@ -820,7 +1198,7 @@ async def update_safe(
         Updated safe object with its exact API fields
     """
     return await execute_tool(
-        "update_safe",
+        "update_safe", ctx=ctx,
         safe_id=safe_id,
         safe_name=safe_name,
         description=description,
@@ -833,7 +1211,9 @@ async def update_safe(
     )
 
 @mcp.tool()
-async def delete_safe(safe_id: str) -> Any:
+async def delete_safe(safe_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Delete a safe from CyberArk Privilege Cloud.
     
     WARNING: This action permanently removes the safe and all its contents.
@@ -844,7 +1224,7 @@ async def delete_safe(safe_id: str) -> Any:
     Returns:
         Confirmation message with the deleted safe ID
     """
-    return await execute_tool("delete_safe", safe_id=safe_id)
+    return await execute_tool("delete_safe", ctx=ctx, safe_id=safe_id)
 
 
 # Safe Member Management Tools
@@ -856,7 +1236,8 @@ async def list_safe_members(
     sort: Optional[str] = None,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
-    member_type: Optional[str] = None
+    member_type: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """List all members of a specific safe with their permissions.
     
@@ -876,7 +1257,7 @@ async def list_safe_members(
         list_safe_members("HR-Safe", member_type="User")
     """
     return await execute_tool(
-        "list_safe_members", 
+        "list_safe_members", ctx=ctx,
         safe_name=safe_name,
         search=search,
         sort=sort,
@@ -886,7 +1267,9 @@ async def list_safe_members(
     )
 
 @mcp.tool()
-async def get_safe_member_details(safe_name: str, member_name: str) -> Any:
+async def get_safe_member_details(safe_name: str, member_name: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific safe member.
     
     Args:
@@ -899,7 +1282,7 @@ async def get_safe_member_details(safe_name: str, member_name: str) -> Any:
     Example:
         get_safe_member_details("IT-Infrastructure", "admin@domain.com")
     """
-    return await execute_tool("get_safe_member_details", safe_name=safe_name, member_name=member_name)
+    return await execute_tool("get_safe_member_details", ctx=ctx, safe_name=safe_name, member_name=member_name)
 
 @mcp.tool()
 async def add_safe_member(
@@ -909,7 +1292,8 @@ async def add_safe_member(
     search_in: Optional[str] = None,
     membership_expiration_date: Optional[str] = None,
     permissions: Optional[Dict[str, Any]] = None,
-    permission_set: Optional[str] = None
+    permission_set: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Add a new member to a safe with specified permissions.
     
@@ -932,7 +1316,7 @@ async def add_safe_member(
     Note: Defaults to "ReadOnly" permission set if no permissions specified
     """
     return await execute_tool(
-        "add_safe_member",
+        "add_safe_member", ctx=ctx,
         safe_name=safe_name,
         member_name=member_name,
         member_type=member_type,
@@ -949,7 +1333,8 @@ async def update_safe_member(
     search_in: Optional[str] = None,
     membership_expiration_date: Optional[str] = None,
     permissions: Optional[Dict[str, Any]] = None,
-    permission_set: Optional[str] = None
+    permission_set: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Update permissions for an existing safe member.
     
@@ -969,7 +1354,7 @@ async def update_safe_member(
         update_safe_member("HR-Safe", "admin", membership_expiration_date="2024-12-31T23:59:59Z")
     """
     return await execute_tool(
-        "update_safe_member",
+        "update_safe_member", ctx=ctx,
         safe_name=safe_name,
         member_name=member_name,
         search_in=search_in,
@@ -979,7 +1364,9 @@ async def update_safe_member(
     )
 
 @mcp.tool()
-async def remove_safe_member(safe_name: str, member_name: str) -> Any:
+async def remove_safe_member(safe_name: str, member_name: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Remove a member from a safe.
     
     Args:
@@ -994,11 +1381,13 @@ async def remove_safe_member(safe_name: str, member_name: str) -> Any:
         
     Note: This action permanently removes the member's access to the safe
     """
-    return await execute_tool("remove_safe_member", safe_name=safe_name, member_name=member_name)
+    return await execute_tool("remove_safe_member", ctx=ctx, safe_name=safe_name, member_name=member_name)
 
 
 @mcp.tool()
-async def get_platform_details(platform_id: str) -> Any:
+async def get_platform_details(platform_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific platform in CyberArk Privilege Cloud.
     
     Args:
@@ -1007,7 +1396,7 @@ async def get_platform_details(platform_id: str) -> Any:
     Returns:
         Platform object with complete configuration details and exact API fields
     """
-    return await execute_tool("get_platform_details", platform_id=platform_id)
+    return await execute_tool("get_platform_details", ctx=ctx, platform_id=platform_id)
 
 @mcp.tool()
 async def list_platforms(
@@ -1028,7 +1417,8 @@ async def list_applications(
     location: Optional[str] = None,
     only_enabled: Optional[bool] = None,
     business_owner_name: Optional[str] = None,
-    business_owner_email: Optional[str] = None
+    business_owner_email: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """List applications from CyberArk Privilege Cloud.
     
@@ -1051,11 +1441,13 @@ async def list_applications(
     if business_owner_email is not None:
         kwargs['business_owner_email'] = business_owner_email
     
-    return await execute_tool("list_applications", **kwargs)
+    return await execute_tool("list_applications", ctx=ctx, **kwargs)
 
 
 @mcp.tool()
-async def get_application_details(app_id: str) -> Any:
+async def get_application_details(app_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific application.
     
     Args:
@@ -1064,7 +1456,7 @@ async def get_application_details(app_id: str) -> Any:
     Returns:
         Application object with all configuration details
     """
-    return await execute_tool("get_application_details", app_id=app_id)
+    return await execute_tool("get_application_details", ctx=ctx, app_id=app_id)
 
 
 @mcp.tool()
@@ -1079,7 +1471,8 @@ async def add_application(
     business_owner_first_name: str = "",
     business_owner_last_name: str = "",
     business_owner_email: str = "",
-    business_owner_phone: str = ""
+    business_owner_phone: str = "",
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Add a new application to CyberArk Privilege Cloud.
     
@@ -1100,7 +1493,7 @@ async def add_application(
         Created application object with its details
     """
     return await execute_tool(
-        "add_application",
+        "add_application", ctx=ctx,
         app_id=app_id,
         description=description,
         location=location,
@@ -1116,7 +1509,9 @@ async def add_application(
 
 
 @mcp.tool()
-async def delete_application(app_id: str) -> Any:
+async def delete_application(app_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Delete an application from CyberArk Privilege Cloud.
     
     Args:
@@ -1125,13 +1520,14 @@ async def delete_application(app_id: str) -> Any:
     Returns:
         Confirmation of deletion
     """
-    return await execute_tool("delete_application", app_id=app_id)
+    return await execute_tool("delete_application", ctx=ctx, app_id=app_id)
 
 
 @mcp.tool()
 async def list_application_auth_methods(
     app_id: str,
-    auth_types: Optional[List[str]] = None
+    auth_types: Optional[List[str]] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """List authentication methods for a specific application.
     
@@ -1146,11 +1542,13 @@ async def list_application_auth_methods(
     if auth_types is not None:
         kwargs['auth_types'] = auth_types
     
-    return await execute_tool("list_application_auth_methods", **kwargs)
+    return await execute_tool("list_application_auth_methods", ctx=ctx, **kwargs)
 
 
 @mcp.tool()
-async def get_application_auth_method_details(app_id: str, auth_id: str) -> Any:
+async def get_application_auth_method_details(app_id: str, auth_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific application authentication method.
     
     Args:
@@ -1160,7 +1558,7 @@ async def get_application_auth_method_details(app_id: str, auth_id: str) -> Any:
     Returns:
         Authentication method object with all configuration details
     """
-    return await execute_tool("get_application_auth_method_details", app_id=app_id, auth_id=auth_id)
+    return await execute_tool("get_application_auth_method_details", ctx=ctx, app_id=app_id, auth_id=auth_id)
 
 
 @mcp.tool()
@@ -1177,7 +1575,8 @@ async def add_application_auth_method(
     env_var_value: str = "",
     subject: Optional[List[Dict[str, str]]] = None,
     issuer: Optional[List[Dict[str, str]]] = None,
-    subject_alternative_name: Optional[List[Dict[str, str]]] = None
+    subject_alternative_name: Optional[List[Dict[str, str]]] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
 ) -> Any:
     """Add an authentication method to an application.
     
@@ -1280,7 +1679,7 @@ async def add_application_auth_method(
         raise ValueError(f"Authentication type '{auth_type}' requires 'auth_value' parameter")
     
     return await execute_tool(
-        "add_application_auth_method",
+        "add_application_auth_method", ctx=ctx,
         app_id=app_id,
         auth_type=auth_type,
         auth_value=auth_value,
@@ -1298,7 +1697,9 @@ async def add_application_auth_method(
 
 
 @mcp.tool()
-async def delete_application_auth_method(app_id: str, auth_id: str) -> Any:
+async def delete_application_auth_method(app_id: str, auth_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Delete an authentication method from an application.
     
     Args:
@@ -1308,11 +1709,13 @@ async def delete_application_auth_method(app_id: str, auth_id: str) -> Any:
     Returns:
         Confirmation of deletion
     """
-    return await execute_tool("delete_application_auth_method", app_id=app_id, auth_id=auth_id)
+    return await execute_tool("delete_application_auth_method", ctx=ctx, app_id=app_id, auth_id=auth_id)
 
 
 @mcp.tool()
-async def get_applications_stats() -> Any:
+async def get_applications_stats(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get comprehensive statistics about applications in CyberArk Privilege Cloud.
     
     Returns:
@@ -1320,13 +1723,15 @@ async def get_applications_stats() -> Any:
         disabled applications, authentication types distribution, and
         authentication method statistics
     """
-    return await execute_tool("get_applications_stats")
+    return await execute_tool("get_applications_stats", ctx=ctx)
 
 
 # Session Monitoring Tools using ArkSMService
 
 @mcp.tool()
-async def list_sessions() -> Any:
+async def list_sessions(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List recent privileged sessions from CyberArk Session Monitoring.
     
     Returns all sessions from the last 24 hours with session details including
@@ -1335,11 +1740,13 @@ async def list_sessions() -> Any:
     Returns:
         List of session objects with their exact API fields
     """
-    return await execute_tool("list_sessions")
+    return await execute_tool("list_sessions", ctx=ctx)
 
 
 @mcp.tool()
-async def list_sessions_by_filter(search: Optional[str] = None) -> Any:
+async def list_sessions_by_filter(search: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List privileged sessions with advanced filtering from CyberArk Session Monitoring.
     
     Supports advanced filtering using CyberArk session query syntax:
@@ -1354,11 +1761,13 @@ async def list_sessions_by_filter(search: Optional[str] = None) -> Any:
     Returns:
         List of filtered session objects with their exact API fields
     """
-    return await execute_tool("list_sessions_by_filter", search=search)
+    return await execute_tool("list_sessions_by_filter", ctx=ctx, search=search)
 
 
 @mcp.tool()
-async def get_session_details(session_id: str) -> Any:
+async def get_session_details(session_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get detailed information about a specific privileged session.
     
     Retrieves comprehensive session information including protocol details,
@@ -1370,11 +1779,13 @@ async def get_session_details(session_id: str) -> Any:
     Returns:
         Detailed session object with all available API fields
     """
-    return await execute_tool("get_session_details", session_id=session_id)
+    return await execute_tool("get_session_details", ctx=ctx, session_id=session_id)
 
 
 @mcp.tool()
-async def list_session_activities(session_id: str) -> Any:
+async def list_session_activities(session_id: str,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """List all activities performed within a specific privileged session.
     
     Retrieves chronological log of commands, actions, and operations
@@ -1386,11 +1797,13 @@ async def list_session_activities(session_id: str) -> Any:
     Returns:
         List of activity objects with timestamps, commands, and results
     """
-    return await execute_tool("list_session_activities", session_id=session_id)
+    return await execute_tool("list_session_activities", ctx=ctx, session_id=session_id)
 
 
 @mcp.tool()
-async def count_sessions(search: Optional[str] = None) -> Any:
+async def count_sessions(search: Optional[str] = None,
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Count privileged sessions with optional filtering.
     
     Provides session counts for analysis and reporting. Supports the same
@@ -1402,11 +1815,13 @@ async def count_sessions(search: Optional[str] = None) -> Any:
     Returns:
         Dictionary with session count and applied filter information
     """
-    return await execute_tool("count_sessions", search=search)
+    return await execute_tool("count_sessions", ctx=ctx, search=search)
 
 
 @mcp.tool()
-async def get_session_statistics() -> Any:
+async def get_session_statistics(
+    ctx: Optional[Context[ServerSession, AppContext]] = None
+) -> Any:
     """Get general session statistics and analytics.
     
     Provides high-level session metrics including total sessions,
@@ -1416,14 +1831,59 @@ async def get_session_statistics() -> Any:
     Returns:
         Statistics object with session analytics and metrics
     """
-    return await execute_tool("get_session_statistics")
+    return await execute_tool("get_session_statistics", ctx=ctx)
+
+
+class TrailingSlashMiddleware:
+    """Strip trailing slashes to prevent Starlette 307 redirects.
+
+    MCP clients (e.g. Copilot Studio) POST to /mcp/ (trailing slash).
+    Starlette's default redirect_slashes returns a 307 redirect to /mcp,
+    which causes HTTP clients to strip the Authorization header per RFC 9110,
+    breaking OAuth Bearer token authentication.
+
+    This middleware normalizes the path at the ASGI level so the router
+    sees /mcp directly — no redirect, no header loss.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path != "/" and path.endswith("/"):
+                scope = dict(scope)
+                scope["path"] = path.rstrip("/")
+        await self.app(scope, receive, send)
+
+
+VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
 
 
 def main() -> None:
-    """Main entry point for the MCP server"""
-    logger.info("Starting CyberArk Privilege Cloud MCP Server")
-    # Environment validation is handled by server initialization above
-    mcp.run()
+    """Main entry point for the MCP server."""
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport not in VALID_TRANSPORTS:
+        logger.error(
+            "Invalid MCP_TRANSPORT=%r (valid: %s)",
+            transport,
+            ", ".join(sorted(VALID_TRANSPORTS)),
+        )
+        sys.exit(1)
+    logger.info("Starting CyberArk Privilege Cloud MCP Server (transport=%s)", transport)
+
+    if transport == "streamable-http":
+        import asyncio
+        import uvicorn
+
+        app = TrailingSlashMiddleware(mcp.streamable_http_app())
+        config = uvicorn.Config(
+            app, host=MCP_HOST, port=MCP_PORT, log_level="info",
+        )
+        asyncio.run(uvicorn.Server(config).serve())
+    else:
+        mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

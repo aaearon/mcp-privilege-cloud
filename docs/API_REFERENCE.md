@@ -22,8 +22,8 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 The CyberArk Privilege Cloud MCP Server provides **53 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
 
 ### Core Capabilities
-- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (17 tools)
-- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (11 tools)
+- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (18 tools)
+- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions (10 tools)
 - **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations (10 tools)
 - **Applications Management**: Full application lifecycle with authentication method management and statistics (9 tools)
 - **Advanced Analytics**: Account filtering, grouping, distribution analysis, and environment categorization
@@ -39,34 +39,56 @@ The CyberArk Privilege Cloud MCP Server provides **53 enterprise-grade tools** f
 
 ## Authentication
 
-### OAuth 2.0 Configuration
-All tools require proper authentication configuration through environment variables:
+The server supports two authentication modes, auto-detected from environment variables.
+
+### OAuth Per-User Mode (Recommended)
+
+Each user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 
 ```bash
-# Required Environment Variables
-CYBERARK_CLIENT_ID=service-account-username    # OAuth service account
+# Required for OAuth per-user mode
+CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
+CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-account-password
+CYBERARK_OAUTH_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+CYBERARK_OAUTH_CLIENT_SECRET=oidc-app-client-secret
 
-# Optional Configuration
+# Optional
+MCP_HOST=127.0.0.1             # Server bind host
+MCP_PORT=8000                  # Server bind port
 CYBERARK_LOG_LEVEL=INFO        # Logging level
 ```
 
+**Service Account Token Bridge Flow**:
+1. MCP client sends Bearer token in request
+2. `CyberArkTokenVerifier` validates JWT signature via JWKS
+3. User identity (from JWT `sub` claim) is logged for audit
+4. Tool executes via shared service account platform token
+
+### Legacy Service Account Mode
+
+A single shared service account authenticates all requests.
+
+```bash
+CYBERARK_CLIENT_ID=service-account-username
+CYBERARK_CLIENT_SECRET=service-account-password
+```
+
 ### Token Management
-- **Expiration**: 15 minutes with automatic refresh
-- **Caching**: Secure in-memory token caching
-- **Concurrency**: Thread-safe token refresh with double-checked locking
+- **OAuth Mode**: JWT verification via JWKS; shared service account platform token for API calls
+- **Legacy Mode**: 15-minute token expiration with automatic refresh
 - **Error Recovery**: Automatic retry on 401 authentication errors
 
 ## Tool Categories
 
 The server provides 53 enterprise-grade tools organized across all 5 CyberArk PCloud services:
 
-### Account Management Tools (17 tools)
+### Account Management Tools (18 tools)
 **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
 **Password Management**: `change_account_password`, `set_next_password`, `verify_account_password`, `reconcile_account_password`
 **Advanced Search**: `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`
 
-### Safe Management Tools (11 tools)
+### Safe Management Tools (10 tools)
 **Core Operations**: `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`
 **Member Management**: `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 
@@ -80,12 +102,13 @@ The server provides 53 enterprise-grade tools organized across all 5 CyberArk PC
 **Auth Methods**: `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`
 **Statistics**: `get_applications_stats`
 
-### Additional Tools
-**Health Monitoring**: `health_check` - Comprehensive system status verification
+### Session Monitoring Tools (6 tools)
+**Session Management**: `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `count_sessions`
+**Activity Tracking**: `list_session_activities`, `get_session_statistics`
 
 ## Account Management Tools
 
-**🤖 LLM REFERENCE**: This section documents core account tools. The server provides 17 total account management tools including: `update_account`, `delete_account`, `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudAccountsService.
+**🤖 LLM REFERENCE**: This section documents core account tools. The server provides 18 total account management tools including: `update_account`, `delete_account`, `filter_accounts_by_platform_group`, `filter_accounts_by_environment`, `filter_accounts_by_management_status`, `group_accounts_by_safe`, `group_accounts_by_platform`, `analyze_account_distribution`, `search_accounts_by_pattern`, `count_accounts_by_criteria`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudAccountsService.
 
 ### `list_accounts`
 
@@ -648,48 +671,6 @@ await client.call_tool("reconcile_account_password", {
 {
   "status": "success",
   "message": "Password reconciliation completed"
-}
-```
-
-## Health Monitoring Tools
-
-### `health_check`
-
-**Description**: Perform a comprehensive health check of the CyberArk connection and system status.
-
-**API Endpoint**: Multiple endpoints for comprehensive validation
-
-**Parameters**: None
-
-**Returns**: Health status object with system information
-
-**Example Usage**:
-```python
-# Perform health check
-await client.call_tool("health_check", {})
-```
-
-**Response Examples**:
-
-**Healthy System**:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-06-28T10:30:00Z",
-  "safes_accessible": 12,
-  "authentication": "valid",
-  "api_connectivity": "operational"
-}
-```
-
-**System Issues**:
-```json
-{
-  "status": "unhealthy",
-  "timestamp": "2025-06-28T10:30:00Z",
-  "error": "Authentication failed: Invalid credentials",
-  "authentication": "failed",
-  "api_connectivity": "unreachable"
 }
 ```
 

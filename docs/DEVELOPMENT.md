@@ -46,25 +46,25 @@ This comprehensive guide provides everything developers need to contribute to th
 3. **Verify setup**:
    ```bash
    # Test basic functionality
-   python -c "
-   from src.mcp_privilege_cloud.server import CyberArkMCPServer
+   python3 -c "
+   from mcp_privilege_cloud.server import CyberArkMCPServer
    import asyncio
    server = CyberArkMCPServer.from_environment()
    health = asyncio.run(server.health_check())
    print('Health:', health['status'])
    "
-   
+
    # Run tests
-   pytest
+   uv run pytest
    ```
 
 ### Development Tools
 
-The project includes several entry points for development:
+The project includes these entry points for development:
 
-- **`run_server.py`** - Multiplatform MCP server launcher
-- **`debug_platform_api.py`** - Platform API debugging script
-- **`test_mvp.py`** - MVP functionality verification
+- **`uv run mcp-privilege-cloud`** - Development server execution
+- **`python -m mcp_privilege_cloud`** - Standard Python module execution
+- **`uvx mcp-privilege-cloud`** - Production execution
 
 ## Architecture
 
@@ -166,39 +166,12 @@ Follow this systematic approach for adding new action tools:
    ```python
    # src/mcp_privilege_cloud/mcp_server.py
    @mcp.tool()
-   async def new_action_tool(param1: str) -> Dict[str, Any]:
+   async def new_action_tool(
+       param1: str,
+       ctx: Optional[Context[ServerSession, AppContext]] = None
+   ) -> Dict[str, Any]:
        """MCP tool wrapper with parameter validation."""
-       server = CyberArkMCPServer.from_environment()
-       return await server.new_action_tool(param1)
-   ```
-
-### Adding New Resources
-
-For read-only data access, use the resource system:
-
-1. **Create Resource Class**:
-   ```python
-   # src/mcp_privilege_cloud/resources/
-   class NewDataResource(ResourceBase):
-       """Resource for accessing new data type."""
-       
-       async def read(self) -> str:
-           # Return JSON data
-           pass
-   ```
-
-2. **Register Resource**:
-   ```python
-   # src/mcp_privilege_cloud/mcp_server.py in setup_resources()
-   resource_registry.register_resource("new-data", NewDataResource)
-   resource_registry.register_resource("new-data/{item_id}", NewDataItemResource)
-   ```
-
-3. **Test Integration**:
-   ```bash
-   # Test with MCP Inspector
-   python run_server.py
-   # Connect Inspector and validate resource access
+       return await execute_tool("new_action_tool", ctx=ctx, param1=param1)
    ```
 
 ## Code Quality Standards
@@ -266,36 +239,47 @@ The test suite is organized into focused categories:
 
 ```
 tests/
-├── test_core_functionality.py    # Auth, server core, platforms (64+ tests)
-├── test_account_operations.py    # Account lifecycle (35+ tests)  
-├── test_mcp_integration.py       # MCP action tools (15+ tests)
-├── test_integration.py           # End-to-end tests (10+ tests)
-└── test_resources.py             # MCP resource tests (24+ tests)
+├── conftest.py                      # Shared fixtures
+├── test_core_functionality.py       # Auth, server core, platforms
+├── test_applications_service.py     # Applications service
+├── test_mcp_integration.py          # MCP tool wrappers
+├── test_integration_tools.py        # End-to-end integration
+├── test_enhanced_error_handling.py  # Error handling validation
+├── test_enhanced_error_messages.py  # Error message consistency
+├── test_token_verifier.py           # JWT verification
+├── test_token_bridge.py             # Token bridge tests
+├── test_oauth_integration.py        # OAuth integration
+├── test_oauth_metadata.py           # RFC 8414 metadata
+├── test_transport.py                # Transport configuration
+├── test_env_var_resolution.py       # Env var priority chain
+├── test_pcloud_url_resolution.py    # PCloud URL resolution
+├── test_context_injection.py        # Context injection
+├── test_lifespan.py                 # Lifespan management
+├── test_response_models.py          # Response models
+└── test_typed_tools.py              # Typed tool validation
 ```
 
 ### Running Tests
 
 ```bash
-# All tests (148+ total)
-pytest
+# All tests (292 total)
+uv run pytest
 
 # Specific test categories
-pytest tests/test_core_functionality.py    # Core functionality
-pytest tests/test_account_operations.py    # Account operations
-pytest tests/test_mcp_integration.py       # MCP action tools
-pytest tests/test_resources.py             # MCP resources
+uv run pytest tests/test_core_functionality.py    # Core functionality
+uv run pytest tests/test_mcp_integration.py       # MCP action tools
+uv run pytest tests/test_oauth_integration.py     # OAuth integration
 
 # By markers
-pytest -m auth          # Authentication tests
-pytest -m integration   # Integration tests only
-pytest -k platform      # Platform management tests
-pytest -k resource      # Resource access tests
+uv run pytest -m auth          # Authentication tests
+uv run pytest -m integration   # Integration tests only
+uv run pytest -k platform      # Platform management tests
 
 # With coverage
-pytest --cov=src/mcp_privilege_cloud
+uv run pytest --cov=src/mcp_privilege_cloud
 
 # Verbose output with detailed failures
-pytest -v --tb=short
+uv run pytest -v --tb=short
 ```
 
 ### Test Patterns
@@ -359,10 +343,10 @@ async def test_api_error_handling(mock_server, mocker):
    pytest --cov=src/mcp_privilege_cloud
    
    # Check style compliance
-   flake8 src/
+   ruff check src/
    
    # Verify MCP integration
-   python run_server.py  # Test with Inspector
+   uv run mcp-privilege-cloud  # Test with Inspector
    ```
 
 4. **Submit Pull Request**:
@@ -396,14 +380,11 @@ async def test_api_error_handling(mock_server, mocker):
 #### Python Environment
 ```bash
 # Check Python version and environment
-python --version
-which python
-pip list | grep mcp
+python3 --version
+which python3
+uv pip list | grep mcp
 
-# Recreate virtual environment if needed
-rm -rf venv
-python -m venv venv
-source venv/bin/activate
+# Reinstall dependencies if needed
 uv sync
 ```
 
@@ -414,7 +395,7 @@ ls -la src/mcp_privilege_cloud/
 python -c "import sys; print(sys.path)"
 
 # Test imports directly
-python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer"
+python3 -c "from mcp_privilege_cloud.server import CyberArkMCPServer"
 ```
 
 ### API Integration Issues
@@ -422,12 +403,11 @@ python -c "from src.mcp_privilege_cloud.server import CyberArkMCPServer"
 #### Authentication Problems
 ```bash
 # Test authentication separately
-python -c "
-from src.mcp_privilege_cloud.sdk_auth import CyberArkSDKAuthenticator
-import asyncio
-auth = CyberArkAuthenticator.from_environment()
-result = asyncio.run(auth.get_auth_header())
-print('Auth header obtained:', bool(result))
+python3 -c "
+from mcp_privilege_cloud.sdk_auth import CyberArkSDKAuthenticator
+auth = CyberArkSDKAuthenticator.from_environment()
+client = auth.get_authenticated_client()
+print('Authenticated:', bool(client))
 "
 ```
 
@@ -623,14 +603,10 @@ python -m mcp_privilege_cloud  # Module execution
 
 #### Tool Validation
 ```bash
-# Verify tool definitions directly
+# Verify tool definitions via MCP Inspector
 python -c "
-from mcp_privilege_cloud.server import CyberArkMCPServer
-server = CyberArkMCPServer.from_environment()
-tools = server.get_available_tools()
-print(f'Available tools ({len(tools)}):')
-for tool in tools:
-    print(f'- {tool}')
+from mcp_privilege_cloud.mcp_server import mcp
+print(f'MCP server: {mcp.name}')
 "
 ```
 
@@ -642,9 +618,9 @@ for tool in tools:
 export CYBERARK_LOG_LEVEL=DEBUG
 
 # Test with minimal operations
-python -c "
+python3 -c "
 import time, asyncio
-from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from mcp_privilege_cloud.server import CyberArkMCPServer
 server = CyberArkMCPServer.from_environment()
 start = time.time()
 health = asyncio.run(server.health_check())
@@ -658,9 +634,9 @@ Quick diagnostic commands for common issues:
 
 ```bash
 # Complete environment verification
-python -c "
+python3 -c "
 import os, sys
-from src.mcp_privilege_cloud.server import CyberArkMCPServer
+from mcp_privilege_cloud.server import CyberArkMCPServer
 print('Python:', sys.version)
 print('Environment variables set:', bool(os.getenv('CYBERARK_CLIENT_ID')))
 try:
@@ -671,15 +647,10 @@ except Exception as e:
 "
 
 # MCP server validation
-python -c "
-from src.mcp_privilege_cloud.mcp_server import mcp
+python3 -c "
+from mcp_privilege_cloud.mcp_server import mcp
 print(f'MCP server: {mcp.name}')
-print(f'Action tools available: {len(list(mcp.list_tools()))}')
-print(f'Resource endpoints available: {len(list(mcp.list_resources()))}')
 "
-
-# Platform management debug
-python debug_platform_api.py
 ```
 
 For additional support, review the [project documentation](docs/development/) or create an issue with detailed error information and environment details.

@@ -1,7 +1,6 @@
 import pytest
 import os
 from unittest.mock import Mock, patch
-from mcp_privilege_cloud.exceptions import AuthenticationError
 from mcp_privilege_cloud.server import CyberArkMCPServer, CyberArkAPIError
 
 
@@ -145,24 +144,23 @@ class TestServerCore:
             with pytest.raises(ValueError, match="CYBERARK_CLIENT_ID"):
                 CyberArkMCPServer.from_environment()
 
-    def test_tool_registration(self, server_instance):
-        """Test that required tools are registered"""
-        tools = server_instance.get_available_tools()
-        expected_tools = [
+    def test_server_has_expected_methods(self, server_instance):
+        """Test that required server methods exist"""
+        expected_methods = [
             "list_accounts",
-            "search_accounts", 
+            "search_accounts",
             "list_safes",
             "list_platforms",
             "create_account",
-            "change_account_password", 
+            "change_account_password",
             "set_next_password",
             "verify_account_password",
             "reconcile_account_password",
             "import_platform_package"
         ]
-        
-        for tool_name in expected_tools:
-            assert tool_name in tools
+
+        for method_name in expected_methods:
+            assert hasattr(server_instance, method_name), f"Missing method: {method_name}"
 
     @pytest.mark.asyncio
     async def test_server_sdk_integration(self, server_instance):

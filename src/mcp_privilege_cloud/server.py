@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Optional, Dict, Any, List, Union
@@ -26,34 +27,26 @@ from ark_sdk_python.models.services.pcloud.accounts import (
 
 # Try to import response model types - these may be generic Pydantic models
 try:
-    # These are the likely response model names based on SDK patterns
     from ark_sdk_python.models.services.pcloud.accounts import (
-        ArkPCloudAccount,  # Individual account response
-        ArkPCloudAccountsList,  # List accounts response
+        ArkPCloudAccount,
     )
 except ImportError:
-    # Fallback to BaseModel if specific response types aren't available
     ArkPCloudAccount = BaseModel
-    ArkPCloudAccountsList = BaseModel
 
 # Import common response types for proper type annotations
 try:
     from ark_sdk_python.models.services.pcloud.safes import (
-        ArkPCloudSafe,
         ArkPCloudSafeMember,
     )
 except ImportError:
-    ArkPCloudSafe = BaseModel
     ArkPCloudSafeMember = BaseModel
 
 try:
     from ark_sdk_python.models.services.pcloud.platforms import (
-        ArkPCloudPlatform,
         ArkPCloudPlatformStatistics,
         ArkPCloudTargetPlatformStatistics,
     )
 except ImportError:
-    ArkPCloudPlatform = BaseModel
     ArkPCloudPlatformStatistics = BaseModel
     ArkPCloudTargetPlatformStatistics = BaseModel
 
@@ -61,12 +54,10 @@ try:
     from ark_sdk_python.models.services.pcloud.applications import (
         ArkPCloudApplication,
         ArkPCloudApplicationAuthMethod,
-        ArkPCloudApplicationStatistics,
     )
 except ImportError:
     ArkPCloudApplication = BaseModel
     ArkPCloudApplicationAuthMethod = BaseModel
-    ArkPCloudApplicationStatistics = BaseModel
 
 try:
     from ark_sdk_python.models.services.sm import (
@@ -164,52 +155,6 @@ def handle_sdk_errors(operation_name: str) -> Any:
                 result = await func(self, *args, **kwargs)
                 return result
             except Exception as e:
-                # Special handling for known SDK validation issues
-                error_str = str(e).lower()
-                if "rotationalgroup" in error_str and operation_name == "listing platforms":
-                    self.logger.warning(f"SDK validation failed due to API/SDK enum mismatch for {operation_name}, attempting direct API workaround: {e}")
-                    
-                    # Attempt direct API call workaround for the platforms enum issue
-                    try:
-                        # Import necessary modules
-                        import json
-                        import httpx
-                        
-                        # Get authentication token
-                        auth_token = await self._run_in_executor(
-                            lambda: self.platforms_service._isp_auth.token.token.get_secret_value()
-                        )
-                        
-                        # Make direct API call
-                        async with httpx.AsyncClient() as client:
-                            headers = {
-                                'Authorization': f'Bearer {auth_token}',
-                                'Content-Type': 'application/json'
-                            }
-                            
-                            # Build API URL using helper method
-                            api_url = self._build_api_url('platforms_service', 'Platforms')
-                            
-                            response = await client.get(api_url, headers=headers)
-                            if response.status_code == 200:
-                                raw_data = response.json()
-                                
-                                # Fix the enum value in the response
-                                for platform in raw_data.get('Platforms', []):
-                                    general = platform.get('general', {})
-                                    if general.get('platformType') == 'rotationalgroup':
-                                        general['platformType'] = 'rotationalGroups'
-                                
-                                self.logger.info(f"Retrieved {len(raw_data.get('Platforms', []))} platforms via direct API call with enum fix")
-                                return raw_data.get('Platforms', [])
-                            else:
-                                raise Exception(f"API call failed with status {response.status_code}")
-                                    
-                    except Exception as api_error:
-                        self.logger.error(f"Direct API call workaround failed for {operation_name}: {api_error}")
-                        # Fall through to normal error handling
-                        pass
-                
                 # Enhanced error handling with SDK-specific exceptions and user guidance
                 if is_sdk_exception(e):
                     # Extract status code from original SDK exception first
@@ -305,30 +250,11 @@ class CyberArkMCPServer:
     def from_environment(cls) -> "CyberArkMCPServer":
         """Create server from environment variables"""
         return cls()
-    
+
     async def _run_in_executor(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Run synchronous SDK calls in ThreadPoolExecutor to avoid blocking the event loop."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
-
-    def _build_api_url(self, service_name: str, endpoint: str) -> str:
-        """Build CyberArk API URL from SDK client base URL.
-        
-        Args:
-            service_name: Name of the service ('platforms_service' or 'applications_service')
-            endpoint: API endpoint (e.g., 'Platforms', 'Applications', 'Applications/Stats')
-            
-        Returns:
-            Complete API URL with proper case conversion
-        """
-        if service_name == 'platforms_service':
-            base_url = self.platforms_service._client.base_url
-        elif service_name == 'applications_service':
-            base_url = self.applications_service._client.base_url
-        else:
-            raise ValueError(f"Unknown service: {service_name}")
-        
-        return base_url.replace('passwordvault', 'PasswordVault') + endpoint
 
     def _ensure_service_initialized(self, service_name: str) -> None:
         """Ensure a specific service is initialized, initializing if needed."""
@@ -344,83 +270,6 @@ class CyberArkMCPServer:
                 self.applications_service = ArkPCloudApplicationsService(sdk_auth)
             elif service_name == 'sm_service':
                 self.sm_service = ArkSMService(sdk_auth)
-
-    def reinitialize_services(self) -> None:
-        """Reinitialize services - useful for testing or after auth changes."""
-        sdk_auth = self.sdk_authenticator.get_authenticated_client()
-        self.accounts_service = ArkPCloudAccountsService(sdk_auth)
-        self.safes_service = ArkPCloudSafesService(sdk_auth) 
-        self.platforms_service = ArkPCloudPlatformsService(sdk_auth)
-        self.applications_service = ArkPCloudApplicationsService(sdk_auth)
-        self.sm_service = ArkSMService(sdk_auth)
-
-    # Legacy API methods removed - all operations now use ark-sdk-python directly
-
-    def get_available_tools(self) -> List[str]:
-        """Get list of available MCP tools"""
-        return [
-            "list_accounts",
-            "get_account_details", 
-            "search_accounts",
-            "create_account",
-            "update_account",
-            "delete_account",
-            "change_account_password",
-            "set_next_password",
-            "verify_account_password",
-            "reconcile_account_password",
-            "filter_accounts_by_platform_group",
-            "filter_accounts_by_environment", 
-            "filter_accounts_by_management_status",
-            "group_accounts_by_safe",
-            "group_accounts_by_platform",
-            "analyze_account_distribution",
-            "search_accounts_by_pattern",
-            "count_accounts_by_criteria",
-            "list_safes",
-            "get_safe_details",
-            "add_safe",
-            "update_safe",
-            "delete_safe",
-            "list_safe_members",
-            "get_safe_member_details", 
-            "add_safe_member",
-            "update_safe_member",
-            "remove_safe_member",
-            "list_platforms",
-            "get_platform_details",
-            "import_platform_package",
-            "export_platform",
-            "duplicate_target_platform",
-            "activate_target_platform",
-            "deactivate_target_platform",
-            "delete_target_platform",
-            "list_applications",
-            "get_application_details",
-            "add_application",
-            "delete_application",
-            "list_application_auth_methods",
-            "get_application_auth_method_details",
-            "add_application_auth_method",
-            "delete_application_auth_method",
-            "get_applications_stats"
-        ]
-    
-    def clear_cache(self) -> None:
-        """Clear all cached services and authentication state. Used for testing."""
-        # Reset authentication state
-        if hasattr(self.sdk_authenticator, '_sdk_auth'):
-            self.sdk_authenticator._sdk_auth = None
-            self.sdk_authenticator._is_authenticated = False
-        
-        # Reinitialize services with fresh authentication
-        self.reinitialize_services()
-    
-    def shutdown(self) -> None:
-        """Shutdown the ThreadPoolExecutor and clean up resources."""
-        if hasattr(self, '_executor') and self._executor:
-            self._executor.shutdown(wait=True)
-            self.logger.info("ThreadPoolExecutor shutdown completed")
 
     # Account Management - Using ark-sdk-python
     @handle_sdk_errors("listing accounts")
@@ -1409,7 +1258,6 @@ class CyberArkMCPServer:
     ) -> Any:
         """Import a platform package using ark-sdk-python"""
         import base64
-        import os
         
         # Handle file input - convert to base64 encoded bytes
         if isinstance(platform_package_file, str):
@@ -1500,8 +1348,6 @@ class CyberArkMCPServer:
         Returns:
             List of complete platform configurations with graceful degradation for failures
         """
-        import asyncio
-        
         # Get the basic platform list
         platforms_list = await self.list_platforms(**kwargs)
         if not platforms_list:
@@ -1871,61 +1717,18 @@ class CyberArkMCPServer:
         if 'business_owner_email' in kwargs:
             filter_params['business_owner_email'] = kwargs['business_owner_email']
             
-        try:
-            if filter_params:
-                app_filter = ArkPCloudApplicationsFilter(**filter_params)
-                applications = await self._run_in_executor(
-                    self.applications_service.list_applications_by, app_filter
-                )
-            else:
-                applications = await self._run_in_executor(
-                    self.applications_service.list_applications
-                )
-            
-            self.logger.info(f"Applications listed successfully: {len(applications)} found")
-            
-            # Convert to dict format to avoid Pydantic validation issues with null ExpirationDate fields
-            return [app.model_dump() if hasattr(app, 'model_dump') else app for app in applications]
-            
-        except Exception as e:
-            # Handle SDK validation errors by bypassing strict validation
-            error_str = str(e).lower()
-            error_type = type(e).__name__.lower()
-            if (("validationerror" in error_str or "validation error" in error_str or "validationerror" in error_type) 
-                and "expirationdate" in error_str):
-                self.logger.warning(f"SDK validation failed due to null ExpirationDate fields, attempting raw API call workaround: {e}")
-                
-                # Import necessary modules for direct API call
-                import json
-                import httpx
-                
-                # Get authentication token
-                auth_token = await self._run_in_executor(
-                    lambda: self.applications_service._isp_auth.token.token.get_secret_value()
-                )
-                
-                # Make direct API call
-                async with httpx.AsyncClient() as client:
-                    headers = {
-                        'Authorization': f'Bearer {auth_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    # Build API URL using helper method
-                    api_url = self._build_api_url('applications_service', 'Applications')
-                    
-                    response = await client.get(api_url, headers=headers)
-                    if response.status_code == 200:
-                        raw_data = response.json()
-                        applications_list = raw_data.get('Applications', [])
-                        
-                        self.logger.info(f"Retrieved {len(applications_list)} applications via direct API call")
-                        return applications_list
-                    else:
-                        raise Exception(f"API call failed with status {response.status_code}")
-            else:
-                # Re-raise non-validation errors
-                raise
+        if filter_params:
+            app_filter = ArkPCloudApplicationsFilter(**filter_params)
+            applications = await self._run_in_executor(
+                self.applications_service.list_applications_by, app_filter
+            )
+        else:
+            applications = await self._run_in_executor(
+                self.applications_service.list_applications
+            )
+
+        self.logger.info(f"Applications listed successfully: {len(applications)} found")
+        return [app.model_dump() if hasattr(app, 'model_dump') else app for app in applications]
     
     @handle_sdk_errors("getting application details")
     async def get_application_details(self, app_id: str) -> ArkPCloudApplication:
@@ -2115,52 +1918,10 @@ class CyberArkMCPServer:
         """Get applications statistics using ark-sdk-python"""
         self._ensure_service_initialized('applications_service')
         
-        try:
-            stats = await self._run_in_executor(
-                self.applications_service.applications_stats
-            )
-            
-            self.logger.info("Applications statistics retrieved successfully")
-            
-            # Convert to dict format to avoid Pydantic validation issues with null ExpirationDate fields
-            return stats.model_dump() if hasattr(stats, 'model_dump') else stats
-            
-        except Exception as e:
-            # Handle SDK validation errors by bypassing strict validation
-            error_str = str(e).lower()
-            error_type = type(e).__name__.lower()
-            if (("validationerror" in error_str or "validation error" in error_str or "validationerror" in error_type) 
-                and "expirationdate" in error_str):
-                self.logger.warning(f"SDK validation failed due to null ExpirationDate fields, attempting raw API call workaround: {e}")
-                
-                # Import necessary modules for direct API call
-                import json
-                import httpx
-                
-                # Get authentication token
-                auth_token = await self._run_in_executor(
-                    lambda: self.applications_service._isp_auth.token.token.get_secret_value()
-                )
-                
-                # Make direct API call
-                async with httpx.AsyncClient() as client:
-                    headers = {
-                        'Authorization': f'Bearer {auth_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    # Build API URL using helper method
-                    api_url = self._build_api_url('applications_service', 'Applications/Stats')
-                    
-                    response = await client.get(api_url, headers=headers)
-                    if response.status_code == 200:
-                        raw_data = response.json()
-                        
-                        self.logger.info("Retrieved applications statistics via direct API call")
-                        return raw_data
-                    else:
-                        raise Exception(f"API call failed with status {response.status_code}")
-            else:
-                # Re-raise non-validation errors
-                raise
+        stats = await self._run_in_executor(
+            self.applications_service.applications_stats
+        )
+
+        self.logger.info("Applications statistics retrieved successfully")
+        return stats.model_dump() if hasattr(stats, 'model_dump') else stats
 

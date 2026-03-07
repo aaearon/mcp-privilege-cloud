@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 210+ passing tests
+2. **Check current test status** - All changes must maintain 269+ passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -96,9 +96,9 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Purpose**: MCP server for CyberArk Privilege Cloud integration, enabling AI assistants to securely manage privileged accounts.
 
-**Current Status**: ✅ **MODERNIZED MCP ARCHITECTURE** - Production ready with FastMCP lifespan management, context injection, typed response models, and complete PCloud service coverage
-**Last Updated**: January 31, 2026
-**Recent Achievement**: Modernized MCP server architecture leveraging mcp SDK v1.26.0 features. Implemented lifespan management for proper server lifecycle, context injection for dependency access in tools, and Pydantic response models for typed returns. Added 50+ new tests bringing total to 213 passing tests with zero regression.
+**Current Status**: ✅ **SERVICE ACCOUNT TOKEN BRIDGE COMPLETE** - OAuth mode verifies user identity via OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
+**Last Updated**: February 27, 2026
+**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 276 passing tests with zero regression.
 
 ## Architecture
 
@@ -113,7 +113,7 @@ The server provides 53 MCP tools for comprehensive CyberArk operations, built on
 - **Safe Management Tools (10 tools)**: Complete CRUD plus member management - `list_safes`, `get_safe_details`, `add_safe`, `update_safe`, `delete_safe`, `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`
 - **Platform Management Tools (12 tools)**: Complete lifecycle plus statistics - `list_platforms`, `get_platform_details`, `import_platform_package`, `export_platform`, `duplicate_target_platform`, `activate_target_platform`, `deactivate_target_platform`, `delete_target_platform`, `get_platform_statistics`, `get_target_platform_statistics`
 - **Applications Management Tools (8 tools)**: Complete application lifecycle - `list_applications`, `get_application_details`, `add_application`, `delete_application`, `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`, `get_applications_stats`
-- **Session Monitoring Tools (5 tools)**: Privileged session monitoring and analytics - `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `list_session_activities`, `count_sessions`, `get_session_statistics`
+- **Session Monitoring Tools (6 tools)**: Privileged session monitoring and analytics - `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `list_session_activities`, `count_sessions`, `get_session_statistics`
 
 > **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 5 PCloud services with enterprise-grade CRUD operations, advanced analytics, member management, and privileged session monitoring. Built on official ark-sdk-python library with 210+ passing tests and zero regression.
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 210+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 261+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -309,38 +309,52 @@ async def your_new_tool(
 **🤖 MANDATORY PATTERN: Lifespan Management**
 ```python
 # Server lifecycle is managed via app_lifespan context manager
-# Access server through ctx.request_context.lifespan_context.server
+# Dual mode: OAuth (is_oauth=True) or legacy (is_oauth=False)
 @dataclass
 class AppContext:
-    server: CyberArkMCPServer
+    server: Optional[CyberArkMCPServer] = None
+    is_oauth: bool = False
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     cyberark_server = CyberArkMCPServer.from_environment()
-    try:
+    if is_oauth_mode():
+        yield AppContext(server=cyberark_server, is_oauth=True)
+    else:
         yield AppContext(server=cyberark_server)
-    finally:
-        # Cleanup resources
-        pass
 ```
 
 **🤖 FILE STRUCTURE GUIDE**:
-- `sdk_auth.py` - Authentication only, no business logic
-- `server.py` - Business logic with @handle_sdk_errors decorator
-- `mcp_server.py` - MCP tools with lifespan management and context injection
-- `models.py` - Pydantic response models for typed returns
-- `exceptions.py` - Custom exceptions only
+- `sdk_auth.py` - Service account authentication (legacy mode)
+- `token_verifier.py` - JWT verification via CyberArk Identity JWKS (MCP TokenVerifier protocol)
+- `server.py` - Business logic with @handle_sdk_errors decorator + `from_token()` factory
+- `mcp_server.py` - MCP tools with dual-mode lifespan, context injection, Streamable HTTP transport, RFC 8414 metadata route
+- `exceptions.py` - Custom exceptions: CyberArkAPIError, SDK compatibility layer
 
 ### Testing Validation ✅ **VERIFIED**
-- **210+ tests passing** - Zero functionality regression with comprehensive expansion
-- **Test Coverage Maintained** - All expansion preserved existing test patterns
+- **261+ tests passing** - Zero functionality regression across all phases
+- **Test Coverage Maintained** - 16 token verifier + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
 
 ## Configuration
 
-**Required Environment Variables**:
-- `CYBERARK_CLIENT_ID` - OAuth service account username  
+**Required Environment Variables** (OAuth per-user mode):
+- `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token access)
+- `CYBERARK_CLIENT_SECRET` - Service account password
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR and /token proxy)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (injected server-side by /token proxy, never exposed via DCR)
+
+**Optional Environment Variables**:
+- `CYBERARK_OIDC_APP_ID` - OIDC app name in URL paths (default: `mcpprivilegecloud`)
+- `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
+- `MCP_HOST` - Server bind host (default: `127.0.0.1`)
+- `MCP_PORT` - Server bind port (default: `8000`)
+- `MCP_SERVER_URL` - Public URL for metadata (default: `http://{host}:{port}`)
+
+**Legacy Environment Variables** (service account mode -- fallback):
+- `CYBERARK_CLIENT_ID` - Service account login name
 - `CYBERARK_CLIENT_SECRET` - Service account password
 
 *See README.md for complete configuration details*
@@ -379,9 +393,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 ### Entry Points
 
 #### Standardized Execution Methods (Recommended)
-- **`uvx mcp-privilege-cloud`** - Primary production execution method
+- **`uvx mcp-privilege-cloud`** - Primary production execution (stdio by default)
 - **`uv run mcp-privilege-cloud`** - Development execution with dependency management
 - **`python -m mcp_privilege_cloud`** - Standard Python module execution
+- **Transport**: Controlled by `MCP_TRANSPORT` env var (default: `stdio`). Set to `streamable-http` for HTTP on `MCP_HOST`:`MCP_PORT`.
 
 #### Legacy Entry Points (Deprecated)
 - **`run_server.py`** - Legacy multiplatform entry point (removed in SDK migration)
@@ -389,14 +404,19 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 ## Testing Strategy
 
-**Test Files**: 160+ total tests across 9 test files
+**Test Files**: 261+ total tests across 15 test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (comprehensive error handling)
-- `tests/test_account_operations.py` - Account lifecycle management with CRUD operations  
+- `tests/test_account_operations.py` - Account lifecycle management with CRUD operations
 - `tests/test_applications_service.py` - Applications service testing with authentication methods
 - `tests/test_mcp_integration.py` - MCP tool wrappers and integration testing
 - `tests/test_integration_tools.py` - End-to-end integration tests for all tools
 - `tests/test_enhanced_error_handling.py` - Enhanced error handling validation
 - `tests/test_enhanced_error_messages.py` - Error message consistency testing
+- `tests/test_transport.py` - Streamable HTTP transport configuration tests
+- `tests/test_token_verifier.py` - CyberArkTokenVerifier JWT verification tests
+- `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
+- `tests/test_oauth_metadata.py` - RFC 8414 `/.well-known/oauth-authorization-server` endpoint tests
+- `tests/test_env_var_resolution.py` - Environment variable priority chain tests (DCR)
 - Additional test files for comprehensive coverage of all 53 tools
 
 **Key Commands**: 
@@ -462,7 +482,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 210+ tests must continue passing
+5. **Preserve test coverage** - All 261+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -473,17 +493,17 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 210+ tests still pass
+4. Verify all 261+ tests still pass
 ```
 
 ## References
 
 - **README.md** - Complete setup and configuration documentation
-- **ARCHITECTURE.md** - System architecture and component details
+- **docs/ARCHITECTURE.md** - System architecture and component details
 - **DEVELOPMENT.md** - Development workflows and procedures
-- **INSTRUCTIONS.md** - Development workflow and coding standards
 - **docs/API_REFERENCE.md** - Complete tool specifications and examples
 - **docs/TESTING.md** - Comprehensive testing guidelines and procedures
+- **docs/CYBERARK_IDENTITY_SETUP.md** - CyberArk Identity OAuth app configuration guide
 
 ---
 
