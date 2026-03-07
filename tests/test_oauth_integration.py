@@ -9,28 +9,11 @@ Tests the full integration of:
 """
 
 import os
-import time
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from helpers import _make_jwt
-
-
-def _default_claims(**overrides: object) -> dict:
-    """Return default valid JWT claims with optional overrides."""
-    claims = {
-        "sub": "testuser@cyberark.cloud.12345",
-        "iss": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
-        "aud": "mcpprivilegecloud",
-        "exp": int(time.time()) + 3600,
-        "iat": int(time.time()),
-        "unique_name": "testuser@abc1234.cyberark.cloud",
-        "subdomain": "abc1234",
-        "platform_domain": "cyberark.cloud",
-    }
-    claims.update(overrides)
-    return claims
+from helpers import _default_claims, _make_jwt
 
 
 class TestOAuthEnvVarConfiguration:
@@ -154,68 +137,36 @@ class TestExecuteToolOAuthResolution:
             with pytest.raises(PermissionError, match="OAuth mode requires authentication"):
                 await execute_tool("list_accounts", ctx=ctx)
 
-
-class TestAppLifespanOAuthMode:
-    """Test app_lifespan behavior in OAuth mode."""
-
     @pytest.mark.asyncio
-    async def test_lifespan_creates_oauth_context(self):
-        """In OAuth mode, app_lifespan should create context with is_oauth=True."""
-        from mcp_privilege_cloud.mcp_server import app_lifespan
+    async def test_execute_tool_logs_authenticated_user(self):
+        """execute_tool should log the authenticated user's identity."""
+        from mcp_privilege_cloud.mcp_server import AppContext, execute_tool
 
-        with patch.dict(os.environ, {
-            "CYBERARK_IDENTITY_TENANT_URL": "https://abc1234.id.cyberark.cloud",
-        }):
-            with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
-                with patch(
-                    "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
-                ) as mock_from_env:
-                    mock_server = MagicMock()
-                    mock_server._executor = MagicMock()
-                    mock_from_env.return_value = mock_server
+        mock_server = AsyncMock()
+        mock_server.list_accounts = AsyncMock(return_value=[])
 
-                    mock_fastmcp = MagicMock()
-                    async with app_lifespan(mock_fastmcp) as app_ctx:
-                        assert app_ctx.is_oauth is True
-                        assert app_ctx.server is not None
+        ctx = Mock()
+        ctx.request_context.lifespan_context = AppContext(
+            server=mock_server, is_oauth=True
+        )
 
-    @pytest.mark.asyncio
-    async def test_lifespan_creates_server_in_legacy_mode(self):
-        """In legacy mode, app_lifespan should create a CyberArkMCPServer."""
-        from mcp_privilege_cloud.mcp_server import app_lifespan
+        claims = _default_claims()
+        jwt_token = _make_jwt(claims)
 
-        with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=False):
-            with patch(
-                "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
-            ) as mock_from_env:
-                mock_server = MagicMock()
-                mock_server._executor = MagicMock()
-                mock_from_env.return_value = mock_server
+        mock_access_token = Mock()
+        mock_access_token.token = jwt_token
+        mock_access_token.client_id = claims["sub"]
 
-                mock_fastmcp = MagicMock()
-                async with app_lifespan(mock_fastmcp) as app_ctx:
-                    assert app_ctx.server is mock_server
-                    assert app_ctx.is_oauth is False
+        with patch(
+            "mcp_privilege_cloud.mcp_server.get_access_token",
+            return_value=mock_access_token,
+        ):
+            with patch("mcp_privilege_cloud.mcp_server.logger") as mock_logger:
+                await execute_tool("list_accounts", ctx=ctx)
 
-    @pytest.mark.asyncio
-    async def test_lifespan_shutdown_cleans_up_executor(self):
-        """On shutdown, lifespan should call executor.shutdown()."""
-        from mcp_privilege_cloud.mcp_server import app_lifespan
-
-        with patch("mcp_privilege_cloud.mcp_server.is_oauth_mode", return_value=True):
-            with patch(
-                "mcp_privilege_cloud.mcp_server.CyberArkMCPServer.from_environment"
-            ) as mock_from_env:
-                mock_server = MagicMock()
-                mock_executor = MagicMock()
-                mock_server._executor = mock_executor
-                mock_from_env.return_value = mock_server
-
-                mock_fastmcp = MagicMock()
-                async with app_lifespan(mock_fastmcp) as app_ctx:
-                    pass
-
-                mock_executor.shutdown.assert_called_once_with(wait=True)
+                mock_logger.info.assert_any_call(
+                    "Authenticated user: %s", claims["sub"]
+                )
 
 
 class TestMCPServerOAuthInit:

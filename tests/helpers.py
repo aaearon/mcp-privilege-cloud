@@ -2,6 +2,24 @@
 
 import base64
 import json
+import time
+
+
+def _default_claims(**overrides: object) -> dict:
+    """Return default valid JWT claims with optional overrides."""
+    claims = {
+        "sub": "testuser@cyberark.cloud.12345",
+        "iss": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
+        "aud": "mcpprivilegecloud",
+        "exp": int(time.time()) + 3600,
+        "iat": int(time.time()),
+        "unique_name": "testuser@abc1234.cyberark.cloud",
+        "subdomain": "abc1234",
+        "platform_domain": "cyberark.cloud",
+        "scope": "openid profile pvwa",
+    }
+    claims.update(overrides)
+    return claims
 
 
 def _make_jwt(claims: dict, header: dict | None = None) -> str:

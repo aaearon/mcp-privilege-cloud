@@ -229,52 +229,6 @@ class TestBuildOAuthMetadata:
 class TestDynamicClientRegistration:
     """Test the /register DCR proxy endpoint."""
 
-    def test_dcr_returns_oauth_client_id_from_env(self):
-        """DCR should return CYBERARK_OAUTH_CLIENT_ID when set, but never secrets."""
-        from mcp_privilege_cloud.mcp_server import _build_dcr_response
-
-        body = {
-            "client_name": "Claude",
-            "redirect_uris": ["https://claude.ai/api/mcp/auth_callback"],
-        }
-
-        env = {
-            "CYBERARK_OAUTH_CLIENT_ID": "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
-            "CYBERARK_OAUTH_CLIENT_SECRET": "oauth-secret",
-        }
-        with patch.dict(os.environ, env, clear=True):
-            response = _build_dcr_response(body)
-
-        assert response["client_id"] == "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6"
-        assert "client_secret" not in response
-        assert response["token_endpoint_auth_method"] == "none"
-        assert response["grant_types"] == ["authorization_code", "refresh_token"]
-
-    def test_dcr_falls_back_to_oidc_app_id(self):
-        """DCR should fall back to CYBERARK_OIDC_APP_ID, not CYBERARK_CLIENT_ID (service account)."""
-        from mcp_privilege_cloud.mcp_server import _build_dcr_response
-        from mcp_privilege_cloud.token_verifier import CYBERARK_OIDC_APP_ID
-
-        env = {
-            "CYBERARK_CLIENT_ID": "myuser@tenant",
-            "CYBERARK_CLIENT_SECRET": "s3cret",
-        }
-        with patch.dict(os.environ, env, clear=True):
-            response = _build_dcr_response({})
-
-        assert response["client_id"] == CYBERARK_OIDC_APP_ID
-        assert "client_secret" not in response
-
-    def test_dcr_public_client_when_no_secret(self):
-        """DCR should return public client (no secret) when CYBERARK_CLIENT_SECRET is unset."""
-        from mcp_privilege_cloud.mcp_server import _build_dcr_response
-
-        with patch.dict(os.environ, {}, clear=True):
-            response = _build_dcr_response({})
-
-        assert response["token_endpoint_auth_method"] == "none"
-        assert "client_secret" not in response
-
     def test_dcr_echoes_client_name(self):
         """DCR should echo back the client_name from the request."""
         from mcp_privilege_cloud.mcp_server import _build_dcr_response

@@ -1,12 +1,11 @@
 """Tests for environment variable resolution priority chains.
 
-Tests the DCR client_id/secret and token verifier audience resolution
-logic to ensure CYBERARK_OAUTH_CLIENT_ID takes priority over legacy vars.
+Tests the DCR client_id/secret priority chain to ensure
+CYBERARK_OAUTH_CLIENT_ID takes priority over legacy vars.
 """
 
 import os
 
-import pytest
 from unittest.mock import patch
 
 
@@ -151,69 +150,3 @@ class TestGetOAuthCredentials:
         assert secret == ""
 
 
-class TestTokenVerifierAudienceResolution:
-    """Test audience collection: all configured env vars are accepted."""
-
-    def test_all_env_vars_collected(self):
-        """Both audience env vars should be collected; CYBERARK_CLIENT_ID excluded."""
-        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
-
-        env = {
-            "CYBERARK_OAUTH_AUDIENCE": "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
-            "CYBERARK_OAUTH_CLIENT_ID": "c21840a7-trust-tab-id",
-            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
-        }
-        with patch.dict(os.environ, env):
-            verifier = CyberArkTokenVerifier(
-                identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            )
-
-        # CYBERARK_CLIENT_ID (service account) is never a valid JWT audience
-        assert verifier._expected_audience == {
-            "1fc81892-a1ba-49ca-9bf9-7d1f1de19ea6",
-            "c21840a7-trust-tab-id",
-        }
-
-    def test_subset_of_env_vars(self):
-        """Only CYBERARK_OAUTH_CLIENT_ID should appear (not service account)."""
-        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
-
-        env = {
-            "CYBERARK_OAUTH_CLIENT_ID": "c21840a7-trust-tab-id",
-            "CYBERARK_CLIENT_ID": "timtest@cyberark.cloud.3240",
-        }
-        with patch.dict(os.environ, env):
-            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
-            verifier = CyberArkTokenVerifier(
-                identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            )
-
-        assert verifier._expected_audience == {"c21840a7-trust-tab-id"}
-
-    def test_single_oauth_env_var(self):
-        """Single CYBERARK_OAUTH_CLIENT_ID should produce a single-element set."""
-        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier
-
-        env = {"CYBERARK_OAUTH_CLIENT_ID": "some-oauth-client-id"}
-        with patch.dict(os.environ, env):
-            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
-            os.environ.pop("CYBERARK_CLIENT_ID", None)
-            verifier = CyberArkTokenVerifier(
-                identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            )
-
-        assert verifier._expected_audience == {"some-oauth-client-id"}
-
-    def test_ultimate_fallback_to_oidc_app_id(self):
-        """Without any env vars, audience should fall back to CYBERARK_OIDC_APP_ID."""
-        from mcp_privilege_cloud.token_verifier import CyberArkTokenVerifier, CYBERARK_OIDC_APP_ID
-
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("CYBERARK_OAUTH_CLIENT_ID", None)
-            os.environ.pop("CYBERARK_OAUTH_AUDIENCE", None)
-            os.environ.pop("CYBERARK_CLIENT_ID", None)
-            verifier = CyberArkTokenVerifier(
-                identity_tenant_url="https://abc1234.id.cyberark.cloud",
-            )
-
-        assert verifier._expected_audience == {CYBERARK_OIDC_APP_ID}

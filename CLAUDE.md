@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 276+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 261+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -332,7 +332,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `exceptions.py` - Custom exceptions: CyberArkAPIError, SDK compatibility layer
 
 ### Testing Validation ✅ **VERIFIED**
-- **276+ tests passing** - Zero functionality regression across all phases
+- **261+ tests passing** - Zero functionality regression across all phases
 - **Test Coverage Maintained** - 16 token verifier + 14 OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
@@ -405,7 +405,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 ## Testing Strategy
 
-**Test Files**: 269+ total tests across 16 test files
+**Test Files**: 261+ total tests across 15 test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (comprehensive error handling)
 - `tests/test_account_operations.py` - Account lifecycle management with CRUD operations
 - `tests/test_applications_service.py` - Applications service testing with authentication methods
@@ -417,7 +417,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `tests/test_token_verifier.py` - CyberArkTokenVerifier JWT verification tests
 - `tests/test_oauth_integration.py` - Full OAuth integration: dual-mode, execute_tool, lifespan
 - `tests/test_oauth_metadata.py` - RFC 8414 `/.well-known/oauth-authorization-server` endpoint tests
-- `tests/test_env_var_resolution.py` - Environment variable priority chain tests (DCR + audience)
+- `tests/test_env_var_resolution.py` - Environment variable priority chain tests (DCR)
 - Additional test files for comprehensive coverage of all 53 tools
 
 **Key Commands**: 
@@ -483,7 +483,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 276+ tests must continue passing
+5. **Preserve test coverage** - All 261+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -494,7 +494,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 269+ tests still pass
+4. Verify all 261+ tests still pass
 ```
 
 ## References

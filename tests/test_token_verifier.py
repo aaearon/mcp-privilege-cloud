@@ -10,24 +10,7 @@ import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from helpers import _make_jwt
-
-
-def _default_claims(**overrides: object) -> dict:
-    """Return default valid JWT claims with optional overrides."""
-    claims = {
-        "sub": "testuser@cyberark.cloud.12345",
-        "iss": "https://abc1234.id.cyberark.cloud/mcpprivilegecloud/",
-        "aud": "mcpprivilegecloud",
-        "exp": int(time.time()) + 3600,
-        "iat": int(time.time()),
-        "unique_name": "testuser@abc1234.cyberark.cloud",
-        "subdomain": "abc1234",
-        "platform_domain": "cyberark.cloud",
-        "scope": "openid profile pvwa",
-    }
-    claims.update(overrides)
-    return claims
+from helpers import _default_claims, _make_jwt
 
 
 class TestCyberArkTokenVerifierInit:
