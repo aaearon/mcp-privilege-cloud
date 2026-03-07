@@ -2,7 +2,13 @@
 
 An MCP server for CyberArk Privilege Cloud, built on the official [ark-sdk-python](https://github.com/cyberark/ark-sdk-python) library. Provides 53 tools for privileged access management.
 
+Supports two authentication modes:
+- **OAuth per-user mode** (recommended) -- each user authenticates with their own CyberArk Identity credentials via OAuth. Requires [Streamable HTTP transport](#docker-deployment) and an OIDC app in CyberArk Identity ([setup guide](docs/CYBERARK_IDENTITY_SETUP.md)).
+- **Legacy service account mode** -- a single shared service account authenticates all requests via stdio transport. Simpler setup, shown in [Quick Start](#quick-start) below.
+
 ## Quick Start
+
+> This sets up the **legacy service account mode** via stdio. For OAuth per-user mode, see [OAuth Per-User Mode](#oauth-per-user-mode).
 
 **1. Install uv** (if not already installed):
 ```bash
@@ -38,43 +44,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 **3. Restart Claude Desktop** - The MCP server will appear in the tools menu (hammer icon) when connected.
 
-## Example Prompts
-
-Once configured, you can ask Claude things like:
-
-**Account Management:**
-- "List all accounts in the Production safe"
-- "Show me Windows accounts that are failing management"
-- "Create a new local admin account for server PROD-WEB-01"
-- "Which accounts haven't had their passwords changed in 90 days?"
-
-**Safe Management:**
-- "Create a new safe called 'DevOps-Credentials' with 30-day retention"
-- "Add the DevOps team as safe members with retrieve permissions"
-- "Show me all safes and their member counts"
-
-**Platform & Session Monitoring:**
-- "List all active platforms and their account counts"
-- "Show me active privileged sessions"
-- "Get session activity for the last hour"
-
-## Prerequisites
-
-- [CyberArk Identity Service User](https://docs.cyberark.com/identity-administration/latest/en/content/ispss/ispss-add-service-user.htm) with:
-  - Appropriate Identity roles for the desired operations (e.g., Privilege Cloud Administrator for platform management)
-  - Safe permissions granting access to the safes and accounts you want to manage
-
-## Client Integration
-
-### Claude Desktop
-
-See [Quick Start](#quick-start) above for configuration.
-
-If the configuration file doesn't exist, create it. If it already exists with other MCP servers, add the `cyberark-privilege-cloud` entry to the existing `mcpServers` object.
-
 ### Claude Code
-
-Add the MCP server using the Claude Code CLI:
 
 ```bash
 claude mcp add cyberark-privilege-cloud \
@@ -82,6 +52,64 @@ claude mcp add cyberark-privilege-cloud \
   -e CYBERARK_CLIENT_SECRET=your-service-user-password \
   -- uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
+
+## Example Prompts
+
+Once configured, you can ask Claude things like:
+
+- "List all accounts in the Production safe"
+- "Show me Windows accounts that are failing management"
+- "Create a new safe called 'DevOps-Credentials' with 30-day retention"
+- "Add the DevOps team as safe members with retrieve permissions"
+- "List all active platforms and their account counts"
+- "Show me active privileged sessions"
+
+## Prerequisites
+
+- [CyberArk Identity Service User](https://docs.cyberark.com/identity-administration/latest/en/content/ispss/ispss-add-service-user.htm) with:
+  - Appropriate Identity roles for the desired operations (e.g., Privilege Cloud Administrator for platform management)
+  - Safe permissions granting access to the safes and accounts you want to manage
+- For OAuth per-user mode: an OIDC app in CyberArk Identity (see [setup guide](docs/CYBERARK_IDENTITY_SETUP.md))
+
+## Configuration
+
+### OAuth Per-User Mode
+
+Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
+
+Requires Streamable HTTP transport -- see [Docker Deployment](#docker-deployment) or set `MCP_TRANSPORT=streamable-http` when running locally.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
+| `CYBERARK_CLIENT_ID` | Yes | Service account login name (for PCloud platform token) |
+| `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
+| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (for DCR and JWT audience) |
+| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (injected server-side in /token proxy) |
+| `MCP_TRANSPORT` | No | Transport protocol (default: `stdio`; set to `streamable-http` for OAuth) |
+| `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
+| `MCP_PORT` | No | Server bind port (default: `8000`) |
+| `MCP_SERVER_URL` | No | Public URL for OAuth metadata (default: `http://{host}:{port}`) |
+
+See [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md) for full configuration instructions.
+
+### Legacy Service Account Mode
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CYBERARK_CLIENT_ID` | Yes | Your Service User username |
+| `CYBERARK_CLIENT_SECRET` | Yes | Your Service User password |
+
+## Docker Deployment
+
+The included `Dockerfile` and `docker-compose.yml` run the server in Streamable HTTP mode, suitable for OAuth per-user authentication and remote MCP clients.
+
+```bash
+# Create .env with your credentials (see .env.example)
+docker compose up -d --build
+```
+
+When deploying behind a reverse proxy, configure it to strip trailing slashes from request paths. MCP clients may POST to `/mcp/` (trailing slash), causing a 307 redirect that strips the `Authorization` header. Set `MCP_SERVER_URL` to the public URL of your server.
 
 ## Available Tools (53 Total)
 
@@ -108,97 +136,6 @@ claude mcp add cyberark-privilege-cloud \
 - **Session Management**: `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `count_sessions`
 - **Activity Tracking**: `list_session_activities`, `get_session_statistics`
 
-## Features
-
-- **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management
-- **Comprehensive Safe Operations**: Full CRUD operations plus member management with granular permissions
-- **Platform Management**: Complete platform lifecycle including statistics, import/export, and target platform operations
-- **Applications Management**: Full application lifecycle with authentication method management
-- **Session Monitoring**: Real-time session tracking, activity monitoring, and analytics
-- **Enterprise Security**: Built on official ark-sdk-python with OAuth and comprehensive error handling
-
-## Configuration
-
-The server supports two authentication modes. It auto-detects which mode to use based on the environment variables present.
-
-### OAuth Per-User Mode (Recommended)
-
-Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a **service account platform token** for all PCloud API calls. Requires an OAuth2 app configured in CyberArk Identity (see [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)).
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
-| `CYBERARK_CLIENT_ID` | Yes | Service account login name (used for PCloud platform token) |
-| `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
-| `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR and JWT audience validation) |
-| `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (injected server-side in /token proxy) |
-| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
-| `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
-| `MCP_PORT` | No | Server bind port (default: `8000`) |
-
-### Legacy Service Account Mode
-
-A single shared service account authenticates all requests. Simpler setup but all operations run under one identity.
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `CYBERARK_CLIENT_ID` | Yes | Your Service User username |
-| `CYBERARK_CLIENT_SECRET` | Yes | Your Service User password |
-| `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
-
-**For Claude Desktop/Claude Code**: Pass these directly in the configuration (see [Client Integration](#client-integration)). No `.env` file is needed.
-
-**For local development/testing**: Create a `.env` file in the project root directory:
-
-```bash
-# OAuth per-user mode (recommended)
-# Service account — for PCloud API access via platform token
-CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
-CYBERARK_CLIENT_SECRET=service-user-password
-# OIDC app — from Trust tab, for DCR
-CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
-CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
-CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
-
-# OR legacy service account mode
-CYBERARK_CLIENT_ID=your-service-user-username
-CYBERARK_CLIENT_SECRET=your-service-user-password
-
-# Transport: stdio (default), sse, or streamable-http
-# MCP_TRANSPORT=streamable-http
-```
-
-## Reverse Proxy Deployment
-
-When deploying behind a reverse proxy with OAuth enabled, you **must** configure the proxy to strip trailing slashes from request paths. MCP clients (e.g. Copilot Studio) POST to `/mcp/` (trailing slash), which causes a 307 redirect to `/mcp`. HTTP clients strip the `Authorization` header on redirect, breaking OAuth Bearer token authentication.
-
-Also set `MCP_SERVER_URL` to the public URL of your server so that OAuth discovery metadata contains reachable URLs.
-
-**Traefik example** (dynamic config):
-```yaml
-http:
-  middlewares:
-    strip-trailing-slash:
-      replacePathRegex:
-        regex: "^(/.+?)/$"
-        replacement: "${1}"
-  routers:
-    mcp:
-      rule: "Host(`mcp.example.com`)"
-      entryPoints:
-        - web-secure
-      service: mcp
-      middlewares:
-        - strip-trailing-slash
-      tls:
-        certResolver: myresolver
-  services:
-    mcp:
-      loadBalancer:
-        servers:
-          - url: "http://backend:8000"
-```
-
 ## Troubleshooting
 
 | Issue | Solution |
@@ -207,7 +144,7 @@ http:
 | Authentication failed | Verify Service User credentials in CyberArk Identity |
 | Permission errors | Ensure the Service User has appropriate Identity roles and safe permissions |
 | Connection issues | Verify you're using the `.cloud` domain (not `.com`) |
-| OAuth 401 behind reverse proxy | Ensure the proxy strips trailing slashes (see Reverse Proxy Deployment above) |
+| OAuth 401 behind reverse proxy | Ensure the proxy strips trailing slashes (see [Docker Deployment](#docker-deployment)) |
 | `uvx` not found | Install uv: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
 **Verify MCP server manually:**
@@ -217,43 +154,21 @@ uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-
 
 ## Development
 
-### Installation
-
 ```bash
 git clone https://github.com/aaearon/mcp-privilege-cloud.git
 cd mcp-privilege-cloud
 uv sync
-```
-
-### Running Tests
-
-```bash
 uv run pytest                              # Run all tests
 uv run pytest --cov=mcp_privilege_cloud    # Run with coverage
-uv run pytest -m integration               # Integration tests only
+uv run mcp-privilege-cloud                 # Run the server locally
 ```
-
-### Running the Server Locally
-
-```bash
-uv run mcp-privilege-cloud      # With uv
-python -m mcp_privilege_cloud   # Direct module execution
-```
-
-### Testing with MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector
-```
-
-Configure with command `uv run mcp-privilege-cloud` and your credentials.
 
 ## Documentation
 
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications and parameters
 - **[Architecture](docs/ARCHITECTURE.md)** - System design and components
 - **[CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)** - OAuth app configuration guide
-- **[Development Guide](DEVELOPMENT.md)** - Contributing and development workflows
+- **[Development Guide](docs/DEVELOPMENT.md)** - Contributing and development workflows
 - **[Testing Guide](docs/TESTING.md)** - Detailed testing instructions
 
 ## Security
@@ -261,6 +176,7 @@ Configure with command `uv run mcp-privilege-cloud` and your credentials.
 - Never commit credentials to version control
 - Use secure environment variable management
 - Grant minimal required permissions to Service Users
+- In OAuth mode, DCR returns public clients only -- secrets are injected server-side
 - Official SDK provides automatic token management and secure protocols
 
 ## License
