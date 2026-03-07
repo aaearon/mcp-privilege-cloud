@@ -12,7 +12,7 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 - [Platform Management Tools](#platform-management-tools)
 - [Applications Management Tools](#applications-management-tools)
 - [Password Management Tools](#password-management-tools)
-- [Health Monitoring Tools](#health-monitoring-tools)
+- [Session Monitoring Tools](#session-monitoring-tools)
 - [Error Handling](#error-handling)
 - [Usage Examples](#usage-examples)
 - [Integration Patterns](#integration-patterns)
@@ -294,7 +294,7 @@ await client.call_tool("create_account", {
 
 ## Safe Management Tools
 
-**🤖 LLM REFERENCE**: This section documents core safe tools. The server provides 11 total safe management tools including: `add_safe`, `update_safe`, `delete_safe`, `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudSafesService.
+**🤖 LLM REFERENCE**: This section documents core safe tools. The server provides 10 total safe management tools including: `add_safe`, `update_safe`, `delete_safe`, `list_safe_members`, `get_safe_member_details`, `add_safe_member`, `update_safe_member`, `remove_safe_member`. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkPCloudSafesService.
 
 ### `list_safes`
 
@@ -672,6 +672,61 @@ await client.call_tool("reconcile_account_password", {
   "status": "success",
   "message": "Password reconciliation completed"
 }
+```
+
+## Session Monitoring Tools
+
+**🤖 LLM REFERENCE**: This section documents session monitoring tools. The server provides 6 total session monitoring tools. For complete specifications of all tools, refer to `src/mcp_privilege_cloud/mcp_server.py` implementations using ArkSMService.
+
+### Core Operations (4 tools)
+
+#### `list_sessions`
+**Description**: List all privileged sessions in CyberArk Privilege Cloud
+**Parameters**: Standard listing parameters
+**Returns**: Array of session objects with basic properties
+**SDK Method**: `ArkSMService.list_sessions()`
+
+#### `list_sessions_by_filter`
+**Description**: List sessions matching specific filter criteria
+**Parameters**: `filter` (required) - Filter expression for sessions
+**Returns**: Array of matching session objects
+**SDK Method**: `ArkSMService.list_sessions_by_filter()`
+
+#### `get_session_details`
+**Description**: Get detailed information about a specific session
+**Parameters**: `session_id` (required)
+**Returns**: Complete session object with all properties
+**SDK Method**: `ArkSMService.get_session_details()`
+
+#### `count_sessions`
+**Description**: Count sessions matching optional criteria
+**Parameters**: Optional filter parameters
+**Returns**: Session count
+**SDK Method**: `ArkSMService.count_sessions()`
+
+### Activity Tracking (2 tools)
+
+#### `list_session_activities`
+**Description**: List activities within a specific session
+**Parameters**: `session_id` (required)
+**Returns**: Array of session activity objects
+**SDK Method**: `ArkSMService.list_session_activities()`
+
+#### `get_session_statistics`
+**Description**: Get comprehensive session statistics and analytics
+**Parameters**: None
+**Returns**: Session statistics object with counts and distribution data
+**SDK Method**: `ArkSMService.get_session_statistics()`
+
+### Usage Patterns
+
+```python
+# Session monitoring workflow
+sessions = await client.call_tool("list_sessions", {})
+active = await client.call_tool("list_sessions_by_filter", {"filter": "Status eq Active"})
+details = await client.call_tool("get_session_details", {"session_id": "sess123"})
+activities = await client.call_tool("list_session_activities", {"session_id": "sess123"})
+stats = await client.call_tool("get_session_statistics", {})
 ```
 
 ## Error Handling

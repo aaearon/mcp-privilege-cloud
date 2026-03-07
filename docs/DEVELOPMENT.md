@@ -247,22 +247,19 @@ tests/
 ├── test_enhanced_error_handling.py  # Error handling validation
 ├── test_enhanced_error_messages.py  # Error message consistency
 ├── test_token_verifier.py           # JWT verification
-├── test_token_bridge.py             # Token bridge tests
 ├── test_oauth_integration.py        # OAuth integration
 ├── test_oauth_metadata.py           # RFC 8414 metadata
 ├── test_transport.py                # Transport configuration
 ├── test_env_var_resolution.py       # Env var priority chain
-├── test_pcloud_url_resolution.py    # PCloud URL resolution
 ├── test_context_injection.py        # Context injection
 ├── test_lifespan.py                 # Lifespan management
-├── test_response_models.py          # Response models
-└── test_typed_tools.py              # Typed tool validation
+└── test_account_operations.py       # Account lifecycle management
 ```
 
 ### Running Tests
 
 ```bash
-# All tests (292 total)
+# All tests (260 total)
 uv run pytest
 
 # Specific test categories
@@ -474,7 +471,7 @@ npx @modelcontextprotocol/inspector
 npx @modelcontextprotocol/inspector -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud
 ```
 
-**List available tools (should return 13):**
+**List available tools (should return 53):**
 ```bash
 npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -e CYBERARK_CLIENT_SECRET=your-secret uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/list
 ```
@@ -498,17 +495,28 @@ npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -
 
 #### Tool Categories and Testing
 ```bash
-# Data Access Tools (7 tools)
-list_accounts, get_account_details, search_accounts
-list_safes, get_safe_details  
-list_platforms, get_platform_details
+# Account Management Tools (18 tools)
+list_accounts, get_account_details, search_accounts, create_account,
+update_account, delete_account, change_account_password, set_next_password,
+verify_account_password, reconcile_account_password, and 8 more analytics tools
 
-# Account Management Tools (5 tools)
-create_account, change_account_password, set_next_password
-verify_account_password, reconcile_account_password
+# Safe Management Tools (10 tools)
+list_safes, get_safe_details, add_safe, update_safe, delete_safe,
+list_safe_members, get_safe_member_details, add_safe_member,
+update_safe_member, remove_safe_member
 
-# Platform Management Tools (1 tool)
-import_platform_package
+# Platform Management Tools (10 tools)
+list_platforms, get_platform_details, import_platform_package,
+export_platform, duplicate_target_platform, activate/deactivate_target_platform,
+delete_target_platform, get_platform_statistics, get_target_platform_statistics
+
+# Applications Management Tools (9 tools)
+list_applications, get_application_details, add_application, delete_application,
+list_application_auth_methods, and 4 more auth method + stats tools
+
+# Session Monitoring Tools (6 tools)
+list_sessions, list_sessions_by_filter, get_session_details,
+list_session_activities, count_sessions, get_session_statistics
 ```
 
 ### Troubleshooting for LLMs
@@ -529,7 +537,7 @@ npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://gith
 
 **"No tools listed" or "Connection failed"**
 - **Cause**: Environment variables incorrect or missing
-- **Solution**: Verify all 4 required environment variables are set correctly
+- **Solution**: Verify all 2 required environment variables (legacy mode) or 5 (OAuth mode) are set correctly
 - **Debug**: Check that variable names match exactly (case-sensitive)
 
 **"401 Unauthorized"** 
@@ -552,7 +560,7 @@ When validating this MCP server, follow this systematic approach:
 
 #### Step 1: Basic Connectivity
 ```bash
-# Verify 13 tools are available
+# Verify 53 tools are available
 npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://github.com/aaearon/mcp-privilege-cloud.git mcp-privilege-cloud --method tools/list
 ```
 
