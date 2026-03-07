@@ -345,7 +345,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `CYBERARK_CLIENT_SECRET` - Service account password
 - `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR and /token proxy)
 - `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (injected server-side by /token proxy, never exposed via DCR)
-- `CYBERARK_OAUTH_AUDIENCE` - JWT audience claim (the app's internal ID, differs from Trust tab client_id)
 
 **Optional Environment Variables**:
 - `CYBERARK_OIDC_APP_ID` - OIDC app name in URL paths (default: `mcpprivilegecloud`)

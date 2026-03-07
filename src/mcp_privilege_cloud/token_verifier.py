@@ -51,19 +51,11 @@ class CyberArkTokenVerifier(TokenVerifier):
         # The app name used for OIDC discovery and issuer validation
         self._expected_app_id = CYBERARK_OIDC_APP_ID
 
-        # Accepted audiences for JWT validation. CyberArk Identity sets the
-        # `aud` claim to the client_id used in the authorization request.
-        # When DCR returns CYBERARK_OAUTH_CLIENT_ID, tokens will have that
-        # as the audience. The internal app ID (CYBERARK_OAUTH_AUDIENCE) may
-        # differ, so we accept both.
-        audiences = set()
-        for var in ("CYBERARK_OAUTH_AUDIENCE", "CYBERARK_OAUTH_CLIENT_ID"):
-            val = os.getenv(var)
-            if val:
-                audiences.add(val)
-        if not audiences:
-            audiences.add(CYBERARK_OIDC_APP_ID)
-        self._expected_audience = audiences
+        # Accepted audience for JWT validation. CyberArk Identity sets the
+        # `aud` claim to the client_id from the Trust tab (CYBERARK_OAUTH_CLIENT_ID).
+        # Falls back to the OIDC app name if not configured.
+        oauth_client_id = os.getenv("CYBERARK_OAUTH_CLIENT_ID")
+        self._expected_audience = {oauth_client_id} if oauth_client_id else {CYBERARK_OIDC_APP_ID}
 
         logger.info(
             "Token verifier initialized (tenant: %s, accepted audiences: %s)",

@@ -68,17 +68,7 @@ Add redirect URIs for each MCP client:
 
 These are different from the service user credentials in Part A.
 
-### Step 4: Note the App's Internal ID
-
-The app's internal ID (used as the JWT `aud` claim) differs from the Trust tab Client ID. To find it:
-
-1. Open the app in CyberArk Identity Admin Portal
-2. Check the URL - it contains the app's UUID
-3. Alternatively, the `aud` claim in issued JWTs will contain this value
-
-This value = `CYBERARK_OAUTH_AUDIENCE`
-
-### Step 5: Configure Tokens Tab
+### Step 4: Configure Tokens Tab
 
 **Signing Algorithm**: Must be **RS256** (the only algorithm the MCP server accepts for JWT signature verification).
 
@@ -98,9 +88,9 @@ This value = `CYBERARK_OAUTH_AUDIENCE`
 | `sub` | `openid` scope | Must be non-empty (used as user identity for audit logging) |
 | `exp` | Always present | Must not be expired |
 | `iss` | Always present | Must match `{tenant_url}/{app_name}/` (e.g., `https://abc1234.id.cyberark.cloud/mcpprivilegecloud/`) |
-| `aud` | Set to the `client_id` used in the authorization request | Must match `CYBERARK_OAUTH_AUDIENCE` or `CYBERARK_OAUTH_CLIENT_ID` (see [JWT Validation](#jwt-validation) below) |
+| `aud` | Set to the `client_id` used in the authorization request | Must match `CYBERARK_OAUTH_CLIENT_ID` (see [JWT Validation](#jwt-validation) below) |
 
-### Step 6: Add Trusted DNS Domains (Required for PKCE Clients)
+### Step 5: Add Trusted DNS Domains (Required for PKCE Clients)
 
 CyberArk Identity requires PKCE clients to have their domain added to trusted DNS domains:
 
@@ -112,13 +102,13 @@ CyberArk Identity requires PKCE clients to have their domain added to trusted DN
 
 **Without this step, CyberArk Identity will return `invalid_client` errors during the authorization code flow.**
 
-### Step 7: Assign Users/Roles
+### Step 6: Assign Users/Roles
 
 1. Navigate to the application's **Permissions** tab
 2. Add the users or roles that should have access to the MCP server
 3. Users must also have appropriate **Privilege Cloud** permissions (safe access, platform admin, etc.)
 
-### Step 8: Verify OIDC Discovery
+### Step 7: Verify OIDC Discovery
 
 Verify the OIDC discovery endpoint is accessible for your app:
 
@@ -143,10 +133,6 @@ CYBERARK_CLIENT_SECRET=service-user-password
 # OIDC app (Part B, Step 3) -- injected server-side in /token proxy, never exposed via DCR
 CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
 CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
-
-# JWT audience (Part B, Step 4) -- the app's internal ID (often differs from Trust tab client_id).
-# Only needed if CYBERARK_OAUTH_CLIENT_ID alone doesn't match the JWT aud claim.
-CYBERARK_OAUTH_AUDIENCE=your-oidc-app-internal-id
 ```
 
 ### Legacy Service Account Mode
@@ -185,13 +171,12 @@ The MCP server validates every incoming Bearer JWT against CyberArk Identity's J
 | `iss` | Must equal `{tenant_url}/{app_name}/` | Wrong app name or tenant URL in `CYBERARK_IDENTITY_TENANT_URL` |
 | `aud` | Must match a configured audience value | See audience resolution below |
 
-**Audience resolution**: The server accepts any of these values as a valid `aud` claim, checked in order:
+**Audience resolution**: The server accepts these values as a valid `aud` claim:
 
-1. `CYBERARK_OAUTH_AUDIENCE` — explicit override (set this if tokens have an unexpected `aud`)
-2. `CYBERARK_OAUTH_CLIENT_ID` — the Trust tab client ID (Part B, Step 3)
-3. Fallback: `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`)
+1. `CYBERARK_OAUTH_CLIENT_ID` — the Trust tab client ID (Part B, Step 3)
+2. Fallback: `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`)
 
-CyberArk Identity sets `aud` to the `client_id` used in the authorization request. When DCR returns `CYBERARK_OAUTH_CLIENT_ID`, tokens will have that UUID as the audience. However, the app's **internal ID** (visible in the admin portal URL) may differ — if so, set `CYBERARK_OAUTH_AUDIENCE` to match.
+CyberArk Identity sets `aud` to the `client_id` used in the authorization request. When DCR returns `CYBERARK_OAUTH_CLIENT_ID`, tokens will have that UUID as the audience.
 
 **Debugging token issues**: Set `CYBERARK_LOG_LEVEL=DEBUG` to see the actual `iss`, `aud`, and `sub` claims from rejected tokens. You can also decode a token manually:
 
@@ -245,7 +230,7 @@ For reference, the tenant-level discovery exposes:
 > - The service account's roles and safe permissions define the ceiling for all users
 > - User identity is logged for audit purposes only
 >
-> **Recommendation**: Grant the service account the minimum PCloud permissions required, and restrict which users can authenticate by limiting the OIDC app's assigned users/roles in CyberArk Identity (Part B, Step 7).
+> **Recommendation**: Grant the service account the minimum PCloud permissions required, and restrict which users can authenticate by limiting the OIDC app's assigned users/roles in CyberArk Identity (Part B, Step 6).
 
 ## Security Considerations
 
@@ -260,11 +245,11 @@ For reference, the tenant-level discovery exposes:
 
 | Issue | Solution |
 |-------|----------|
-| `invalid_client` during auth | Verify trusted DNS domains include the MCP client's domain (Part B, Step 6) and that Client ID Type is set to "Anything" |
+| `invalid_client` during auth | Verify trusted DNS domains include the MCP client's domain (Part B, Step 5) and that Client ID Type is set to "Anything" |
 | "Token verification failed" | Set `CYBERARK_LOG_LEVEL=DEBUG` to see actual vs expected claims. Verify `CYBERARK_IDENTITY_TENANT_URL` is correct |
-| "Token missing required 'sub' claim" | Ensure `openid` scope is configured on the Tokens tab (Part B, Step 5) |
+| "Token missing required 'sub' claim" | Ensure `openid` scope is configured on the Tokens tab (Part B, Step 4) |
 | "JWKS connection failed" | Verify `CYBERARK_IDENTITY_TENANT_URL` is reachable and the app's OIDC discovery endpoint responds |
 | Server starts in legacy mode | Ensure `CYBERARK_IDENTITY_TENANT_URL` is set |
 | Copilot Studio auth fails | Ensure `CYBERARK_OAUTH_CLIENT_SECRET` is set and Client ID Type is "Anything" or "Confidential" |
-| JWT `aud` claim mismatch | Set `CYBERARK_OAUTH_AUDIENCE` to the value from the JWT `aud` claim (decode the token to check — see [JWT Validation](#jwt-validation)) |
+| JWT `aud` claim mismatch | Verify `CYBERARK_OAUTH_CLIENT_ID` matches the Trust tab client ID (decode the token to check — see [JWT Validation](#jwt-validation)) |
 | JWT `iss` claim mismatch | The issuer must be `{tenant_url}/{app_name}/` — verify the app name matches `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`) |

@@ -132,7 +132,6 @@ Each connecting user authenticates with their own CyberArk Identity credentials 
 | `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
 | `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (used for DCR and JWT audience validation) |
 | `CYBERARK_OAUTH_CLIENT_SECRET` | Yes | OIDC app client secret from Trust tab (injected server-side in /token proxy) |
-| `CYBERARK_OAUTH_AUDIENCE` | No | JWT audience override (only if `aud` claim differs from `CYBERARK_OAUTH_CLIENT_ID`) |
 | `MCP_TRANSPORT` | No | Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`) |
 | `MCP_HOST` | No | Server bind host (default: `127.0.0.1`) |
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
@@ -159,8 +158,6 @@ CYBERARK_CLIENT_SECRET=service-user-password
 # OIDC app — from Trust tab, for DCR
 CYBERARK_OAUTH_CLIENT_ID=your-oidc-app-client-id
 CYBERARK_OAUTH_CLIENT_SECRET=your-oidc-app-client-secret
-# JWT audience — the app's internal ID (differs from Trust tab client_id)
-CYBERARK_OAUTH_AUDIENCE=your-oidc-app-internal-id
 CYBERARK_IDENTITY_TENANT_URL=https://abc1234.id.cyberark.cloud
 
 # OR legacy service account mode

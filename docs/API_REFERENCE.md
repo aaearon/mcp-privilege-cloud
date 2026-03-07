@@ -52,7 +52,6 @@ CYBERARK_CLIENT_ID=mcp-service@cyberark.cloud.XXXX
 CYBERARK_CLIENT_SECRET=service-account-password
 CYBERARK_OAUTH_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 CYBERARK_OAUTH_CLIENT_SECRET=oidc-app-client-secret
-CYBERARK_OAUTH_AUDIENCE=your-jwt-audience-value
 
 # Optional
 MCP_HOST=127.0.0.1             # Server bind host
