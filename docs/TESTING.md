@@ -4,7 +4,7 @@ Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Fo
 
 ## Current Test Status ✅ **VERIFIED**
 
-**Test Suite Results**: **269 tests passing**
+**Test Suite Results**: **260 tests passing**
 **Code Coverage**: Comprehensive coverage across all 53 tools  
 **Integration Testing**: All 53 MCP tools verified across all services with proper parameter passing  
 
@@ -101,9 +101,6 @@ The test suite is organized into specialized test files with comprehensive cover
 - CyberArkTokenVerifier JWT verification tests
 - JWKS endpoint validation
 
-#### `tests/test_token_bridge.py`
-- Service account token bridge testing
-
 #### `tests/test_oauth_integration.py`
 - Full OAuth integration: dual-mode, execute_tool, lifespan
 
@@ -119,9 +116,6 @@ The test suite is organized into specialized test files with comprehensive cover
 #### `tests/test_env_var_resolution.py`
 - Environment variable priority chain tests
 
-#### `tests/test_pcloud_url_resolution.py`
-- PCloud URL resolution and subdomain override tests
-
 #### `tests/test_enhanced_error_handling.py`
 - Enhanced error handling validation
 
@@ -129,7 +123,7 @@ The test suite is organized into specialized test files with comprehensive cover
 - Error message consistency testing
 
 ### Test Coverage Metrics
-- **Total Tests**: 269 tests across 16 test files
+- **Total Tests**: 260 tests across 14 test files
 - **Target Coverage**: Minimum 80% code coverage maintained across 53 tools
 - **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
 - **Test Types**: Unit, integration, MCP tools tests across all 5 PCloud services
@@ -193,6 +187,6 @@ For interactive testing of the MCP server against a live CyberArk environment, u
 # Run MCP Inspector
 npx @modelcontextprotocol/inspector
 
-# Run all pytest tests (269 tests)
+# Run all pytest tests (260 tests)
 uv run pytest
 ```

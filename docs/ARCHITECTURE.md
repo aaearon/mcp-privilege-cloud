@@ -164,8 +164,8 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 - `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 - `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token)
 - `CYBERARK_CLIENT_SECRET` - Service account password
-- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR)
-- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (for DCR)
+- `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR and JWT audience)
+- `CYBERARK_OAUTH_CLIENT_SECRET` - OIDC app client secret from Trust tab (injected server-side in /token proxy)
 - `MCP_TRANSPORT` - Transport protocol: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Server bind host (default: `127.0.0.1`)
 - `MCP_PORT` - Server bind port (default: `8000`)

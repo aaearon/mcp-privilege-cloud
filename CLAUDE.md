@@ -6,7 +6,7 @@
 
 **BEFORE CODING**:
 1. **Always read this entire CLAUDE.md file first** - Contains critical patterns and constraints
-2. **Check current test status** - All changes must maintain 269+ passing tests
+2. **Check current test status** - All changes must maintain 260+ passing tests
 3. **Follow existing patterns** - Simplified architecture patterns are established and documented
 4. **Use official SDK** - All CyberArk operations MUST use ark-sdk-python (never direct HTTP)
 5. **MANDATORY: Use context7 MCP tools for ALL API documentation** - Before working with any library or API, use context7 MCP server tools to get up-to-date documentation
@@ -98,7 +98,7 @@ Use context7 resolve-library-id and get-library-docs tools:
 
 **Current Status**: ✅ **SERVICE ACCOUNT TOKEN BRIDGE COMPLETE** - OAuth mode verifies user identity via OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 **Last Updated**: February 27, 2026
-**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 276 passing tests with zero regression.
+**Recent Achievement**: Technical debt cleanup — removed dead code (session_manager.py, token_auth.py, HTTP bypasses, unused server methods), simplified AppContext to use `is_oauth` flag, fixed token_verifier exception handling, updated all documentation. 260 passing tests with zero regression.
 
 ## Architecture
 
@@ -115,7 +115,7 @@ The server provides 53 MCP tools for comprehensive CyberArk operations, built on
 - **Applications Management Tools (8 tools)**: Complete application lifecycle - `list_applications`, `get_application_details`, `add_application`, `delete_application`, `list_application_auth_methods`, `get_application_auth_method_details`, `add_application_auth_method`, `delete_application_auth_method`, `get_applications_stats`
 - **Session Monitoring Tools (6 tools)**: Privileged session monitoring and analytics - `list_sessions`, `list_sessions_by_filter`, `get_session_details`, `list_session_activities`, `count_sessions`, `get_session_statistics`
 
-> **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 5 PCloud services with enterprise-grade CRUD operations, advanced analytics, member management, and privileged session monitoring. Built on official ark-sdk-python library with 210+ passing tests and zero regression.
+> **Complete PCloud Coverage**: All tools provide comprehensive coverage of CyberArk's 5 PCloud services with enterprise-grade CRUD operations, advanced analytics, member management, and privileged session monitoring. Built on official ark-sdk-python library with 260+ passing tests and zero regression.
 
 ## Enhanced Platform Data Combination
 
@@ -274,7 +274,7 @@ The codebase underwent a systematic simplification process achieving **~27% code
 - **Simplified Testing**: Cleaner test patterns with reduced mocking complexity
 
 **Performance & Reliability**:
-- **Zero Functional Regression**: All 261+ tests passing with complete functionality coverage
+- **Zero Functional Regression**: All 260+ tests passing with complete functionality coverage
 - **Preserved SDK Integration**: Official ark-sdk-python patterns maintained
 - **Graceful Error Handling**: Centralized error management with consistent logging
 - **Backward Compatibility**: No breaking changes to MCP tool interfaces
@@ -332,8 +332,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 - `exceptions.py` - Custom exceptions: CyberArkAPIError, SDK compatibility layer
 
 ### Testing Validation ✅ **VERIFIED**
-- **261+ tests passing** - Zero functionality regression across all phases
-- **Test Coverage Maintained** - 16 token verifier + 14 OAuth integration tests added
+- **260+ tests passing** - Zero functionality regression across all phases
+- **Test Coverage Maintained** - Token verifier + OAuth integration tests added
 - **Integration Tests Updated** - MCP tool parameter passing verified for all 53 tools
 - **Performance Baseline** - No degradation in execution performance
 
@@ -404,7 +404,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 ## Testing Strategy
 
-**Test Files**: 261+ total tests across 15 test files
+**Test Files**: 260 total tests across 14 test files
 - `tests/test_core_functionality.py` - Authentication, server core, platform management (comprehensive error handling)
 - `tests/test_account_operations.py` - Account lifecycle management with CRUD operations
 - `tests/test_applications_service.py` - Applications service testing with authentication methods
@@ -482,7 +482,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
 2. **NEVER bypass patterns** - Always use @handle_sdk_errors decorator
 3. **ALWAYS follow TDD** - Write failing test first, then implementation  
 4. **SDK-only operations** - Never create direct HTTP requests
-5. **Preserve test coverage** - All 261+ tests must continue passing
+5. **Preserve test coverage** - All 260+ tests must continue passing
 6. **Use existing models** - Leverage ark-sdk-python model classes
 
 **🔍 Mandatory Context7 Workflow**:
@@ -493,7 +493,7 @@ async def get_account_password(account_id: str) -> Dict[str, Any]:
    - get-library-docs with the resolved ID
 2. Write failing test using current patterns
 3. Implement using up-to-date SDK methods  
-4. Verify all 261+ tests still pass
+4. Verify all 260+ tests still pass
 ```
 
 ## References
