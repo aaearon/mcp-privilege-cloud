@@ -1,15 +1,15 @@
-# CyberArk Identity Setup Guide
+# Idira Identity Setup Guide
 
-This guide explains how to configure CyberArk Identity for use with the MCP Privilege Cloud server in OAuth per-user mode.
+This guide explains how to configure Idira Identity for use with the MCP Privilege Cloud server in OAuth per-user mode.
 
 ## Prerequisites
 
-- CyberArk Identity administrator access
-- CyberArk Privilege Cloud tenant
+- Idira Identity administrator access
+- Idira Privilege Cloud tenant
 
 ## Part A: Create a Service User (OAuth Confidential Client)
 
-CyberArk Identity OAuth2 apps do NOT provide their own client_id/client_secret. Instead, credentials come from a **service user** marked as an OAuth 2.0 confidential client.
+Idira Identity OAuth2 apps do NOT provide their own client_id/client_secret. Instead, credentials come from a **service user** marked as an OAuth 2.0 confidential client.
 
 ### Step 1: Create the Service User
 
@@ -81,7 +81,7 @@ These are different from the service user credentials in Part A.
 | `openid` | Yes | Produces the `sub` claim (user identity) — the MCP server requires this claim and rejects tokens without it |
 | `profile` | Recommended | Adds `unique_name` and display name claims for richer audit logging |
 
-**Required JWT Claims**: The MCP server validates these claims on every request. All are standard OIDC claims produced automatically by CyberArk Identity when the scopes above are configured:
+**Required JWT Claims**: The MCP server validates these claims on every request. All are standard OIDC claims produced automatically by Idira Identity when the scopes above are configured:
 
 | Claim | Set By | Validated Against |
 |-------|--------|-------------------|
@@ -92,7 +92,7 @@ These are different from the service user credentials in Part A.
 
 ### Step 5: Add Trusted DNS Domains (Required for PKCE Clients)
 
-CyberArk Identity requires PKCE clients to have their domain added to trusted DNS domains:
+Idira Identity requires PKCE clients to have their domain added to trusted DNS domains:
 
 1. Navigate to **Settings** > **Authentication** > **Security Settings** > **API Security**
 2. Under **Trusted DNS Domains for API Calls**, add:
@@ -100,7 +100,7 @@ CyberArk Identity requires PKCE clients to have their domain added to trusted DN
    - Any other MCP client domains that will use the OAuth flow
 3. Save the settings
 
-**Without this step, CyberArk Identity will return `invalid_client` errors during the authorization code flow.**
+**Without this step, Idira Identity will return `invalid_client` errors during the authorization code flow.**
 
 ### Step 6: Assign Users/Roles
 
@@ -148,17 +148,17 @@ CYBERARK_CLIENT_SECRET=service-user-password
 
 1. **User connects** to the MCP server via an MCP client (claude.ai, Copilot Studio, etc.)
 2. **MCP client** calls DCR (`/register`) and receives the `client_id` (public client, no secret)
-3. **MCP client** redirects to CyberArk Identity for user authentication (authorization_code flow with PKCE)
+3. **MCP client** redirects to Idira Identity for user authentication (authorization_code flow with PKCE)
 4. **MCP server** receives the Bearer JWT token with each request
 5. **CyberArkTokenVerifier** validates the JWT signature against the JWKS endpoint (`/OAuth2/Keys/mcpprivilegecloud`, RS256)
 6. **execute_tool()** verifies user identity from the OIDC JWT, then routes API calls through the service account's platform token
-7. **Tools execute** under the service account's CyberArk permissions, with the authenticated user's identity logged for audit
+7. **Tools execute** under the service account's Idira permissions, with the authenticated user's identity logged for audit
 
 **Architecture note**: All API calls use a single shared service account platform token. The OIDC JWT is used solely for identity verification and audit logging -- it is not used for PCloud API authorization.
 
 ## JWT Validation
 
-The MCP server validates every incoming Bearer JWT against CyberArk Identity's JWKS endpoint. Understanding these checks helps diagnose authentication failures.
+The MCP server validates every incoming Bearer JWT against Idira Identity's JWKS endpoint. Understanding these checks helps diagnose authentication failures.
 
 **Signature**: RS256 only, verified against keys from `{tenant}/{app_name}/.well-known/openid-configuration` → `jwks_uri`. Keys are cached after first fetch.
 
@@ -176,7 +176,7 @@ The MCP server validates every incoming Bearer JWT against CyberArk Identity's J
 1. `CYBERARK_OAUTH_CLIENT_ID` — the Trust tab client ID (Part B, Step 3)
 2. Fallback: `CYBERARK_OIDC_APP_ID` (default: `mcpprivilegecloud`)
 
-CyberArk Identity sets `aud` to the `client_id` used in the authorization request. When DCR returns `CYBERARK_OAUTH_CLIENT_ID`, tokens will have that UUID as the audience.
+Idira Identity sets `aud` to the `client_id` used in the authorization request. When DCR returns `CYBERARK_OAUTH_CLIENT_ID`, tokens will have that UUID as the audience.
 
 **Debugging token issues**: Set `CYBERARK_LOG_LEVEL=DEBUG` to see the actual `iss`, `aud`, and `sub` claims from rejected tokens. You can also decode a token manually:
 
@@ -187,7 +187,7 @@ echo "<token>" | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool
 
 ## OIDC App Configuration Reference
 
-The following details describe the expected configuration of the CyberArk Identity OIDC app created in Part B.
+The following details describe the expected configuration of the Idira Identity OIDC app created in Part B.
 
 | Setting | Value |
 |---------|-------|
@@ -226,11 +226,11 @@ For reference, the tenant-level discovery exposes:
 > **Important**: All authenticated users share the same service account's PCloud permissions. The OIDC JWT verifies *who* the user is, but API calls are executed using the service account's platform token. This means:
 >
 > - Any authenticated user can perform any operation the service account is authorized for
-> - Per-user permission enforcement is **not** supported — CyberArk PCloud does not accept OIDC tokens for API authorization
+> - Per-user permission enforcement is **not** supported — Idira PCloud does not accept OIDC tokens for API authorization
 > - The service account's roles and safe permissions define the ceiling for all users
 > - User identity is logged for audit purposes only
 >
-> **Recommendation**: Grant the service account the minimum PCloud permissions required, and restrict which users can authenticate by limiting the OIDC app's assigned users/roles in CyberArk Identity (Part B, Step 6).
+> **Recommendation**: Grant the service account the minimum PCloud permissions required, and restrict which users can authenticate by limiting the OIDC app's assigned users/roles in Idira Identity (Part B, Step 6).
 
 ## Security Considerations
 
@@ -239,7 +239,7 @@ For reference, the tenant-level discovery exposes:
 - The OIDC JWT establishes user identity for audit logging only
 - Service user credentials are stored server-side and never exposed to end users
 - DCR (`/register`) returns public client only (`token_endpoint_auth_method: "none"`) -- secrets are injected server-side by the `/token` proxy
-- Token verification uses RS256 signature validation via CyberArk Identity's public keys
+- Token verification uses RS256 signature validation via Idira Identity's public keys
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 # API Reference
 
-Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This guide provides complete specifications, parameters, examples, and integration details for all available MCP tools.
+Comprehensive API reference for the Idira Privilege Cloud MCP Server. This guide provides complete specifications, parameters, examples, and integration details for all available MCP tools.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Comprehensive API reference for the CyberArk Privilege Cloud MCP Server. This gu
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server provides **53 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
+The Idira Privilege Cloud MCP Server provides **53 enterprise-grade tools** for comprehensive privileged account management through the Model Context Protocol (MCP). All tools follow consistent patterns built on the official ark-sdk-python library for authentication, parameter validation, and error handling.
 
 ### Core Capabilities
 - **Complete Account Lifecycle**: Create, read, update, delete accounts with advanced search and password management (18 tools)
@@ -43,7 +43,7 @@ The server supports two authentication modes, auto-detected from environment var
 
 ### OAuth Per-User Mode (Recommended)
 
-Each user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
+Each user authenticates with their own Idira Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 
 ```bash
 # Required for OAuth per-user mode
@@ -81,7 +81,7 @@ CYBERARK_CLIENT_SECRET=service-account-password
 
 ## Tool Categories
 
-The server provides 53 enterprise-grade tools organized across all 5 CyberArk PCloud services:
+The server provides 53 enterprise-grade tools organized across all 5 Idira PCloud services:
 
 ### Account Management Tools (18 tools)
 **Core Operations**: `list_accounts`, `get_account_details`, `search_accounts`, `create_account`, `update_account`, `delete_account`
@@ -112,7 +112,7 @@ The server provides 53 enterprise-grade tools organized across all 5 CyberArk PC
 
 ### `list_accounts`
 
-**Description**: List all accessible accounts in CyberArk Privilege Cloud.
+**Description**: List all accessible accounts in Idira Privilege Cloud.
 
 **Parameters**: None
 
@@ -217,7 +217,7 @@ await client.call_tool("get_account_details", {
 
 ### `create_account`
 
-**Description**: Create a new privileged account in CyberArk Privilege Cloud.
+**Description**: Create a new privileged account in Idira Privilege Cloud.
 
 **API Endpoint**: `POST /PasswordVault/API/Accounts`
 
@@ -298,7 +298,7 @@ await client.call_tool("create_account", {
 
 ### `list_safes`
 
-**Description**: List all accessible safes in CyberArk Privilege Cloud.
+**Description**: List all accessible safes in Idira Privilege Cloud.
 
 **Parameters**: None
 
@@ -396,7 +396,7 @@ await client.call_tool("get_safe_details", {
 
 ### `list_platforms`
 
-**Description**: List all available platforms in CyberArk Privilege Cloud.
+**Description**: List all available platforms in Idira Privilege Cloud.
 
 **Required Permissions**: Service account must be a member of the Privilege Cloud Administrator role
 
@@ -436,7 +436,7 @@ platforms = await client.call_tool("list_platforms", {})
 
 ### `import_platform_package`
 
-**Description**: Import a platform package into CyberArk Privilege Cloud.
+**Description**: Import a platform package into Idira Privilege Cloud.
 
 **API Endpoint**: `POST /PasswordVault/API/Platforms/Import`
 
@@ -471,7 +471,7 @@ await client.call_tool("import_platform_package", {
 ### Core Operations (4 tools)
 
 #### `list_applications`
-**Description**: List all applications in CyberArk Privilege Cloud  
+**Description**: List all applications in Idira Privilege Cloud  
 **Parameters**: Standard listing parameters (search, filter, sort, limit)  
 **Returns**: Array of application objects with basic properties  
 **SDK Method**: `ArkPCloudApplicationsService.list_applications()`
@@ -483,7 +483,7 @@ await client.call_tool("import_platform_package", {
 **SDK Method**: `ArkPCloudApplicationsService.get_application()`
 
 #### `add_application`
-**Description**: Create a new application in CyberArk Privilege Cloud  
+**Description**: Create a new application in Idira Privilege Cloud  
 **Parameters**: Application configuration (name, description, location, access_permissions, etc.)  
 **Returns**: Created application object with generated ID  
 **SDK Method**: `ArkPCloudApplicationsService.add_application()`
@@ -681,7 +681,7 @@ await client.call_tool("reconcile_account_password", {
 ### Core Operations (4 tools)
 
 #### `list_sessions`
-**Description**: List all privileged sessions in CyberArk Privilege Cloud
+**Description**: List all privileged sessions in Idira Privilege Cloud
 **Parameters**: Standard listing parameters
 **Returns**: Array of session objects with basic properties
 **SDK Method**: `ArkSMService.list_sessions()`
@@ -972,7 +972,7 @@ async def robust_account_creation(account_data):
 - Pagination for large datasets
 
 ### Rate Limiting
-- Respects CyberArk API rate limits
+- Respects Idira API rate limits
 - Automatic retry with exponential backoff
 - Connection management optimization
 
@@ -987,4 +987,4 @@ async def robust_account_creation(account_data):
 
 ---
 
-This API reference provides comprehensive documentation for integrating with the CyberArk Privilege Cloud MCP Server. For additional examples and testing guidance, refer to the [Testing Guide](TESTING.md).
+This API reference provides comprehensive documentation for integrating with the Idira Privilege Cloud MCP Server. For additional examples and testing guidance, refer to the [Testing Guide](TESTING.md).

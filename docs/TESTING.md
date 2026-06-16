@@ -1,6 +1,6 @@
 # Testing Guide
 
-Testing guide for LLM development of the CyberArk Privilege Cloud MCP Server. Focus on test structure, patterns, and validation strategies for AI-assisted development.
+Testing guide for LLM development of the Idira Privilege Cloud MCP Server. Focus on test structure, patterns, and validation strategies for AI-assisted development.
 
 ## Current Test Status ✅ **VERIFIED**
 
@@ -125,7 +125,7 @@ The test suite is organized into specialized test files with comprehensive cover
 ### Test Coverage Metrics
 - **Total Tests**: 260 tests across 14 test files
 - **Target Coverage**: Minimum 80% code coverage maintained across 53 tools
-- **Mock Strategy**: All external CyberArk API dependencies are mocked using official SDK patterns
+- **Mock Strategy**: All external Idira API dependencies are mocked using official SDK patterns
 - **Test Types**: Unit, integration, MCP tools tests across all 5 PCloud services
 - **Service Coverage**: Complete testing for ArkPCloudAccountsService, ArkPCloudSafesService, ArkPCloudPlatformsService, ArkPCloudApplicationsService, ArkSMService
 
@@ -138,7 +138,7 @@ The test suite is organized into specialized test files with comprehensive cover
 4. **Comprehensive Coverage**: Test both success and failure scenarios
 
 ### Mock Strategy
-- **External Dependencies**: All CyberArk API calls are mocked in unit tests
+- **External Dependencies**: All Idira API calls are mocked in unit tests
 - **Realistic Response Data**: Mock responses match real API behavior
 - **Error Simulation**: Mock various error conditions (401, 403, 429, 500)
 - **Network Conditions**: Simulate timeouts and connection failures
@@ -181,7 +181,7 @@ pytest -k account      # Account management tests
 
 ## MCP Inspector Testing
 
-For interactive testing of the MCP server against a live CyberArk environment, use the MCP Inspector:
+For interactive testing of the MCP server against a live Idira environment, use the MCP Inspector:
 
 ```bash
 # Run MCP Inspector
