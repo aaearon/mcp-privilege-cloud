@@ -1,4 +1,4 @@
-# CyberArk Privilege Cloud MCP Server - Architecture Reference
+# Idira Privilege Cloud MCP Server - Architecture Reference
 
 **🤖 LLM REFERENCE**: This document provides complete architectural patterns for implementing new features. Use as reference for maintaining consistency with established patterns.
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The CyberArk Privilege Cloud MCP Server follows a **simplified, streamlined architecture** leveraging the official CyberArk SDK, with clear separation of concerns and enterprise-grade reliability. Through comprehensive refactoring, the codebase achieved **~27% code reduction** while maintaining full functionality. It enables AI assistants to securely manage privileged accounts through the Model Context Protocol (MCP) with official CyberArk support.
+The Idira Privilege Cloud MCP Server follows a **simplified, streamlined architecture** leveraging the official Idira SDK, with clear separation of concerns and enterprise-grade reliability. Through comprehensive refactoring, the codebase achieved **~27% code reduction** while maintaining full functionality. It enables AI assistants to securely manage privileged accounts through the Model Context Protocol (MCP) with official Idira support.
 
 ## Core Components
 
@@ -17,8 +17,8 @@ The project is structured around these core modules leveraging the official ark-
 ```
 src/mcp_privilege_cloud/
 ├── sdk_auth.py          # Legacy service account authentication
-├── token_verifier.py    # JWT verification via CyberArk Identity JWKS
-├── server.py            # Core CyberArk API integration via SDK
+├── token_verifier.py    # JWT verification via Idira Identity JWKS
+├── server.py            # Core Idira API integration via SDK
 ├── mcp_server.py        # MCP protocol implementation (Streamable HTTP)
 └── exceptions.py        # Custom exception handling
 ```
@@ -28,7 +28,7 @@ src/mcp_privilege_cloud/
 The server supports two authentication modes:
 
 **OAuth Per-User Mode** (recommended for multi-user deployments):
-- Users authenticate via CyberArk Identity OAuth Authorization Code flow
+- Users authenticate via Idira Identity OAuth Authorization Code flow
 - Each user's JWT is verified against the JWKS endpoint by `CyberArkTokenVerifier`
 - A shared service account platform token is used for all PCloud API calls
 - User identity from the JWT is logged for audit purposes
@@ -40,10 +40,10 @@ The server supports two authentication modes:
 
 ### 1. Token Verifier (`token_verifier.py`)
 
-**Purpose**: MCP SDK `TokenVerifier` protocol implementation for CyberArk Identity JWTs
+**Purpose**: MCP SDK `TokenVerifier` protocol implementation for Idira Identity JWTs
 
 **Key Features**:
-- **JWKS Validation**: Verifies JWT signatures against CyberArk Identity `/oauth2/certs`
+- **JWKS Validation**: Verifies JWT signatures against Idira Identity `/oauth2/certs`
 - **MCP Protocol Compliance**: Returns `AccessToken` for MCP auth middleware
 - **Claim Validation**: Enforces `exp`, `iss`, `sub`, `aud` with RS256 algorithm
 - **Graceful Failures**: Returns `None` on any verification failure (no exceptions)
@@ -80,7 +80,7 @@ The server supports two authentication modes:
 
 **Key Features**:
 - **FastMCP Server**: MCP protocol implementation
-- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete CyberArk PCloud operations across all 5 services (18+10+10+9+6)
+- **Comprehensive Tool Suite**: 53 enterprise-grade action tools for complete Idira PCloud operations across all 5 services (18+10+10+9+6)
 - **SDK-Powered Reliability**: All tools leverage official ark-sdk-python services
 - **Parameter Validation**: Enhanced input validation and type checking
 - **Cross-Platform Support**: Windows encoding compatibility
@@ -103,16 +103,16 @@ execute_tool() → get_access_token() → verify user identity (audit log)
                                               ↓
                               Shared CyberArkMCPServer (service account)
                                               ↓
-                              SDK Services → CyberArk PCloud API
+                              SDK Services → Idira PCloud API
 ```
 
 **Legacy Service Account Mode:**
 ```
-Client Request → MCP Tool → Server Method → SDK Auth → ark-sdk-python → CyberArk Identity
+Client Request → MCP Tool → Server Method → SDK Auth → ark-sdk-python → Idira Identity
                                       ↓                      ↓
                               SDK Service Instance    Auto Token Management
                                       ↓                      ↓
-Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
+Server Method → SDK Service → Idira API → SDK Response → MCP Response
 ```
 
 ### Base URLs and Endpoints
@@ -154,14 +154,14 @@ Server Method → SDK Service → CyberArk API → SDK Response → MCP Response
 2. **MCP Server** validates parameters and routes to server method
 3. **Server Method** obtains SDK service instance (accounts/safes/platforms/applications for complete PCloud coverage)
 4. **SDK Service** automatically handles authentication via ark-sdk-python
-5. **SDK Service** calls CyberArk API with proper authentication and error handling
+5. **SDK Service** calls Idira API with proper authentication and error handling
 6. **SDK Response** provides exact API data with built-in data integrity
 7. **MCP Response** returns SDK response data to client with enhanced reliability
 
 ### Configuration Management
 
 **OAuth Per-User Mode Environment Variables** (recommended):
-- `CYBERARK_IDENTITY_TENANT_URL` - CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
+- `CYBERARK_IDENTITY_TENANT_URL` - Idira Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`)
 - `CYBERARK_CLIENT_ID` - Service account login name (for PCloud platform token)
 - `CYBERARK_CLIENT_SECRET` - Service account password
 - `CYBERARK_OAUTH_CLIENT_ID` - OIDC app client ID from Trust tab (for DCR and JWT audience)

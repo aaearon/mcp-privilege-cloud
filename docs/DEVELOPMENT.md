@@ -1,6 +1,6 @@
-# Development Guide - CyberArk Privilege Cloud MCP Server
+# Development Guide - Idira Privilege Cloud MCP Server
 
-This comprehensive guide provides everything developers need to contribute to the CyberArk Privilege Cloud MCP Server project.
+This comprehensive guide provides everything developers need to contribute to the Idira Privilege Cloud MCP Server project.
 
 ## Table of Contents
 
@@ -18,8 +18,8 @@ This comprehensive guide provides everything developers need to contribute to th
 
 - Python 3.11 or higher
 - Git
-- CyberArk Privilege Cloud tenant (for integration testing)
-- CyberArk Identity service account
+- Idira Privilege Cloud tenant (for integration testing)
+- Idira Identity service account
 
 ### Installation
 
@@ -37,7 +37,7 @@ This comprehensive guide provides everything developers need to contribute to th
    # Copy example configuration
    cp .env.example .env
    
-   # Edit .env with your CyberArk credentials
+   # Edit .env with your Idira credentials
    # Required variables:
    # CYBERARK_CLIENT_ID=your-service-account-username
    # CYBERARK_CLIENT_SECRET=your-service-account-password
@@ -195,7 +195,7 @@ async def create_account(
     user_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Create a new privileged account in CyberArk Privilege Cloud.
+    Create a new privileged account in Idira Privilege Cloud.
     
     Args:
         platform_id: Platform ID for the account
@@ -293,7 +293,7 @@ async def test_async_operation(mock_server):
 ```python
 @pytest.fixture
 def mock_cyberark_api(mocker):
-    """Mock CyberArk API responses."""
+    """Mock Idira API responses."""
     mock_response = mocker.MagicMock()
     mock_response.json.return_value = {"value": []}
     mock_response.status_code = 200
@@ -365,7 +365,7 @@ async def test_api_error_handling(mock_server, mocker):
 ### Release Process
 
 1. **Automated Testing**: GitHub Actions runs full test suite
-2. **Manual Validation**: Test with MCP Inspector and real CyberArk environment
+2. **Manual Validation**: Test with MCP Inspector and real Idira environment
 3. **Documentation Updates**: Version numbers and changelog
 4. **Release Creation**: Git tag and release notes
 5. **CI/CD Verification**: All checks must pass
@@ -490,8 +490,8 @@ npx @modelcontextprotocol/inspector --cli -e CYBERARK_CLIENT_ID=your-client-id -
 #### Successful Connection Indicators
 - ✅ **Tool Count**: `tools/list` returns exactly 53 tools
 - ✅ **Resource Count**: `resources/list` returns empty array (correct - server uses tools, not resources)
-- ✅ **Authentication**: All tool calls require valid CyberArk credentials
-- ✅ **Response Format**: All tools return JSON with exact CyberArk API field names
+- ✅ **Authentication**: All tool calls require valid Idira credentials
+- ✅ **Response Format**: All tools return JSON with exact Idira API field names
 
 #### Tool Categories and Testing
 ```bash
@@ -542,12 +542,12 @@ npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://gith
 
 **"401 Unauthorized"** 
 - **Cause**: Invalid service account credentials
-- **Solution**: Verify `CYBERARK_CLIENT_ID` and `CYBERARK_CLIENT_SECRET` in CyberArk Identity
+- **Solution**: Verify `CYBERARK_CLIENT_ID` and `CYBERARK_CLIENT_SECRET` in Idira Identity
 - **Debug**: Test credentials with direct API call
 
 **"403 Forbidden"**
 - **Cause**: Service account lacks required safe permissions
-- **Solution**: Grant appropriate safe access in CyberArk Privilege Cloud
+- **Solution**: Grant appropriate safe access in Idira Privilege Cloud
 - **Debug**: Check safe membership for the service account
 
 **"Empty response" or "No data returned"**
@@ -578,7 +578,7 @@ npx @modelcontextprotocol/inspector --cli [env-vars] uvx --from git+https://gith
 ```
 
 #### Step 4: Validate Response Structure
-- Verify responses contain exact CyberArk API field names (no transformations)
+- Verify responses contain exact Idira API field names (no transformations)
 - Check that platform tools return raw Policy INI values ("Yes"/"No", "12", etc.)
 - Confirm error responses provide helpful context
 

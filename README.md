@@ -1,9 +1,9 @@
-# CyberArk Privilege Cloud MCP Server
+# Idira Privilege Cloud MCP Server
 
-An MCP server for CyberArk Privilege Cloud, built on the official [ark-sdk-python](https://github.com/cyberark/ark-sdk-python) library. Provides 53 tools for privileged access management.
+An MCP server for Idira (formerly CyberArk) Privilege Cloud, built on the official [ark-sdk-python](https://github.com/cyberark/ark-sdk-python) library. Provides 53 tools for privileged access management.
 
 Supports two authentication modes:
-- **OAuth per-user mode** (recommended) -- each user authenticates with their own CyberArk Identity credentials via OAuth. Requires [Streamable HTTP transport](#docker-deployment) and an OIDC app in CyberArk Identity ([setup guide](docs/CYBERARK_IDENTITY_SETUP.md)).
+- **OAuth per-user mode** (recommended) -- each user authenticates with their own Idira Identity credentials via OAuth. Requires [Streamable HTTP transport](#docker-deployment) and an OIDC app in Idira Identity ([setup guide](docs/CYBERARK_IDENTITY_SETUP.md)).
 - **Legacy service account mode** -- a single shared service account authenticates all requests via stdio transport. Simpler setup, shown in [Quick Start](#quick-start) below.
 
 ## Quick Start
@@ -66,22 +66,22 @@ Once configured, you can ask Claude things like:
 
 ## Prerequisites
 
-- [CyberArk Identity Service User](https://docs.cyberark.com/identity-administration/latest/en/content/ispss/ispss-add-service-user.htm) with:
+- [Idira Identity Service User](https://docs.cyberark.com/identity-administration/latest/en/content/ispss/ispss-add-service-user.htm) with:
   - Appropriate Identity roles for the desired operations (e.g., Privilege Cloud Administrator for platform management)
   - Safe permissions granting access to the safes and accounts you want to manage
-- For OAuth per-user mode: an OIDC app in CyberArk Identity (see [setup guide](docs/CYBERARK_IDENTITY_SETUP.md))
+- For OAuth per-user mode: an OIDC app in Idira Identity (see [setup guide](docs/CYBERARK_IDENTITY_SETUP.md))
 
 ## Configuration
 
 ### OAuth Per-User Mode
 
-Each connecting user authenticates with their own CyberArk Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
+Each connecting user authenticates with their own Idira Identity credentials via OAuth. The server verifies user identity from the OIDC JWT, then uses a shared service account platform token for all PCloud API calls.
 
 Requires Streamable HTTP transport -- see [Docker Deployment](#docker-deployment) or set `MCP_TRANSPORT=streamable-http` when running locally.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CYBERARK_IDENTITY_TENANT_URL` | Yes | CyberArk Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
+| `CYBERARK_IDENTITY_TENANT_URL` | Yes | Idira Identity tenant URL (e.g., `https://abc1234.id.cyberark.cloud`) |
 | `CYBERARK_CLIENT_ID` | Yes | Service account login name (for PCloud platform token) |
 | `CYBERARK_CLIENT_SECRET` | Yes | Service account password |
 | `CYBERARK_OAUTH_CLIENT_ID` | Yes | OIDC app client ID from Trust tab (for DCR and JWT audience) |
@@ -91,7 +91,7 @@ Requires Streamable HTTP transport -- see [Docker Deployment](#docker-deployment
 | `MCP_PORT` | No | Server bind port (default: `8000`) |
 | `MCP_SERVER_URL` | No | Public URL for OAuth metadata (default: `http://{host}:{port}`) |
 
-See [CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md) for full configuration instructions.
+See [Idira Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md) for full configuration instructions.
 
 ### Legacy Service Account Mode
 
@@ -141,7 +141,7 @@ When deploying behind a reverse proxy, configure it to strip trailing slashes fr
 | Issue | Solution |
 |-------|----------|
 | MCP not appearing in Claude | Restart Claude Desktop after saving configuration |
-| Authentication failed | Verify Service User credentials in CyberArk Identity |
+| Authentication failed | Verify Service User credentials in Idira Identity |
 | Permission errors | Ensure the Service User has appropriate Identity roles and safe permissions |
 | Connection issues | Verify you're using the `.cloud` domain (not `.com`) |
 | OAuth 401 behind reverse proxy | Ensure the proxy strips trailing slashes (see [Docker Deployment](#docker-deployment)) |
@@ -167,7 +167,7 @@ uv run mcp-privilege-cloud                 # Run the server locally
 
 - **[API Reference](docs/API_REFERENCE.md)** - Complete tool specifications and parameters
 - **[Architecture](docs/ARCHITECTURE.md)** - System design and components
-- **[CyberArk Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)** - OAuth app configuration guide
+- **[Idira Identity Setup](docs/CYBERARK_IDENTITY_SETUP.md)** - OAuth app configuration guide
 - **[Development Guide](docs/DEVELOPMENT.md)** - Contributing and development workflows
 - **[Testing Guide](docs/TESTING.md)** - Detailed testing instructions
 
